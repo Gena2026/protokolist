@@ -294,7 +294,7 @@ textarea{resize:vertical;line-height:1.6}
 // ── CONFIG ───────────────────────────────────────────
 const CHUNK_MINUTES = 14; // 14 мин × 60 × 263 токена/сек = ~221K — с запасом до лимита 250K TPM
 const CHUNK_SEC = CHUNK_MINUTES * 60;
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-2.5-pro'; // free tier: 100 RPD, лучшее качество
 
 // ── STATE ────────────────────────────────────────────
 let currentProtocolText = '';
@@ -744,9 +744,13 @@ function hideAP() { document.getElementById('analysis-progress').style.display =
 const today = () => new Date().toLocaleDateString('ru-RU');
 
 function PROTOCOL_PROMPT(title, partInfo) {
-  return `Ты — эксперт по документированию IT-проектов. Составь протокол встречи строго по шаблону.${partInfo ? `\n\nВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент. Участники могут ссылаться на экран (документы, таблицы) — фиксируй что именно обсуждалось, даже если визуал недоступен.` : ''}
+  return `Ты — эксперт по документированию IT-проектов. Составь протокол встречи и реестр требований строго по шаблону.${partInfo ? `\n\nВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент. Участники могут ссылаться на экран (документы, таблицы) — фиксируй что именно обсуждалось.` : ''}
 
 Название: ${title || 'не указано'} · Дата составления: ${today()}
+
+Верни ДВА блока разделённых маркером ===ТРЕБОВАНИЯ===
+
+БЛОК 1 — ПРОТОКОЛ:
 
 ПРОТОКОЛ ВСТРЕЧИ
 Дата: [из контекста]
@@ -769,42 +773,75 @@ function PROTOCOL_PROMPT(title, partInfo) {
 [нумерованный список, каждое с глагола]
 
 ─────────────────────────────────
-4. ТРЕБОВАНИЯ ЗАКАЗЧИКА
-─────────────────────────────────
-REQ-001: [описание] | Приоритет: Высокий / Средний / Низкий
-[если нет — написать явно]
-
-─────────────────────────────────
-5. ОТКРЫТЫЕ ВОПРОСЫ
+4. ОТКРЫТЫЕ ВОПРОСЫ
 ─────────────────────────────────
 [нерешённые вопросы]
 
 ─────────────────────────────────
-6. СЛЕДУЮЩИЕ ШАГИ
+5. СЛЕДУЮЩИЕ ШАГИ
 ─────────────────────────────────
 № | Действие | Ответственный | Срок
 ─────────────────────────────────
-Составлен: ${today()}`;
+Составлен: ${today()}
+
+===ТРЕБОВАНИЯ===
+
+БЛОК 2 — РЕЕСТР ТРЕБОВАНИЙ из этого фрагмента:
+Извлеки ВСЕ требования заказчика которые прозвучали в этом фрагменте.
+Смотри внимательно — требования могут быть явными ("нам нужно...") и неявными ("было бы хорошо если...").
+Также фиксируй требования к данным которые показывались на экране.
+
+Формат: ID | Описание | Тип | Приоритет | Источник | Статус
+Тип: Функциональное или Нефункциональное
+Приоритет: Высокий / Средний / Низкий
+Источник: "${title || 'встреча'}, ${partInfo || 'полная запись'}"
+Статус: Зафиксировано
+
+Если требований не было — написать: "Требований в этом фрагменте не зафиксировано"`;
 }
 
 function MERGE_PROMPT(parts, title) {
   return `Объедини фрагменты протокола встречи «${title || 'без названия'}» в единый связный документ.
-Правила: сохрани хронологию · убери дубли · единая нумерация REQ · выглядит как один протокол, не склейка.
-Используй тот же шаблон с разделами 1–6.
-
-После протокола добавь раздел:
-
-═══════════════════════════════════
-РЕЕСТР ТРЕБОВАНИЙ
-Дата: ${today()}
-
-Формат: ID | Описание | Тип | Приоритет | Источник | Статус
-Тип: Функциональное или Нефункциональное · Статус: Зафиксировано
-
-Итог: Всего: N | Функциональных: N | Нефункциональных: N | Высокий приоритет: N
-═══════════════════════════════════
+Правила: сохрани хронологию · убери дубли · выглядит как один протокол, не склейка.
+Используй шаблон с разделами 1–5 (Повестка, Обсуждения, Решения, Открытые вопросы, Следующие шаги).
+НЕ добавляй раздел с требованиями — они обрабатываются отдельно.
 
 ${parts.map((p, i) => `=== ФРАГМЕНТ ${i + 1} ===\n${p}`).join('\n\n')}`;
+}
+
+function MERGE_REQUIREMENTS_PROMPT(reqParts, title) {
+  return `Объедини реестры требований из фрагментов встречи «${title || 'без названия'}» в единый сводный реестр.
+
+Правила:
+— Устрани дублирующиеся требования (похожие по смыслу → объединяй в одно)
+— Присвой каждому уникальный ID: REQ-001, REQ-002...
+— Сохрани источник (из какого фрагмента)
+— Сохрани все нюансы формулировок — ничего не теряй
+
+СВОДНЫЙ РЕЕСТР ТРЕБОВАНИЙ
+Встреча: ${title || 'без названия'} · Дата: ${today()}
+
+Формат: ID | Описание | Тип | Приоритет | Источник | Статус
+
+Итог: Всего: N | Функциональных: N | Нефункциональных: N | Высокий: N | Средний: N | Низкий: N
+
+${reqParts.map((r, i) => `=== РЕЕСТР ФРАГМЕНТА ${i + 1} ===\n${r}`).join('\n\n')}`;
+}
+
+function FINAL_CHECK_REQUIREMENTS_PROMPT(protocol, mergedReqs, title) {
+  return `Ты — старший бизнес-аналитик. Проверь сводный реестр требований на полноту.
+
+Задача: сравни итоговый протокол встречи и сводный реестр требований.
+Найди требования которые есть в протоколе но отсутствуют или недостаточно детализированы в реестре.
+Дополни реестр найденными требованиями. Если всё в порядке — верни реестр без изменений.
+
+ИТОГОВЫЙ ПРОТОКОЛ:
+${protocol}
+
+ТЕКУЩИЙ СВОДНЫЙ РЕЕСТР:
+${mergedReqs}
+
+Верни ТОЛЬКО финальный реестр в том же формате. Без пояснений.`;
 }
 
 function REQUIREMENTS_PROMPT(protocol) {
@@ -917,26 +954,64 @@ async function generateProtocol() {
     } else if (uploadedParts.length > 0) {
       // Multi-part
       const partProtocols = [];
-      for (let i = 0; i < uploadedParts.length; i++) {
-        const part = uploadedParts[i];
-        const pct = 20 + (i / uploadedParts.length) * 60;
-        showStatus('protocol-status', 'info', `Gemini анализирует ${part.label}...`);
-        showAP(`Анализ части ${i + 1} из ${uploadedParts.length}...`, pct,
-          'Gemini видит экран и слышит речь');
-        const text = await callGemini([
-          { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-          { text: PROTOCOL_PROMPT(title, part.label) }
-        ]);
-        partProtocols.push(text);
-        if (i < uploadedParts.length - 1) {
-          showAP(`Пауза между запросами...`, 20 + (i / uploadedParts.length) * 60, 'Соблюдаем лимит API — 15 сек');
-          await sleep(20000);
-        }
-      }
-      showStatus('protocol-status', 'info', 'Объединяю части в единый протокол...');
-      showAP('Объединение частей...', 85, '');
-      protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
+        const partRequirements = [];
 
+        // Шаги 1..N: анализ каждого куска — протокол + требования прямо из видео
+        for (let i = 0; i < uploadedParts.length; i++) {
+          const part = uploadedParts[i];
+          const pct = 10 + (i / uploadedParts.length) * 50;
+          showStatus('protocol-status', 'info',
+            `Шаг ${i+1}/${uploadedParts.length+4} — анализирую ${part.label}...`);
+          showAP(`Анализ части ${i+1} из ${uploadedParts.length}`, pct,
+            'Протокол + требования прямо из видео');
+
+          const raw = await callGemini([
+            { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
+            { text: PROTOCOL_PROMPT(title, part.label) }
+          ]);
+
+          const marker = raw.indexOf('===ТРЕБОВАНИЯ===');
+          if (marker > -1) {
+            partProtocols.push(raw.slice(0, marker).trim());
+            partRequirements.push(raw.slice(marker + 16).trim());
+          } else {
+            partProtocols.push(raw.trim());
+            partRequirements.push('');
+          }
+
+          if (i < uploadedParts.length - 1) {
+            showAP(`Пауза...`, pct + 2, 'Соблюдаем лимит API');
+            await sleep(20000);
+          }
+        }
+
+        const totalParts = uploadedParts.length;
+
+        // Шаг N+1: объединить протоколы
+        showStatus('protocol-status', 'info',
+          `Шаг ${totalParts+1}/${totalParts+4} — объединяю протоколы...`);
+        showAP('Объединение протоколов...', 65, '');
+        await sleep(20000);
+        protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
+
+        // Шаг N+2: объединить реестры требований
+        showStatus('protocol-status', 'info',
+          `Шаг ${totalParts+2}/${totalParts+4} — объединяю реестры требований...`);
+        showAP('Объединение реестров требований...', 76, 'Убираем дубли, сохраняем нюансы');
+        await sleep(20000);
+        currentRequirementsText = await callGemini([{
+          text: MERGE_REQUIREMENTS_PROMPT(partRequirements, title)
+        }]);
+
+        // Шаг N+3: финальная проверка — сверяем реестр с итоговым протоколом
+        showStatus('protocol-status', 'info',
+          `Шаг ${totalParts+3}/${totalParts+4} — финальная проверка требований...`);
+        showAP('Сверяю реестр с протоколом...', 88,
+          'Проверяем не потерялось ли ничего при объединении');
+        await sleep(20000);
+        currentRequirementsText = await callGemini([{
+          text: FINAL_CHECK_REQUIREMENTS_PROMPT(protocolText, currentRequirementsText, title)
+        }]);
     } else if (uploadedFile) {
       // Single file
       showStatus('protocol-status', 'info', 'Gemini анализирует запись...');
@@ -951,9 +1026,13 @@ async function generateProtocol() {
     currentProtocolText = protocolText;
 
     if (!currentRequirementsText) {
+      // Single file or text path — extract requirements from final protocol
       showStatus('protocol-status', 'info', 'Извлекаю требования...');
       showAP('Извлечение требований...', 92, '');
       currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
+    } else {
+      // Multi-part path — requirements already extracted and verified
+      showAP('Готово', 99, '');
     }
 
     hideAP();
