@@ -1053,6 +1053,9 @@ ${reqs}`;
 async function generateProtocol() {
   const manualText = document.getElementById('manual-transcript').value.trim();
   const title = document.getElementById('meeting-title').value.trim();
+  const projectName = typeof getProjectName === 'function' ? (getProjectName() || '') : '';
+  const teamText = typeof getProjectTeamText === 'function' ? (getProjectTeamText() || '') : '';
+  const meetingDate = (document.getElementById('meeting-date')?.value?.trim()) || today();
 
   // Validation
   if (!manualText && uploadState === 'uploading') {
