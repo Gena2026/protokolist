@@ -271,7 +271,7 @@ textarea{resize:vertical;line-height:1.6}
 
 <script>
 // ── CONFIG ───────────────────────────────────────────
-const CHUNK_MINUTES = 55;
+const CHUNK_MINUTES = 10; // 10 мин × 60 × 263 токена/сек = ~158K — с запасом до лимита 250K TPM
 const CHUNK_SEC = CHUNK_MINUTES * 60;
 const MODEL = 'gemini-2.5-flash';
 
@@ -840,6 +840,10 @@ async function generateProtocol() {
           { text: PROTOCOL_PROMPT(title, part.label) }
         ]);
         partProtocols.push(text);
+        if (i < uploadedParts.length - 1) {
+          showAP(`Пауза между запросами...`, 20 + (i / uploadedParts.length) * 60, 'Соблюдаем лимит API — 15 сек');
+          await sleep(20000);
+        }
       }
       showStatus('protocol-status', 'info', 'Объединяю части в единый протокол...');
       showAP('Объединение частей...', 85, '');
