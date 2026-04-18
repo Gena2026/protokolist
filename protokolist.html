@@ -127,6 +127,7 @@ textarea{resize:vertical;line-height:1.6}
   <div class="tab active" onclick="showTab('protocol',this)">🎙️ Протокол встречи</div>
   <div class="tab" onclick="showTab('report',this)">📄 Отчёт об обследовании</div>
   <div class="tab" onclick="showTab('registry',this)">📋 Реестр требований</div>
+  <div class="tab" onclick="showTab('library',this)">📂 Библиотека файлов</div>
 </div>
 
 <div class="main">
@@ -254,6 +255,26 @@ textarea{resize:vertical;line-height:1.6}
 
 </div>
 
+<!-- ======= LIBRARY ======= -->
+<div class="page" id="page-library">
+  <div class="card">
+    <div class="card-title"><div class="card-title-icon icon-blue">📂</div>Файлы на серверах Google</div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:16px">Файлы хранятся 48 часов. Нажми на встречу чтобы переделать протокол без повторной загрузки видео.</p>
+    <div id="library-list"><div class="empty-state"><div class="empty-state-icon">📂</div>Нет сохранённых сессий загрузки</div></div>
+    <div id="library-status"></div>
+  </div>
+  <div class="card" id="library-result-card" style="display:none">
+    <div class="card-title"><div class="card-title-icon icon-green">✅</div>Результат</div>
+    <div class="preview" id="library-preview"></div>
+    <div class="btn-row">
+      <button class="btn btn-success" onclick="downloadDocx('protocol')">⬇️ Протокол.docx</button>
+      <button class="btn btn-success" onclick="downloadDocx('requirements')">⬇️ Требования.docx</button>
+      <button class="btn btn-secondary" onclick="saveProtocolFromLibrary()">💾 Сохранить в список</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- ======= SETTINGS ======= -->
 <div class="modal-overlay" id="settings-modal" onclick="if(event.target===this)closeSettings()">
   <div class="modal">
@@ -306,6 +327,7 @@ function showTab(name, el) {
   document.getElementById('page-' + name).classList.add('active');
   if (name === 'report') renderList('report');
   if (name === 'registry') renderList('registry');
+  if (name === 'library') renderLibrary();
 }
 
 // ── UPLOAD AREA UI ────────────────────────────────────
@@ -393,17 +415,43 @@ async function startFileUpload(file) {
     const durationStr = duration > 0 ? ` · ${Math.round(duration / 60)} мин` : '';
 
     if (numParts > 1) {
-      // ── LONG VIDEO: split → upload parts ──
-      setUploadUI('uploading', {
-        title: `Запись ${Math.round(duration/60)} мин — нарезаю на ${numParts} части`,
-        stage: 'Подготовка...',
-        pct: 2,
-        note: 'Для длинных записей обрабатывается аудиодорожка'
-      });
+      // ── LONG VIDEO: split → upload parts (with resume support) ──
+      const meetingTitle = document.getElementById('meeting-title').value.trim() || file.name;
+      const fileKey = makeFileKey(file);
 
+      // Check if we have an existing partial session for this file
+      const existingSession = findSession(file);
+      const alreadyUploaded = existingSession?.parts || [];
+      const doneCount = alreadyUploaded.filter(p => p !== null).length;
+
+      if (doneCount > 0 && doneCount < numParts) {
+        setUploadUI('uploading', {
+          title: `Продолжаю загрузку: ${doneCount} из ${numParts} уже загружено`,
+          stage: 'Нарезаю оставшиеся части...',
+          pct: 5,
+          note: `Пропускаем уже загруженные ${doneCount} части`
+        });
+      } else {
+        setUploadUI('uploading', {
+          title: `Нарезаю видео на ${numParts} части...`,
+          stage: 'Подготовка...',
+          pct: 2,
+          note: ''
+        });
+      }
+
+      // Init or reuse session
+      initSession(file, numParts, meetingTitle);
       const chunks = await splitVideoIntoChunks(file);
 
+      // Restore already-uploaded parts
+      uploadedParts = [];
       for (let i = 0; i < chunks.length; i++) {
+        if (alreadyUploaded[i]) {
+          uploadedParts.push({ ...alreadyUploaded[i] });
+          continue; // skip — already on Google
+        }
+
         const chunk = chunks[i];
         const pBase = 50 + (i / chunks.length) * 45;
         const pEnd  = 50 + ((i + 1) / chunks.length) * 45;
@@ -427,9 +475,11 @@ async function startFileUpload(file) {
           });
         });
 
-        // Wait for ACTIVE
-        setUIP(`Часть ${i + 1}: обработка на серверах Google...`, pEnd - 2, 'Обычно 10–30 сек');
+        setUIP(`Часть ${i + 1}: ожидание Google...`, pEnd - 2, 'Обычно 10–30 сек');
         await waitForActive(result.uri);
+
+        // Save this chunk immediately so it survives a crash
+        saveChunkURI(fileKey, i, result.uri, result.mimeType, chunk.label);
         uploadedParts.push({ ...result, label: chunk.label });
       }
 
@@ -475,6 +525,8 @@ async function startFileUpload(file) {
         title: file.name,
         sub: `${mb} МБ${durationStr} · готово к анализу`
       });
+      saveSingleFileURI(file, result.uri, result.mimeType,
+        document.getElementById('meeting-title').value.trim() || file.name);
     }
 
   } catch (e) {
@@ -626,9 +678,10 @@ async function uploadFileToGemini(file, onProgress) {
 }
 
 // ── GEMINI GENERATE ───────────────────────────────────
-async function callGemini(parts) {
+async function callGemini(parts, _attempt = 0) {
   const key = getKey();
   if (!key) throw new Error('Не указан Gemini API Key');
+
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
     {
@@ -640,12 +693,35 @@ async function callGemini(parts) {
       })
     }
   );
-  if (!res.ok) {
-    const e = await res.json().catch(() => ({}));
-    throw new Error('Gemini: ' + (e.error?.message || JSON.stringify(e)).slice(0, 300));
+
+  if (res.ok) {
+    const d = await res.json();
+    return d.candidates?.[0]?.content?.parts?.[0]?.text || '';
   }
-  const d = await res.json();
-  return d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+  const e = await res.json().catch(() => ({}));
+  const msg = (e.error?.message || JSON.stringify(e)).slice(0, 300);
+  const isRateLimit = res.status === 429 || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED');
+
+  if (isRateLimit && _attempt < 5) {
+    const waitSec = [60, 90, 120, 180, 240][_attempt];
+    await countdownWait(waitSec, _attempt + 1);
+    return callGemini(parts, _attempt + 1);
+  }
+
+  throw new Error('Gemini: ' + msg);
+}
+
+async function countdownWait(seconds, attempt) {
+  document.getElementById('analysis-progress').style.display = 'block';
+  for (let i = seconds; i > 0; i--) {
+    document.getElementById('ap-stage').textContent =
+      `Лимит API — автоповтор ${attempt}/5 через ${i} сек...`;
+    document.getElementById('ap-pct').textContent = '';
+    document.getElementById('ap-bar').style.width = Math.round(((seconds - i) / seconds) * 100) + '%';
+    document.getElementById('ap-note').textContent = 'Это автоматически — ничего делать не нужно';
+    await sleep(1000);
+  }
 }
 
 // ── STATUS / ANALYSIS PROGRESS ────────────────────────
@@ -990,6 +1066,210 @@ async function downloadDocx(type) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = file; a.click();
   URL.revokeObjectURL(url);
+}
+
+// ── FILE LIBRARY ─────────────────────────────────────
+// Session key = filename + filesize (unique fingerprint)
+function makeFileKey(file) {
+  return `${file.name}__${file.size}`;
+}
+
+// Initialize or get existing session for this file
+function initSession(file, numParts, meetingTitle) {
+  const key = makeFileKey(file);
+  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+  const existing = sessions.find(s => s.fileKey === key);
+  if (existing) return existing;
+
+  const session = {
+    id: Date.now(),
+    fileKey: key,
+    fileName: file.name,
+    fileSize: file.size,
+    title: meetingTitle || file.name,
+    date: today(),
+    uploadedAt: Date.now(),
+    numParts,
+    parts: Array(numParts).fill(null) // null = not uploaded yet
+  };
+  sessions.unshift(session);
+  localStorage.setItem('upload_sessions', JSON.stringify(sessions.slice(0, 20)));
+  return session;
+}
+
+// Save a single chunk URI after successful upload
+function saveChunkURI(fileKey, chunkIndex, uri, mimeType, label) {
+  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+  const s = sessions.find(s => s.fileKey === fileKey);
+  if (!s) return;
+  s.parts[chunkIndex] = { uri, mimeType, label };
+  localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+}
+
+// Save single-file URI (short video, no splitting)
+function saveSingleFileURI(file, uri, mimeType, meetingTitle) {
+  const key = makeFileKey(file);
+  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+  const session = {
+    id: Date.now(),
+    fileKey: key,
+    fileName: file.name,
+    fileSize: file.size,
+    title: meetingTitle || file.name,
+    date: today(),
+    uploadedAt: Date.now(),
+    numParts: 1,
+    parts: [{ uri, mimeType, label: 'полное видео' }]
+  };
+  // remove duplicate if exists
+  const filtered = sessions.filter(s => s.fileKey !== key);
+  filtered.unshift(session);
+  localStorage.setItem('upload_sessions', JSON.stringify(filtered.slice(0, 20)));
+}
+
+// Find existing session by file (to resume)
+function findSession(file) {
+  const key = makeFileKey(file);
+  return JSON.parse(localStorage.getItem('upload_sessions') || '[]')
+    .find(s => s.fileKey === key) || null;
+}
+
+function getUploadSessions() {
+  return JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+}
+
+function renderLibrary() {
+  // Автоматически убираем истёкшие записи (старше 48 часов)
+  const now = Date.now();
+  let sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
+  localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+
+  const el = document.getElementById('library-list');
+  if (!sessions.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div>Нет активных файлов.<br>Загрузи видео на вкладке «Протокол встречи».</div>';
+    return;
+  }
+
+  el.innerHTML = sessions.map(s => {
+    const hoursLeft = Math.round(48 - (now - s.uploadedAt) / 1000 / 60 / 60);
+    const isWarn = hoursLeft < 12;
+    const badgeBg = isWarn ? '#fffbeb' : '#f0fdf4';
+    const badgeTx = isWarn ? '#92400e' : '#166534';
+    const badgeBd = isWarn ? '#fde68a' : '#bbf7d0';
+    const doneCount = s.parts.filter(p => p !== null).length;
+    const isPartial = doneCount < s.numParts;
+    const partsLabel = isPartial
+      ? `${doneCount} из ${s.numParts} частей загружено`
+      : s.numParts === 1 ? '1 файл' : `${s.numParts} части`;
+    const statusColor = isPartial ? '#fffbeb' : '#f0fdf4';
+    const statusTx = isPartial ? '#92400e' : '#166534';
+    const statusBd = isPartial ? '#fde68a' : '#bbf7d0';
+    const statusText = isPartial ? `⚠️ ${doneCount}/${s.numParts} частей` : '✅ Готово';
+    return `
+      <div class="protocol-item" style="flex-direction:column;align-items:flex-start;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px;width:100%">
+          <div class="protocol-meta">
+            <div class="protocol-title">${escHtml(s.fileName)}</div>
+            <div class="protocol-date">${s.date} · ${partsLabel}</div>
+          </div>
+          <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${statusColor};color:${statusTx};border:1px solid ${statusBd};white-space:nowrap">${statusText}</span>
+          <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${badgeBg};color:${badgeTx};border:1px solid ${badgeBd};white-space:nowrap">⏱ ${hoursLeft}ч</span>
+          <button class="protocol-del" onclick="deleteSession(${s.id})" title="Удалить">×</button>
+        </div>
+        ${isPartial
+          ? `<div style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;width:100%">
+               Загрузка прервалась. Выбери тот же файл <strong>${escHtml(s.fileName)}</strong> на вкладке «Протокол встречи» — приложение само пропустит уже загруженные части.
+             </div>`
+          : `<button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="reprocessSession(${s.id})">✨ Переделать протокол</button>`
+        }
+      </div>`;
+  }).join('');
+}
+
+function deleteSession(id) {
+  const sessions = getUploadSessions().filter(s => s.id !== id);
+  localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+  renderLibrary();
+}
+
+async function reprocessSession(id) {
+  const session = getUploadSessions().find(s => s.id === id);
+  if (!session) return;
+
+  // Check if files still active
+  showStatus('library-status', 'info', 'Проверяю файлы на серверах Google...');
+  const now = Date.now();
+  const age = (now - session.uploadedAt) / 1000 / 60 / 60;
+  if (age >= 48) {
+    showStatus('library-status', 'error', 'Файлы истекли (прошло более 48 часов). Загрузи видео заново.');
+    return;
+  }
+
+  // Restore state and process
+  if (session.parts.length === 1 && session.parts[0].label === 'полное видео') {
+    uploadedFile = { uri: session.parts[0].uri, mimeType: session.parts[0].mimeType };
+    uploadedParts = [];
+  } else {
+    uploadedFile = null;
+    uploadedParts = session.parts.map(p => ({ uri: p.uri, mimeType: p.mimeType, label: p.label }));
+  }
+
+  const title = session.title;
+  showStatus('library-status', 'info', `Запускаю анализ: «${title}»...`);
+  document.getElementById('library-result-card').style.display = 'none';
+
+  const btn = event.target;
+  btn.disabled = true;
+
+  try {
+    let protocolText = '';
+    const apEl = document.getElementById('analysis-progress');
+
+    if (uploadedParts.length > 0) {
+      const partProtocols = [];
+      for (let i = 0; i < uploadedParts.length; i++) {
+        const part = uploadedParts[i];
+        showStatus('library-status', 'info', `Gemini анализирует ${part.label}...`);
+        const text = await callGemini([
+          { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
+          { text: PROTOCOL_PROMPT(title, part.label) }
+        ]);
+        partProtocols.push(text);
+        if (i < uploadedParts.length - 1) await sleep(20000);
+      }
+      showStatus('library-status', 'info', 'Объединяю части...');
+      protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
+    } else {
+      showStatus('library-status', 'info', 'Gemini анализирует запись...');
+      protocolText = await callGemini([
+        { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
+        { text: PROTOCOL_PROMPT(title, null) }
+      ]);
+    }
+
+    currentProtocolText = protocolText;
+    showStatus('library-status', 'info', 'Извлекаю требования...');
+    currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
+
+    document.getElementById('library-preview').textContent = currentProtocolText;
+    document.getElementById('library-result-card').style.display = 'block';
+    document.getElementById('library-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showStatus('library-status', 'success', 'Готово!');
+
+  } catch (e) {
+    showStatus('library-status', 'error', e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function saveProtocolFromLibrary() {
+  if (!currentProtocolText) return;
+  const title = (getUploadSessions()[0]?.title) || 'Встреча ' + today();
+  const list = JSON.parse(localStorage.getItem('protocols') || '[]');
+  list.unshift({ id: Date.now(), title, date: today(), protocol: currentProtocolText, requirements: currentRequirementsText });
+  localStorage.setItem('protocols', JSON.stringify(list));
+  showStatus('library-status', 'success', `Протокол «${title}» сохранён`);
 }
 
 // ── INIT ─────────────────────────────────────────────
