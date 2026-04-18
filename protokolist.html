@@ -217,6 +217,7 @@ textarea{resize:vertical;line-height:1.6}
     <div class="btn-row">
       <button class="btn btn-success" onclick="downloadDocx('protocol')">⬇️ Протокол.docx</button>
       <button class="btn btn-success" onclick="downloadDocx('requirements')">⬇️ Требования.docx</button>
+      <button class="btn btn-secondary" onclick="downloadTranscript()">📄 Транскрипция.txt</button>
       <button class="btn btn-secondary" onclick="saveProtocol()">💾 Сохранить в список</button>
     </div>
   </div>
@@ -280,6 +281,7 @@ textarea{resize:vertical;line-height:1.6}
     <div class="btn-row">
       <button class="btn btn-success" onclick="downloadDocx('protocol')">⬇️ Протокол.docx</button>
       <button class="btn btn-success" onclick="downloadDocx('requirements')">⬇️ Требования.docx</button>
+      <button class="btn btn-secondary" onclick="downloadTranscript()">📄 Транскрипция.txt</button>
       <button class="btn btn-secondary" onclick="saveProtocolFromLibrary()">💾 Сохранить в список</button>
     </div>
   </div>
@@ -388,6 +390,7 @@ let currentProtocolText = '';
 let currentRequirementsText = '';
 let currentReportText = '';
 let currentRegistryText = '';
+let currentTranscriptText = '';
 
 // Upload state
 // 'idle' | 'uploading' | 'ready' | 'error'
@@ -916,7 +919,17 @@ ${teamText || '[список участников не задан — опред
 
 Если требований не было — написать: Требований в этом фрагменте не зафиксировано.
 
-━━━ КОНЕЦ БЛОКА 2 ━━━`;
+━━━ КОНЕЦ БЛОКА 2 ━━━
+
+===ТРАНСКРИПЦИЯ===
+
+━━━ БЛОК 3: ТРАНСКРИПЦИЯ ━━━
+
+Напиши полную транскрипцию слово в слово.
+Формат: [ЧЧ:ММ:СС] Имя (если известно): текст
+Если имя неизвестно — [ЧЧ:ММ:СС]: текст
+
+━━━ КОНЕЦ БЛОКА 3 ━━━`;
 }
 
 
@@ -1059,6 +1072,7 @@ async function generateProtocol() {
   btn.disabled = true;
   clearStatus('protocol-status');
   hideAP();
+  currentTranscriptText = '';
 
   try {
     let protocolText = '';
@@ -1075,6 +1089,7 @@ async function generateProtocol() {
       // Multi-part
       const partProtocols = [];
         const partRequirements = [];
+        const partTranscripts = [];
 
         // Шаги 1..N: анализ каждого куска — протокол + требования прямо из видео
         for (let i = 0; i < uploadedParts.length; i++) {
@@ -1090,13 +1105,22 @@ async function generateProtocol() {
             { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate) }
           ]);
 
-          const marker = raw.indexOf('===ТРЕБОВАНИЯ===');
-          if (marker > -1) {
-            partProtocols.push(raw.slice(0, marker).trim());
-            partRequirements.push(raw.slice(marker + 16).trim());
+          const marker1 = raw.indexOf('===ТРЕБОВАНИЯ===');
+          const marker2 = raw.indexOf('===ТРАНСКРИПЦИЯ===');
+          if (marker1 > -1) {
+            partProtocols.push(raw.slice(0, marker1).trim());
+            const reqAndTrans = raw.slice(marker1 + 16);
+            if (marker2 > marker1) {
+              partRequirements.push(reqAndTrans.slice(0, marker2 - marker1 - 16).trim());
+              partTranscripts.push(reqAndTrans.slice(marker2 - marker1 - 16 + 18).trim());
+            } else {
+              partRequirements.push(reqAndTrans.trim());
+              partTranscripts.push('');
+            }
           } else {
             partProtocols.push(raw.trim());
             partRequirements.push('');
+            partTranscripts.push('');
           }
 
           if (i < uploadedParts.length - 1) {
@@ -1132,6 +1156,11 @@ async function generateProtocol() {
         currentRequirementsText = await callGemini([{
           text: FINAL_CHECK_REQUIREMENTS_PROMPT(protocolText, currentRequirementsText, title)
         }]);
+
+        // Транскрипция — просто склеиваем части (без AI, бесплатно)
+        currentTranscriptText = partTranscripts
+          .filter(t => t && t.length > 0)
+          .join('\n\n--- Продолжение ---\n\n');
     } else if (uploadedFile) {
       // Single file
       showStatus('protocol-status', 'info', 'Gemini анализирует запись...');
@@ -1176,7 +1205,7 @@ function saveProtocol() {
   const proj = getProjectName();
   const displayTitle = proj ? `[${proj}] ${title}` : title;
   const list = JSON.parse(localStorage.getItem('protocols') || '[]');
-  list.unshift({ id: Date.now(), title: displayTitle, date: today(), protocol: currentProtocolText, requirements: currentRequirementsText });
+  list.unshift({ id: Date.now(), title: displayTitle, date: today(), protocol: currentProtocolText, requirements: currentRequirementsText, transcript: currentTranscriptText });
   localStorage.setItem('protocols', JSON.stringify(list));
   showStatus('protocol-status', 'success', `Протокол «${title}» сохранён`);
 }
@@ -1245,6 +1274,18 @@ async function generateRegistry() {
 }
 
 // ── DOCX ──────────────────────────────────────────────
+function downloadTranscript(text, filename) {
+  const txt = text || currentTranscriptText;
+  if (!txt) { alert('Транскрипция недоступна — пересоздай протокол из видео'); return; }
+  const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'транскрипция.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function downloadDocx(type) {
   // Wait up to 10 seconds for docx library to load
   if (!window.docx) {
@@ -1405,7 +1446,10 @@ function renderLibrary() {
           ? `<div style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;width:100%">
                Загрузка прервалась. Выбери тот же файл <strong>${escHtml(s.fileName)}</strong> на вкладке «Протокол встречи» — приложение само пропустит уже загруженные части.
              </div>`
-          : `<button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="reprocessSession(${s.id})">✨ Переделать протокол</button>`
+          : `<div style="display:flex;gap:8px;flex-wrap:wrap">
+               <button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="reprocessSession(${s.id})">✨ Переделать протокол</button>
+               ${s.transcript ? `<button class="btn btn-secondary" style="padding:6px 14px;font-size:12px" onclick="downloadTranscript(${JSON.stringify(s.transcript)}, '${escHtml(s.fileName).replace(/'/g,''')}_транскрипция.txt')">📄 Транскрипция.txt</button>` : ''}
+             </div>`
         }
       </div>`;
   }).join('');
