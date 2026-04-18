@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Протоколист — ИИ-ассистент</title>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
+.header{background:#1e293b;color:#fff;padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:58px;position:sticky;top:0;z-index:50;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.header-logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.header h1{font-size:17px;font-weight:600;letter-spacing:-.3px}
+.header-sub{font-size:12px;color:#94a3b8;font-weight:400;margin-left:2px}
+.btn-settings{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:#e2e8f0;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;transition:.2s;display:flex;align-items:center;gap:6px}
+.btn-settings:hover{background:rgba(255,255,255,.18)}
+.tabs{background:#fff;border-bottom:1px solid #e2e8f0;display:flex;padding:0 28px;position:sticky;top:58px;z-index:40;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.tab{padding:15px 18px;cursor:pointer;font-size:13px;font-weight:500;color:#64748b;border-bottom:2px solid transparent;transition:.2s;white-space:nowrap}
+.tab:hover{color:#334155}
+.tab.active{color:#3b82f6;border-color:#3b82f6}
+.main{max-width:860px;margin:0 auto;padding:28px 24px}
+.page{display:none}
+.page.active{display:block}
+.card{background:#fff;border-radius:14px;border:1px solid #e2e8f0;padding:26px;margin-bottom:18px}
+.card-title{font-size:15px;font-weight:600;color:#1e293b;margin-bottom:18px;display:flex;align-items:center;gap:8px}
+.card-title-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.icon-blue{background:#eff6ff}.icon-green{background:#f0fdf4}.icon-amber{background:#fffbeb}.icon-purple{background:#f5f3ff}
+label{display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;margin-top:14px;text-transform:uppercase;letter-spacing:.5px}
+label:first-of-type{margin-top:0}
+input[type=text],input[type=password],textarea{width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 13px;font-size:14px;font-family:inherit;outline:none;transition:.2s;background:#fafafa;color:#1e293b}
+input[type=text]:focus,input[type=password]:focus,textarea:focus{border-color:#3b82f6;background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+textarea{resize:vertical;line-height:1.6}
+
+/* UPLOAD */
+.upload-area{border:2px dashed #cbd5e1;border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:.2s;background:#fafafa;position:relative}
+.upload-area:hover:not(.uploading),.upload-area.dragover{border-color:#3b82f6;background:#eff6ff}
+.upload-area.uploading{cursor:default;border-color:#3b82f6;background:#f8faff}
+.upload-area.upload-done{cursor:pointer;border-color:#10b981;background:#f0fdf4;border-style:solid}
+.upload-area.upload-error{border-color:#ef4444;background:#fef2f2;border-style:solid}
+.upload-icon{font-size:28px;margin-bottom:8px}
+.upload-title{font-size:14px;font-weight:600;color:#334155;margin-bottom:3px}
+.upload-sub{font-size:12px;color:#94a3b8}
+.upload-tags{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+.upload-tag{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;border:1px solid}
+.tag-green{color:#10b981;background:#f0fdf4;border-color:#bbf7d0}
+.tag-blue{color:#3b82f6;background:#eff6ff;border-color:#bfdbfe}
+
+/* UPLOAD PROGRESS (inside upload area) */
+.upload-inline-progress{margin-top:14px}
+.uip-label{display:flex;justify-content:space-between;font-size:12px;font-weight:600;color:#3b82f6;margin-bottom:5px}
+.uip-bar-bg{background:#dbeafe;border-radius:99px;height:6px;overflow:hidden}
+.uip-bar{height:6px;border-radius:99px;background:linear-gradient(90deg,#3b82f6,#8b5cf6);transition:width .4s;width:0%}
+.uip-note{font-size:11px;color:#64748b;margin-top:5px}
+
+/* UPLOAD STATES */
+.upload-ready-badge{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:13px;font-weight:600;color:#059669;background:#dcfce7;padding:5px 13px;border-radius:20px}
+.upload-error-badge{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:#dc2626;background:#fee2e2;padding:5px 13px;border-radius:8px}
+
+.or-divider{text-align:center;margin:16px 0;position:relative}
+.or-divider::before{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:#e2e8f0}
+.or-divider span{background:#fff;padding:0 12px;position:relative;font-size:12px;color:#94a3b8;font-weight:500}
+
+/* BUTTONS */
+.btn{padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.2s;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:#3b82f6;color:#fff}
+.btn-primary:hover:not(:disabled){background:#2563eb;box-shadow:0 4px 12px rgba(59,130,246,.3)}
+.btn-success{background:#10b981;color:#fff}
+.btn-success:hover:not(:disabled){background:#059669}
+.btn-secondary{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}
+.btn-secondary:hover:not(:disabled){background:#e2e8f0}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+
+/* STATUS */
+.status{padding:11px 15px;border-radius:9px;font-size:13px;margin:14px 0;display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+.status-info{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.status-success{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+.status-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.status-warn{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+
+/* ANALYSIS PROGRESS (below button) */
+.progress-wrap{margin:14px 0;display:none}
+.progress-label{font-size:12px;color:#475569;font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between}
+.progress-bar-bg{background:#e2e8f0;border-radius:99px;height:8px;overflow:hidden}
+.progress-bar{height:8px;border-radius:99px;background:linear-gradient(90deg,#3b82f6,#8b5cf6);transition:width .3s;width:0%}
+.progress-note{font-size:11px;color:#94a3b8;margin-top:5px}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:16px;height:16px;border:2px solid rgba(59,130,246,.3);border-top-color:#3b82f6;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;margin-top:1px}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.pulsing{animation:pulse 1.5s ease-in-out infinite}
+
+.preview{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:18px;font-size:13px;line-height:1.75;white-space:pre-wrap;max-height:420px;overflow-y:auto;font-family:inherit;color:#334155}
+.protocol-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #e2e8f0;border-radius:9px;margin-bottom:8px;transition:.2s;cursor:pointer}
+.protocol-item:hover{border-color:#bfdbfe;background:#f8faff}
+.protocol-item input[type=checkbox]{width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#3b82f6}
+.protocol-meta{flex:1;min-width:0}
+.protocol-title{font-size:14px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.protocol-date{font-size:12px;color:#94a3b8;margin-top:2px}
+.protocol-del{background:none;border:none;color:#cbd5e1;cursor:pointer;font-size:20px;padding:4px;line-height:1;transition:.2s;border-radius:5px}
+.protocol-del:hover{color:#ef4444;background:#fef2f2}
+.empty-state{text-align:center;padding:36px;color:#94a3b8;font-size:14px}
+.empty-state-icon{font-size:36px;margin-bottom:10px}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:100;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:460px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:6px;color:#1e293b}
+.modal-sub{font-size:13px;color:#64748b;margin-bottom:20px}
+.modal-footer{display:flex;gap:10px;margin-top:24px}
+.key-hint{font-size:11px;color:#94a3b8;margin-top:4px}
+.list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.list-header-label{font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.5px}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">
+    <div class="logo-icon">📋</div>
+    <div><h1>Протоколист <span class="header-sub">AI</span></h1></div>
+  </div>
+  <button class="btn-settings" onclick="openSettings()">⚙️ API-ключ</button>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('protocol',this)">🎙️ Протокол встречи</div>
+  <div class="tab" onclick="showTab('report',this)">📄 Отчёт об обследовании</div>
+  <div class="tab" onclick="showTab('registry',this)">📋 Реестр требований</div>
+</div>
+
+<div class="main">
+
+<!-- ======= PROTOCOL ======= -->
+<div class="page active" id="page-protocol">
+  <div class="card">
+    <div class="card-title"><div class="card-title-icon icon-blue">🎙️</div>Запись встречи</div>
+
+    <label>Название встречи</label>
+    <input type="text" id="meeting-title" placeholder="Например: Встреча по проекту CRM — 18.04.2026">
+
+    <div style="margin-top:16px">
+      <label>Видео или аудио файл — загрузка начинается сразу после выбора</label>
+      <div class="upload-area" id="upload-area" onclick="onUploadAreaClick()">
+        <div id="upload-idle">
+          <div class="upload-icon">🎬</div>
+          <div class="upload-title">Нажми или перетащи файл</div>
+          <div class="upload-sub">MP4, MKV, WEBM, MOV, AVI, MP3, WAV, M4A</div>
+          <div class="upload-tags">
+            <span class="upload-tag tag-green">✅ До 2 ГБ</span>
+            <span class="upload-tag tag-blue">🔪 Длинные записи разбиваются автоматически</span>
+          </div>
+        </div>
+        <div id="upload-progress-area" style="display:none">
+          <div class="upload-icon pulsing" id="upload-icon-anim">⬆️</div>
+          <div class="upload-title" id="upload-stage-text">Загрузка...</div>
+          <div class="upload-inline-progress">
+            <div class="uip-label">
+              <span id="uip-stage"></span>
+              <span id="uip-pct">0%</span>
+            </div>
+            <div class="uip-bar-bg"><div class="uip-bar" id="uip-bar"></div></div>
+            <div class="uip-note" id="uip-note"></div>
+          </div>
+        </div>
+        <div id="upload-done-area" style="display:none">
+          <div class="upload-icon">✅</div>
+          <div class="upload-title" id="upload-done-title">Файл готов к обработке</div>
+          <div class="upload-sub" id="upload-done-sub"></div>
+          <div class="upload-ready-badge">✅ Загружен и готов — нажми «Создать протокол»</div>
+        </div>
+        <div id="upload-error-area" style="display:none">
+          <div class="upload-icon">❌</div>
+          <div class="upload-title">Ошибка загрузки</div>
+          <div class="upload-error-badge" id="upload-error-text"></div>
+          <div class="upload-sub" style="margin-top:8px">Нажми чтобы выбрать файл снова</div>
+        </div>
+      </div>
+      <input type="file" id="audio-file" accept="audio/*,video/*" style="display:none" onchange="handleFileSelect(this)">
+    </div>
+
+    <div class="or-divider"><span>или вставить текст</span></div>
+
+    <label>Готовая транскрипция</label>
+    <textarea id="manual-transcript" rows="4" placeholder="Вставь готовый текст встречи — файл загружать не нужно..."></textarea>
+
+    <div class="progress-wrap" id="analysis-progress">
+      <div class="progress-label">
+        <span id="ap-stage">Анализ...</span>
+        <span id="ap-pct">0%</span>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar" id="ap-bar"></div></div>
+      <div class="progress-note" id="ap-note"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-generate" onclick="generateProtocol()">✨ Создать протокол</button>
+    </div>
+    <div id="protocol-status"></div>
+  </div>
+
+  <div class="card" id="protocol-result-card" style="display:none">
+    <div class="card-title"><div class="card-title-icon icon-green">✅</div>Результат</div>
+    <div class="preview" id="protocol-preview"></div>
+    <div class="btn-row">
+      <button class="btn btn-success" onclick="downloadDocx('protocol')">⬇️ Протокол.docx</button>
+      <button class="btn btn-success" onclick="downloadDocx('requirements')">⬇️ Требования.docx</button>
+      <button class="btn btn-secondary" onclick="saveProtocol()">💾 Сохранить в список</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======= REPORT ======= -->
+<div class="page" id="page-report">
+  <div class="card">
+    <div class="card-title"><div class="card-title-icon icon-amber">📄</div>Отчёт об обследовании</div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:18px">Выбери протоколы — Gemini составит сводный отчёт</p>
+    <div class="list-header">
+      <span class="list-header-label">Протоколы</span>
+      <button class="btn btn-secondary" style="padding:5px 11px;font-size:12px" onclick="selectAll('rp')">Выбрать все</button>
+    </div>
+    <div id="report-protocol-list"></div>
+    <label style="margin-top:18px">Дополнительные инструкции (необязательно)</label>
+    <textarea id="report-instructions" rows="3" placeholder="Например: акцент на интеграцию с 1С..."></textarea>
+    <div class="btn-row"><button class="btn btn-primary" onclick="generateReport()">✨ Создать отчёт</button></div>
+    <div id="report-status"></div>
+  </div>
+  <div class="card" id="report-result-card" style="display:none">
+    <div class="card-title"><div class="card-title-icon icon-amber">📄</div>Отчёт</div>
+    <div class="preview" id="report-preview"></div>
+    <div class="btn-row"><button class="btn btn-success" onclick="downloadDocx('report')">⬇️ Отчёт.docx</button></div>
+  </div>
+</div>
+
+<!-- ======= REGISTRY ======= -->
+<div class="page" id="page-registry">
+  <div class="card">
+    <div class="card-title"><div class="card-title-icon icon-purple">📋</div>Сводный реестр требований</div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:18px">Объединяет требования из выбранных протоколов, убирает дубли</p>
+    <div class="list-header">
+      <span class="list-header-label">Протоколы</span>
+      <button class="btn btn-secondary" style="padding:5px 11px;font-size:12px" onclick="selectAll('rg')">Выбрать все</button>
+    </div>
+    <div id="registry-protocol-list"></div>
+    <div class="btn-row"><button class="btn btn-primary" onclick="generateRegistry()">✨ Сформировать реестр</button></div>
+    <div id="registry-status"></div>
+  </div>
+  <div class="card" id="registry-result-card" style="display:none">
+    <div class="card-title"><div class="card-title-icon icon-purple">📋</div>Реестр</div>
+    <div class="preview" id="registry-preview"></div>
+    <div class="btn-row"><button class="btn btn-success" onclick="downloadDocx('registry')">⬇️ Реестр.docx</button></div>
+  </div>
+</div>
+
+</div>
+
+<!-- ======= SETTINGS ======= -->
+<div class="modal-overlay" id="settings-modal" onclick="if(event.target===this)closeSettings()">
+  <div class="modal">
+    <div class="modal-title">⚙️ Настройки</div>
+    <div class="modal-sub">Ключ хранится только в твоём браузере</div>
+    <label>Gemini API Key</label>
+    <input type="password" id="gemini-key" placeholder="AIza...">
+    <div class="key-hint">Бесплатно: aistudio.google.com → Get API key</div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveSettings()">Сохранить</button>
+      <button class="btn btn-secondary" onclick="closeSettings()">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────
+const CHUNK_MINUTES = 55;
+const CHUNK_SEC = CHUNK_MINUTES * 60;
+const MODEL = 'gemini-2.5-flash';
+
+// ── STATE ────────────────────────────────────────────
+let currentProtocolText = '';
+let currentRequirementsText = '';
+let currentReportText = '';
+let currentRegistryText = '';
+
+// Upload state
+// 'idle' | 'uploading' | 'ready' | 'error'
+let uploadState = 'idle';
+let uploadedFile = null;      // { uri, mimeType } for short videos
+let uploadedParts = [];       // [{ uri, mimeType, label }] for long videos
+let ffmpegInstance = null;
+
+// ── SETTINGS ─────────────────────────────────────────
+const getKey = () => localStorage.getItem('gemini_key') || '';
+function openSettings() { document.getElementById('gemini-key').value = getKey(); document.getElementById('settings-modal').classList.add('open'); }
+function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
+function saveSettings() {
+  const k = document.getElementById('gemini-key').value.trim();
+  if (k) localStorage.setItem('gemini_key', k);
+  closeSettings();
+  showStatus('protocol-status', 'success', 'Ключ сохранён');
+}
+
+// ── TABS ─────────────────────────────────────────────
+function showTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('page-' + name).classList.add('active');
+  if (name === 'report') renderList('report');
+  if (name === 'registry') renderList('registry');
+}
+
+// ── UPLOAD AREA UI ────────────────────────────────────
+function setUploadUI(state, opts = {}) {
+  const area = document.getElementById('upload-area');
+  const idle = document.getElementById('upload-idle');
+  const prog = document.getElementById('upload-progress-area');
+  const done = document.getElementById('upload-done-area');
+  const err  = document.getElementById('upload-error-area');
+
+  idle.style.display = 'none';
+  prog.style.display = 'none';
+  done.style.display = 'none';
+  err.style.display  = 'none';
+  area.className = 'upload-area';
+
+  if (state === 'idle') {
+    idle.style.display = 'block';
+  } else if (state === 'uploading') {
+    prog.style.display = 'block';
+    area.classList.add('uploading');
+    document.getElementById('upload-stage-text').textContent = opts.title || 'Загрузка...';
+    setUIP(opts.stage || '', opts.pct || 0, opts.note || '');
+  } else if (state === 'ready') {
+    done.style.display = 'block';
+    area.classList.add('upload-done');
+    document.getElementById('upload-done-title').textContent = opts.title || 'Файл готов';
+    document.getElementById('upload-done-sub').textContent = opts.sub || '';
+  } else if (state === 'error') {
+    err.style.display = 'block';
+    area.classList.add('upload-error');
+    document.getElementById('upload-error-text').textContent = opts.msg || 'Неизвестная ошибка';
+  }
+}
+
+function setUIP(stage, pct, note) {
+  document.getElementById('uip-stage').textContent = stage;
+  document.getElementById('uip-pct').textContent = Math.round(pct) + '%';
+  document.getElementById('uip-bar').style.width = Math.round(pct) + '%';
+  document.getElementById('uip-note').textContent = note || '';
+}
+
+// ── UPLOAD AREA CLICK ─────────────────────────────────
+function onUploadAreaClick() {
+  // Allow re-select only if not currently uploading
+  if (uploadState === 'uploading') return;
+  document.getElementById('audio-file').click();
+}
+
+// ── DRAG & DROP ───────────────────────────────────────
+const ua = document.getElementById('upload-area');
+ua.addEventListener('dragover', e => { e.preventDefault(); if (uploadState !== 'uploading') ua.classList.add('dragover'); });
+ua.addEventListener('dragleave', () => ua.classList.remove('dragover'));
+ua.addEventListener('drop', e => {
+  e.preventDefault(); ua.classList.remove('dragover');
+  if (uploadState === 'uploading') return;
+  const f = e.dataTransfer.files[0];
+  if (f) startFileUpload(f);
+});
+
+// ── FILE SELECT ───────────────────────────────────────
+function handleFileSelect(input) {
+  const f = input.files[0];
+  if (!f) return;
+  startFileUpload(f);
+  input.value = ''; // reset so same file can be re-selected
+}
+
+async function startFileUpload(file) {
+  if (!getKey()) {
+    openSettings();
+    return;
+  }
+
+  uploadState = 'uploading';
+  uploadedFile = null;
+  uploadedParts = [];
+  clearStatus('protocol-status');
+
+  const mb = (file.size / 1024 / 1024).toFixed(1);
+
+  try {
+    const duration = await getVideoDuration(file).catch(() => 0);
+    const numParts = duration > CHUNK_SEC ? Math.ceil(duration / CHUNK_SEC) : 1;
+    const durationStr = duration > 0 ? ` · ${Math.round(duration / 60)} мин` : '';
+
+    if (numParts > 1) {
+      // ── LONG VIDEO: split → upload parts ──
+      setUploadUI('uploading', {
+        title: `Подготовка видео (${numParts} части)`,
+        stage: 'Загрузка ffmpeg...',
+        pct: 2,
+        note: 'Первый раз ~30 МБ, один раз'
+      });
+
+      const chunks = await splitVideoIntoChunks(file, numParts);
+
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const pBase = 50 + (i / chunks.length) * 45;
+        const pEnd  = 50 + ((i + 1) / chunks.length) * 45;
+
+        setUploadUI('uploading', {
+          title: `Загрузка части ${i + 1} из ${chunks.length}`,
+          stage: `Часть ${i + 1}: 0 МБ`,
+          pct: pBase,
+          note: 'Не закрывай вкладку'
+        });
+
+        const result = await uploadFileToGemini(chunk.file, (loaded, total) => {
+          const loadedMb = (loaded / 1024 / 1024).toFixed(0);
+          const totalMb  = (total  / 1024 / 1024).toFixed(0);
+          const pct = pBase + (loaded / total) * (pEnd - pBase - 3);
+          setUploadUI('uploading', {
+            title: `Загрузка части ${i + 1} из ${chunks.length}`,
+            stage: `${loadedMb} / ${totalMb} МБ`,
+            pct,
+            note: 'Не закрывай вкладку'
+          });
+        });
+
+        // Wait for ACTIVE
+        setUIP(`Часть ${i + 1}: обработка на серверах Google...`, pEnd - 2, 'Обычно 10–30 сек');
+        await waitForActive(result.uri);
+        uploadedParts.push({ ...result, label: chunk.label });
+      }
+
+      uploadState = 'ready';
+      setUploadUI('ready', {
+        title: `${file.name}${durationStr}`,
+        sub: `Разбито на ${numParts} части · готово к анализу`
+      });
+
+    } else {
+      // ── SHORT VIDEO: upload directly ──
+      setUploadUI('uploading', {
+        title: `Загрузка: ${file.name}`,
+        stage: '0 МБ',
+        pct: 2,
+        note: `${mb} МБ · не закрывай вкладку`
+      });
+
+      const result = await uploadFileToGemini(file, (loaded, total) => {
+        const loadedMb = (loaded / 1024 / 1024).toFixed(0);
+        const totalMb  = (total  / 1024 / 1024).toFixed(0);
+        const pct = 2 + (loaded / total) * 88;
+        setUploadUI('uploading', {
+          title: `Загрузка: ${file.name}`,
+          stage: `${loadedMb} / ${totalMb} МБ`,
+          pct,
+          note: 'Не закрывай вкладку'
+        });
+      });
+
+      // Wait for ACTIVE
+      setUploadUI('uploading', {
+        title: 'Файл обрабатывается на серверах Google...',
+        stage: 'Ожидание...',
+        pct: 93,
+        note: 'Обычно 10–30 секунд'
+      });
+      await waitForActive(result.uri);
+
+      uploadedFile = result;
+      uploadState = 'ready';
+      setUploadUI('ready', {
+        title: file.name,
+        sub: `${mb} МБ${durationStr} · готово к анализу`
+      });
+    }
+
+  } catch (e) {
+    uploadState = 'error';
+    setUploadUI('error', { msg: e.message });
+  }
+}
+
+// ── WAIT FOR FILE ACTIVE ──────────────────────────────
+async function waitForActive(fileUri) {
+  const key = getKey();
+  // Extract file name: URI = .../files/FILE_ID
+  const fileName = 'files/' + fileUri.split('/files/')[1];
+
+  for (let attempt = 0; attempt < 40; attempt++) {
+    await sleep(5000); // check every 5 sec, max 3.5 min
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${key}`
+    );
+    if (!res.ok) continue;
+    const data = await res.json();
+    if (data.state === 'ACTIVE') return;
+    if (data.state === 'FAILED') throw new Error('Файл не прошёл обработку на серверах Google');
+  }
+  throw new Error('Превышено время ожидания обработки файла (3 мин)');
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── VIDEO DURATION ────────────────────────────────────
+function getVideoDuration(file) {
+  return new Promise((resolve, reject) => {
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => { URL.revokeObjectURL(v.src); resolve(v.duration); };
+    v.onerror = () => reject(new Error('Не удалось определить длину'));
+    v.src = URL.createObjectURL(file);
+  });
+}
+
+// ── FFMPEG ────────────────────────────────────────────
+async function loadFFmpeg() {
+  if (ffmpegInstance) return ffmpegInstance;
+
+  if (window.location.protocol === 'file:') {
+    throw new Error(
+      'Видео длиннее 58 минут требует размещения приложения на GitHub Pages. ' +
+      'Причина: браузер блокирует ffmpeg при открытии файла с диска. ' +
+      'Короткие видео (до 58 мин) работают прямо сейчас. ' +
+      'Для длинных — разместите protokolist.html на GitHub Pages (бесплатно, инструкция в чате).'
+    );
+  }
+
+  await new Promise((resolve, reject) => {
+    if (window.FFmpegWASM) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Не удалось загрузить ffmpeg'));
+    document.head.appendChild(s);
+  });
+  const { FFmpeg } = FFmpegWASM;
+  const ff = new FFmpeg();
+  ff.on('progress', ({ progress }) => {
+    if (progress >= 0 && progress <= 1) {
+      setUIP('Нарезка видео...', 10 + progress * 35, 'Без перекодирования — быстро');
+    }
+  });
+  await ff.load({ coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js' });
+  ffmpegInstance = ff;
+  return ff;
+}
+
+async function splitVideoIntoChunks(file, numParts) {
+  const ff = await loadFFmpeg();
+  const duration = await getVideoDuration(file);
+
+  setUIP('Копирование файла...', 5, `${(file.size/1024/1024).toFixed(0)} МБ`);
+  const inputData = new Uint8Array(await file.arrayBuffer());
+  await ff.writeFile('input.mp4', inputData);
+
+  const chunks = [];
+  for (let i = 0; i < numParts; i++) {
+    const start = i * CHUNK_SEC;
+    const partName = `part${i + 1}.mp4`;
+    const startMin = Math.round(start / 60);
+    const endMin = Math.round(Math.min(start + CHUNK_SEC, duration) / 60);
+
+    setUIP(`Нарезка: часть ${i + 1} из ${numParts}...`, 8 + (i / numParts) * 38,
+      `${startMin}–${endMin} мин`);
+
+    await ff.exec([
+      '-i', 'input.mp4',
+      '-ss', String(start),
+      '-t', String(CHUNK_SEC),
+      '-c', 'copy',
+      '-avoid_negative_ts', 'make_zero',
+      partName
+    ]);
+
+    const partData = await ff.readFile(partName);
+    await ff.deleteFile(partName);
+    chunks.push({
+      file: new File([partData], `part${i + 1}.mp4`, { type: 'video/mp4' }),
+      label: `часть ${i + 1} из ${numParts} (${startMin}–${endMin} мин)`
+    });
+  }
+  await ff.deleteFile('input.mp4');
+  return chunks;
+}
+
+// ── GEMINI FILE API ───────────────────────────────────
+async function uploadFileToGemini(file, onProgress) {
+  const key = getKey();
+  const mimeType = file.type || 'video/mp4';
+
+  const initRes = await fetch(
+    `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${key}`,
+    {
+      method: 'POST',
+      headers: {
+        'X-Goog-Upload-Protocol': 'resumable',
+        'X-Goog-Upload-Command': 'start',
+        'X-Goog-Upload-Header-Content-Length': file.size,
+        'X-Goog-Upload-Header-Content-Type': mimeType,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ file: { display_name: file.name } })
+    }
+  );
+  if (!initRes.ok) throw new Error('Ошибка инициализации: ' + (await initRes.text()).slice(0, 150));
+  const uploadUrl = initRes.headers.get('x-goog-upload-url');
+  if (!uploadUrl) throw new Error('Google не вернул URL загрузки');
+
+  const fileUri = await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader('Content-Length', file.size);
+    xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
+    xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
+    xhr.setRequestHeader('Content-Type', mimeType);
+    xhr.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(e.loaded, e.total); };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)?.file?.uri); }
+        catch { reject(new Error('Не удалось разобрать ответ Google')); }
+      } else {
+        reject(new Error(`Ошибка загрузки ${xhr.status}: ${xhr.responseText.slice(0, 150)}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Сетевая ошибка'));
+    xhr.send(file);
+  });
+
+  if (!fileUri) throw new Error('Google не вернул URI файла');
+  return { uri: fileUri, mimeType };
+}
+
+// ── GEMINI GENERATE ───────────────────────────────────
+async function callGemini(parts) {
+  const key = getKey();
+  if (!key) throw new Error('Не указан Gemini API Key');
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+      })
+    }
+  );
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error('Gemini: ' + (e.error?.message || JSON.stringify(e)).slice(0, 300));
+  }
+  const d = await res.json();
+  return d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// ── STATUS / ANALYSIS PROGRESS ────────────────────────
+function showStatus(id, type, msg) {
+  const icon = { info: '<div class="spinner"></div>', success: '✅', error: '❌', warn: '⚠️' }[type] || '';
+  document.getElementById(id).innerHTML = `<div class="status status-${type}">${icon}<span>${msg}</span></div>`;
+}
+function clearStatus(id) { document.getElementById(id).innerHTML = ''; }
+
+function showAP(stage, pct, note) {
+  document.getElementById('analysis-progress').style.display = 'block';
+  document.getElementById('ap-stage').textContent = stage;
+  document.getElementById('ap-pct').textContent = Math.round(pct) + '%';
+  document.getElementById('ap-bar').style.width = Math.round(pct) + '%';
+  document.getElementById('ap-note').textContent = note || '';
+}
+function hideAP() { document.getElementById('analysis-progress').style.display = 'none'; }
+
+// ── PROMPTS ───────────────────────────────────────────
+const today = () => new Date().toLocaleDateString('ru-RU');
+
+function PROTOCOL_PROMPT(title, partInfo) {
+  return `Ты — эксперт по документированию IT-проектов. Составь протокол встречи строго по шаблону.${partInfo ? `\n\nВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент.` : ''}
+
+Название: ${title || 'не указано'} · Дата составления: ${today()}
+
+ПРОТОКОЛ ВСТРЕЧИ
+Дата: [из контекста]
+Тема: [из контекста]
+Участники: [имена если звучат, иначе — уточнить]
+
+─────────────────────────────────
+1. ПОВЕСТКА ВСТРЕЧИ
+─────────────────────────────────
+[нумерованный список]
+
+─────────────────────────────────
+2. КЛЮЧЕВЫЕ ОБСУЖДЕНИЯ
+─────────────────────────────────
+[включая содержимое экрана если показывали документы, таблицы, данные]
+
+─────────────────────────────────
+3. ПРИНЯТЫЕ РЕШЕНИЯ
+─────────────────────────────────
+[нумерованный список, каждое с глагола]
+
+─────────────────────────────────
+4. ТРЕБОВАНИЯ ЗАКАЗЧИКА
+─────────────────────────────────
+REQ-001: [описание] | Приоритет: Высокий / Средний / Низкий
+[если нет — написать явно]
+
+─────────────────────────────────
+5. ОТКРЫТЫЕ ВОПРОСЫ
+─────────────────────────────────
+[нерешённые вопросы]
+
+─────────────────────────────────
+6. СЛЕДУЮЩИЕ ШАГИ
+─────────────────────────────────
+№ | Действие | Ответственный | Срок
+─────────────────────────────────
+Составлен: ${today()}`;
+}
+
+function MERGE_PROMPT(parts, title) {
+  return `Объедини фрагменты протокола встречи «${title || 'без названия'}» в единый связный документ.
+Правила: сохрани хронологию · убери дубли · единая нумерация REQ · выглядит как один протокол, не склейка.
+Используй тот же шаблон с разделами 1–6.
+
+${parts.map((p, i) => `=== ФРАГМЕНТ ${i + 1} ===\n${p}`).join('\n\n')}`;
+}
+
+function REQUIREMENTS_PROMPT(protocol) {
+  return `Извлеки все требования заказчика из протокола, оформи реестр.
+
+РЕЕСТР ТРЕБОВАНИЙ · Дата: ${today()}
+
+Формат: ID | Описание | Тип | Приоритет | Источник | Статус
+Тип: Функциональное или Нефункциональное · Статус: Зафиксировано
+
+После таблицы: Всего: N | Функциональных: N | Нефункциональных: N | Высокий приоритет: N
+
+ПРОТОКОЛ:
+${protocol}`;
+}
+
+function REPORT_PROMPT(protocols, instr) {
+  return `Ты — старший системный аналитик. Составь отчёт об обследовании.
+${instr ? '\nДоп. инструкции: ' + instr : ''}
+
+ОТЧЁТ ОБ ОБСЛЕДОВАНИИ · Дата: ${today()}
+Период: [из дат протоколов]
+
+АННОТАЦИЯ [2–3 предложения]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. ВВЕДЕНИЕ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1.1. Цель обследования
+1.2. Состав рабочей группы
+1.3. Перечень встреч
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. ТЕКУЩЕЕ СОСТОЯНИЕ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Бизнес-процессы и системы]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. СВОДНЫЙ РЕЕСТР ТРЕБОВАНИЙ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Требования сгруппированные по тематике]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+4. ВЫЯВЛЕННЫЕ ПРОБЛЕМЫ И РИСКИ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Из открытых вопросов]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+5. РЕКОМЕНДАЦИИ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Конкретные рекомендации]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+6. ЗАКЛЮЧЕНИЕ
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+[Итог]
+
+ПРОТОКОЛЫ:
+${protocols}`;
+}
+
+function REGISTRY_PROMPT(reqs) {
+  return `Сводный реестр требований без дублей. Уникальный ID каждому. Укажи источник.
+
+СВОДНЫЙ РЕЕСТР ТРЕБОВАНИЙ · Дата: ${today()}
+
+Формат: ID | Описание | Тип | Приоритет | Источник | Статус
+
+ИТОГО: Всего: N | Функциональных: N | Нефункциональных: N | Высокий: N | Средний: N | Низкий: N
+
+ВХОДНЫЕ РЕЕСТРЫ:
+${reqs}`;
+}
+
+// ── GENERATE PROTOCOL ─────────────────────────────────
+async function generateProtocol() {
+  const manualText = document.getElementById('manual-transcript').value.trim();
+  const title = document.getElementById('meeting-title').value.trim();
+
+  // Validation
+  if (!manualText && uploadState === 'uploading') {
+    showStatus('protocol-status', 'warn', 'Файл ещё загружается, подожди...');
+    return;
+  }
+  if (!manualText && uploadState === 'idle') {
+    showStatus('protocol-status', 'error', 'Загрузи файл или вставь текст встречи');
+    return;
+  }
+  if (!manualText && uploadState === 'error') {
+    showStatus('protocol-status', 'error', 'Ошибка загрузки файла — выбери файл снова');
+    return;
+  }
+
+  const btn = document.getElementById('btn-generate');
+  btn.disabled = true;
+  clearStatus('protocol-status');
+  hideAP();
+
+  try {
+    let protocolText = '';
+
+    if (manualText) {
+      showStatus('protocol-status', 'info', 'Составляю протокол...');
+      showAP('Анализ текста...', 30, '');
+      protocolText = await callGemini([{
+        text: PROTOCOL_PROMPT(title, null) + '\n\nТЕКСТ ВСТРЕЧИ:\n' + manualText
+      }]);
+      showAP('Готово', 90, '');
+
+    } else if (uploadedParts.length > 0) {
+      // Multi-part
+      const partProtocols = [];
+      for (let i = 0; i < uploadedParts.length; i++) {
+        const part = uploadedParts[i];
+        const pct = 20 + (i / uploadedParts.length) * 60;
+        showStatus('protocol-status', 'info', `Gemini анализирует ${part.label}...`);
+        showAP(`Анализ части ${i + 1} из ${uploadedParts.length}...`, pct,
+          'Gemini видит экран и слышит речь');
+        const text = await callGemini([
+          { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
+          { text: PROTOCOL_PROMPT(title, part.label) }
+        ]);
+        partProtocols.push(text);
+      }
+      showStatus('protocol-status', 'info', 'Объединяю части в единый протокол...');
+      showAP('Объединение частей...', 85, '');
+      protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
+
+    } else if (uploadedFile) {
+      // Single file
+      showStatus('protocol-status', 'info', 'Gemini анализирует запись...');
+      showAP('Gemini смотрит запись...', 40, 'Видит экран и слышит речь · ~1–2 минуты');
+      protocolText = await callGemini([
+        { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
+        { text: PROTOCOL_PROMPT(title, null) }
+      ]);
+      showAP('Протокол готов', 85, '');
+    }
+
+    currentProtocolText = protocolText;
+
+    showStatus('protocol-status', 'info', 'Извлекаю требования...');
+    showAP('Извлечение требований...', 92, '');
+    currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
+
+    hideAP();
+    document.getElementById('protocol-preview').textContent = currentProtocolText;
+    document.getElementById('protocol-result-card').style.display = 'block';
+    document.getElementById('protocol-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showStatus('protocol-status', 'success', 'Готово! Скачай документы или сохрани в список.');
+
+  } catch (e) {
+    hideAP();
+    showStatus('protocol-status', 'error', e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── SAVE / LIST ───────────────────────────────────────
+function saveProtocol() {
+  if (!currentProtocolText) { alert('Сначала создай протокол'); return; }
+  const title = document.getElementById('meeting-title').value.trim() || 'Встреча ' + today();
+  const list = JSON.parse(localStorage.getItem('protocols') || '[]');
+  list.unshift({ id: Date.now(), title, date: today(), protocol: currentProtocolText, requirements: currentRequirementsText });
+  localStorage.setItem('protocols', JSON.stringify(list));
+  showStatus('protocol-status', 'success', `Протокол «${title}» сохранён`);
+}
+
+const getProtocols = () => JSON.parse(localStorage.getItem('protocols') || '[]');
+
+function renderList(tab) {
+  const isReport = tab === 'report';
+  const el = document.getElementById(isReport ? 'report-protocol-list' : 'registry-protocol-list');
+  const prefix = isReport ? 'rp' : 'rg';
+  const list = getProtocols();
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div>Нет сохранённых протоколов.<br>Создай протокол и нажми «Сохранить в список».</div>`;
+    return;
+  }
+  el.innerHTML = `<div style="font-size:12px;color:#64748b;margin-bottom:12px">${list.length} протокол(ов)</div>` +
+    list.map(p => `
+      <div class="protocol-item" onclick="document.getElementById('${prefix}-${p.id}').click()">
+        <input type="checkbox" id="${prefix}-${p.id}" value="${p.id}" onclick="event.stopPropagation()">
+        <div class="protocol-meta">
+          <div class="protocol-title">${escHtml(p.title)}</div>
+          <div class="protocol-date">${p.date}</div>
+        </div>
+        ${isReport ? `<button class="protocol-del" onclick="event.stopPropagation();deleteProtocol(${p.id})" title="Удалить">×</button>` : ''}
+      </div>`).join('');
+}
+
+function deleteProtocol(id) {
+  if (!confirm('Удалить?')) return;
+  localStorage.setItem('protocols', JSON.stringify(getProtocols().filter(x => x.id !== id)));
+  renderList('report');
+}
+function selectAll(prefix) { document.querySelectorAll(`input[id^="${prefix}-"]`).forEach(c => c.checked = true); }
+const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// ── GENERATE REPORT ───────────────────────────────────
+async function generateReport() {
+  const checked = [...document.querySelectorAll('input[id^="rp-"]:checked')].map(c => c.value);
+  if (!checked.length) { showStatus('report-status', 'error', 'Выбери хотя бы один протокол'); return; }
+  const sel = getProtocols().filter(p => checked.includes(String(p.id)));
+  const combined = sel.map(p => `=== ${p.title} (${p.date}) ===\n${p.protocol}`).join('\n\n');
+  try {
+    showStatus('report-status', 'info', `Формирую отчёт из ${sel.length} протоколов...`);
+    currentReportText = await callGemini([{ text: REPORT_PROMPT(combined, document.getElementById('report-instructions').value) }]);
+    document.getElementById('report-preview').textContent = currentReportText;
+    document.getElementById('report-result-card').style.display = 'block';
+    document.getElementById('report-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showStatus('report-status', 'success', 'Отчёт готов!');
+  } catch (e) { showStatus('report-status', 'error', e.message); }
+}
+
+// ── GENERATE REGISTRY ─────────────────────────────────
+async function generateRegistry() {
+  const checked = [...document.querySelectorAll('input[id^="rg-"]:checked')].map(c => c.value);
+  if (!checked.length) { showStatus('registry-status', 'error', 'Выбери хотя бы один протокол'); return; }
+  const sel = getProtocols().filter(p => checked.includes(String(p.id)));
+  const combined = sel.map(p => `=== ${p.title} (${p.date}) ===\n${p.requirements}`).join('\n\n');
+  try {
+    showStatus('registry-status', 'info', `Формирую реестр из ${sel.length} протоколов...`);
+    currentRegistryText = await callGemini([{ text: REGISTRY_PROMPT(combined) }]);
+    document.getElementById('registry-preview').textContent = currentRegistryText;
+    document.getElementById('registry-result-card').style.display = 'block';
+    document.getElementById('registry-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showStatus('registry-status', 'success', 'Реестр готов!');
+  } catch (e) { showStatus('registry-status', 'error', e.message); }
+}
+
+// ── DOCX ──────────────────────────────────────────────
+async function downloadDocx(type) {
+  const map = {
+    protocol: { text: currentProtocolText, file: 'протокол.docx' },
+    requirements: { text: currentRequirementsText, file: 'требования.docx' },
+    report: { text: currentReportText, file: 'отчёт_об_обследовании.docx' },
+    registry: { text: currentRegistryText, file: 'реестр_требований.docx' }
+  };
+  const { text, file } = map[type];
+  if (!text) { alert('Сначала сгенерируй документ'); return; }
+  const { Document, Paragraph, TextRun, AlignmentType, Packer } = docx;
+  const children = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trimEnd();
+    if (!line || /^[─━═]{4,}$/.test(line)) { children.push(new Paragraph({ text: '', spacing: { after: 80 } })); continue; }
+    if (/^(ПРОТОКОЛ ВСТРЕЧИ|ОТЧЁТ ОБ ОБСЛЕДОВАНИИ|РЕЕСТР ТРЕБОВАНИЙ|СВОДНЫЙ РЕЕСТР)/.test(line))
+      children.push(new Paragraph({ children: [new TextRun({ text: line, bold: true, size: 30, color: '1e293b' })], alignment: AlignmentType.CENTER, spacing: { after: 240 } }));
+    else if (/^\d+\.\s+[А-ЯA-Z]/.test(line))
+      children.push(new Paragraph({ children: [new TextRun({ text: line, bold: true, size: 26, color: '1e40af' })], spacing: { before: 280, after: 120 } }));
+    else if (/^\d+\.\d+/.test(line))
+      children.push(new Paragraph({ children: [new TextRun({ text: line, bold: true, size: 24 })], spacing: { before: 160, after: 80 } }));
+    else if (/^REQ-\d+/.test(line))
+      children.push(new Paragraph({ children: [new TextRun({ text: line, size: 22, color: '1d4ed8' })], spacing: { before: 60, after: 60 }, indent: { left: 360 } }));
+    else if (/^[\-\•]\s|^\d+\.\s/.test(line))
+      children.push(new Paragraph({ children: [new TextRun({ text: line, size: 22 })], spacing: { after: 60 }, indent: { left: 360 } }));
+    else if (/^(Дата:|Тема:|Участники:|Период:|АННОТАЦИЯ|ИТОГО)/.test(line)) {
+      const c = line.indexOf(':');
+      if (c > 0) children.push(new Paragraph({ children: [new TextRun({ text: line.slice(0,c+1), bold: true, size: 22 }), new TextRun({ text: line.slice(c+1), size: 22 })], spacing: { after: 80 } }));
+      else children.push(new Paragraph({ children: [new TextRun({ text: line, bold: true, size: 22 })], spacing: { before: 160, after: 80 } }));
+    } else
+      children.push(new Paragraph({ children: [new TextRun({ text: line, size: 22 })], spacing: { after: 60 } }));
+  }
+  const d = new Document({ sections: [{ properties: { page: { margin: { top: 1134, right: 850, bottom: 1134, left: 1701 } } }, children }] });
+  const blob = await Packer.toBlob(d);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = file; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── INIT ─────────────────────────────────────────────
+if (!getKey()) setTimeout(openSettings, 500);
+</script>
+</body>
+</html>
