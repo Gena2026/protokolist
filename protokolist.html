@@ -292,7 +292,7 @@ textarea{resize:vertical;line-height:1.6}
 
 <script>
 // ── CONFIG ───────────────────────────────────────────
-const CHUNK_MINUTES = 10; // 10 мин × 60 × 263 токена/сек = ~158K — с запасом до лимита 250K TPM
+const CHUNK_MINUTES = 14; // 14 мин × 60 × 263 токена/сек = ~221K — с запасом до лимита 250K TPM
 const CHUNK_SEC = CHUNK_MINUTES * 60;
 const MODEL = 'gemini-2.5-flash';
 
@@ -792,6 +792,18 @@ function MERGE_PROMPT(parts, title) {
 Правила: сохрани хронологию · убери дубли · единая нумерация REQ · выглядит как один протокол, не склейка.
 Используй тот же шаблон с разделами 1–6.
 
+После протокола добавь раздел:
+
+═══════════════════════════════════
+РЕЕСТР ТРЕБОВАНИЙ
+Дата: ${today()}
+
+Формат: ID | Описание | Тип | Приоритет | Источник | Статус
+Тип: Функциональное или Нефункциональное · Статус: Зафиксировано
+
+Итог: Всего: N | Функциональных: N | Нефункциональных: N | Высокий приоритет: N
+═══════════════════════════════════
+
 ${parts.map((p, i) => `=== ФРАГМЕНТ ${i + 1} ===\n${p}`).join('\n\n')}`;
 }
 
@@ -938,9 +950,11 @@ async function generateProtocol() {
 
     currentProtocolText = protocolText;
 
-    showStatus('protocol-status', 'info', 'Извлекаю требования...');
-    showAP('Извлечение требований...', 92, '');
-    currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
+    if (!currentRequirementsText) {
+      showStatus('protocol-status', 'info', 'Извлекаю требования...');
+      showAP('Извлечение требований...', 92, '');
+      currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
+    }
 
     hideAP();
     document.getElementById('protocol-preview').textContent = currentProtocolText;
@@ -1031,6 +1045,8 @@ async function generateRegistry() {
 
 // ── DOCX ──────────────────────────────────────────────
 async function downloadDocx(type) {
+  const docxLib = window.docx;
+  if (!docxLib) { alert('Библиотека docx не загружена — обнови страницу'); return; }
   const map = {
     protocol: { text: currentProtocolText, file: 'протокол.docx' },
     requirements: { text: currentRequirementsText, file: 'требования.docx' },
@@ -1039,7 +1055,7 @@ async function downloadDocx(type) {
   };
   const { text, file } = map[type];
   if (!text) { alert('Сначала сгенерируй документ'); return; }
-  const { Document, Paragraph, TextRun, AlignmentType, Packer } = docx;
+  const { Document, Paragraph, TextRun, AlignmentType, Packer } = docxLib;
   const children = [];
   for (const raw of text.split('\n')) {
     const line = raw.trimEnd();
