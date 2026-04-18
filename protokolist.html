@@ -520,15 +520,6 @@ function getVideoDuration(file) {
 async function loadFFmpeg() {
   if (ffmpegInstance) return ffmpegInstance;
 
-  if (window.location.protocol === 'file:') {
-    throw new Error(
-      'Видео длиннее 58 минут требует размещения приложения на GitHub Pages. ' +
-      'Причина: браузер блокирует ffmpeg при открытии файла с диска. ' +
-      'Короткие видео (до 58 мин) работают прямо сейчас. ' +
-      'Для длинных — разместите protokolist.html на GitHub Pages (бесплатно, инструкция в чате).'
-    );
-  }
-
   await new Promise((resolve, reject) => {
     if (window.FFmpegWASM) { resolve(); return; }
     const s = document.createElement('script');
@@ -996,6 +987,19 @@ async function downloadDocx(type) {
   const a = document.createElement('a'); a.href = url; a.download = file; a.click();
   URL.revokeObjectURL(url);
 }
+
+// ── COI SERVICE WORKER (нужен для ffmpeg на GitHub Pages) ────
+(function() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('/protokolist/coi-serviceworker.js')
+    .then(() => {
+      if (!self.crossOriginIsolated) {
+        // Перезагружаем страницу один раз чтобы SW вступил в силу
+        window.location.reload();
+      }
+    })
+    .catch((e) => console.warn('[coi-sw] не удалось зарегистрировать:', e));
+})();
 
 // ── INIT ─────────────────────────────────────────────
 if (!getKey()) setTimeout(openSettings, 500);
