@@ -286,7 +286,6 @@ let currentRegistryText = '';
 let uploadState = 'idle';
 let uploadedFile = null;      // { uri, mimeType } for short videos
 let uploadedParts = [];       // [{ uri, mimeType, label }] for long videos
-let ffmpegInstance = null;
 
 // ── SETTINGS ─────────────────────────────────────────
 const getKey = () => localStorage.getItem('gemini_key') || '';
@@ -396,13 +395,13 @@ async function startFileUpload(file) {
     if (numParts > 1) {
       // ── LONG VIDEO: split → upload parts ──
       setUploadUI('uploading', {
-        title: `Подготовка видео (${numParts} части)`,
-        stage: 'Загрузка ffmpeg...',
+        title: `Запись ${Math.round(duration/60)} мин — нарезаю на ${numParts} части`,
+        stage: 'Подготовка...',
         pct: 2,
-        note: 'Первый раз ~30 МБ, один раз'
+        note: 'Для длинных записей обрабатывается аудиодорожка'
       });
 
-      const chunks = await splitVideoIntoChunks(file, numParts);
+      const chunks = await splitVideoIntoChunks(file);
 
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
@@ -437,7 +436,7 @@ async function startFileUpload(file) {
       uploadState = 'ready';
       setUploadUI('ready', {
         title: `${file.name}${durationStr}`,
-        sub: `Разбито на ${numParts} части · готово к анализу`
+        sub: `Видео разбито на ${numParts} части · готово к анализу (видео + звук)`
       });
 
     } else {
@@ -516,67 +515,68 @@ function getVideoDuration(file) {
   });
 }
 
-// ── FFMPEG ────────────────────────────────────────────
+// ── FFMPEG (локальные файлы — без кросс-доменных проблем) ──────────
+let ffmpegInstance = null;
+
 async function loadFFmpeg() {
   if (ffmpegInstance) return ffmpegInstance;
-
+  setUIP('Загрузка ffmpeg...', 3, 'Первый запуск — ~30 МБ, один раз');
   await new Promise((resolve, reject) => {
     if (window.FFmpegWASM) { resolve(); return; }
     const s = document.createElement('script');
-    s.src = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js';
+    s.src = '/protokolist/ffmpeg/ffmpeg.js'; // same-origin — worker создаётся без ошибок
     s.onload = resolve;
-    s.onerror = () => reject(new Error('Не удалось загрузить ffmpeg'));
+    s.onerror = () => reject(new Error('Не удалось загрузить ffmpeg — проверь что файлы загружены в GitHub'));
     document.head.appendChild(s);
   });
   const { FFmpeg } = FFmpegWASM;
   const ff = new FFmpeg();
   ff.on('progress', ({ progress }) => {
-    if (progress >= 0 && progress <= 1) {
-      setUIP('Нарезка видео...', 10 + progress * 35, 'Без перекодирования — быстро');
-    }
+    if (progress >= 0 && progress <= 1)
+      setUIP('Нарезка видео...', 15 + progress * 35, 'Без перекодирования — быстро');
   });
-  await ff.load({ coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js' });
+  // core и wasm грузятся внутри worker через importScripts — CORS работает
+  await ff.load({
+    coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+    wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
+  });
   ffmpegInstance = ff;
   return ff;
 }
 
-async function splitVideoIntoChunks(file, numParts) {
+async function splitVideoIntoChunks(file) {
   const ff = await loadFFmpeg();
   const duration = await getVideoDuration(file);
+  const numParts = Math.ceil(duration / CHUNK_SEC);
 
-  setUIP('Копирование файла...', 5, `${(file.size/1024/1024).toFixed(0)} МБ`);
+  setUIP('Копирование файла в память...', 8, `${(file.size/1024/1024).toFixed(0)} МБ`);
   const inputData = new Uint8Array(await file.arrayBuffer());
   await ff.writeFile('input.mp4', inputData);
 
   const chunks = [];
   for (let i = 0; i < numParts; i++) {
     const start = i * CHUNK_SEC;
-    const partName = `part${i + 1}.mp4`;
+    const partName = `part${i+1}.mp4`;
     const startMin = Math.round(start / 60);
     const endMin = Math.round(Math.min(start + CHUNK_SEC, duration) / 60);
 
-    setUIP(`Нарезка: часть ${i + 1} из ${numParts}...`, 8 + (i / numParts) * 38,
-      `${startMin}–${endMin} мин`);
+    setUIP(`Нарезка: часть ${i+1} из ${numParts}...`,
+      50 + (i / numParts) * 45, `${startMin}–${endMin} мин`);
 
-    await ff.exec([
-      '-i', 'input.mp4',
-      '-ss', String(start),
-      '-t', String(CHUNK_SEC),
-      '-c', 'copy',
-      '-avoid_negative_ts', 'make_zero',
-      partName
-    ]);
+    await ff.exec(['-i','input.mp4','-ss',String(start),'-t',String(CHUNK_SEC),
+      '-c','copy','-avoid_negative_ts','make_zero', partName]);
 
     const partData = await ff.readFile(partName);
     await ff.deleteFile(partName);
     chunks.push({
-      file: new File([partData], `part${i + 1}.mp4`, { type: 'video/mp4' }),
-      label: `часть ${i + 1} из ${numParts} (${startMin}–${endMin} мин)`
+      file: new File([partData], `part${i+1}.mp4`, { type: 'video/mp4' }),
+      label: `часть ${i+1} из ${numParts} (${startMin}–${endMin} мин)`
     });
   }
   await ff.deleteFile('input.mp4');
   return chunks;
 }
+
 
 // ── GEMINI FILE API ───────────────────────────────────
 async function uploadFileToGemini(file, onProgress) {
@@ -668,7 +668,7 @@ function hideAP() { document.getElementById('analysis-progress').style.display =
 const today = () => new Date().toLocaleDateString('ru-RU');
 
 function PROTOCOL_PROMPT(title, partInfo) {
-  return `Ты — эксперт по документированию IT-проектов. Составь протокол встречи строго по шаблону.${partInfo ? `\n\nВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент.` : ''}
+  return `Ты — эксперт по документированию IT-проектов. Составь протокол встречи строго по шаблону.${partInfo ? `\n\nВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент. Участники могут ссылаться на экран (документы, таблицы) — фиксируй что именно обсуждалось, даже если визуал недоступен.` : ''}
 
 Название: ${title || 'не указано'} · Дата составления: ${today()}
 
@@ -987,19 +987,6 @@ async function downloadDocx(type) {
   const a = document.createElement('a'); a.href = url; a.download = file; a.click();
   URL.revokeObjectURL(url);
 }
-
-// ── COI SERVICE WORKER (нужен для ffmpeg на GitHub Pages) ────
-(function() {
-  if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.register('/protokolist/coi-serviceworker.js')
-    .then(() => {
-      if (!self.crossOriginIsolated) {
-        // Перезагружаем страницу один раз чтобы SW вступил в силу
-        window.location.reload();
-      }
-    })
-    .catch((e) => console.warn('[coi-sw] не удалось зарегистрировать:', e));
-})();
 
 // ── INIT ─────────────────────────────────────────────
 if (!getKey()) setTimeout(openSettings, 500);
