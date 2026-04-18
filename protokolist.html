@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Протоколист — ИИ-ассистент</title>
-<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js" onload="window.docxReady=true" onerror="console.error('docx failed to load')"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
@@ -128,6 +128,7 @@ textarea{resize:vertical;line-height:1.6}
   <div class="tab" onclick="showTab('report',this)">📄 Отчёт об обследовании</div>
   <div class="tab" onclick="showTab('registry',this)">📋 Реестр требований</div>
   <div class="tab" onclick="showTab('library',this)">📂 Библиотека файлов</div>
+  <div class="tab" onclick="showTab('nsi',this)">⚙️ НСИ</div>
 </div>
 
 <div class="main">
@@ -137,8 +138,18 @@ textarea{resize:vertical;line-height:1.6}
   <div class="card">
     <div class="card-title"><div class="card-title-icon icon-blue">🎙️</div>Запись встречи</div>
 
+    <label>Проект</label>
+    <select id="meeting-project" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 13px;font-size:14px;font-family:inherit;outline:none;background:#fafafa;color:#1e293b;cursor:pointer">
+      <option value="">— Выбери проект —</option>
+    </select>
+
     <label>Название встречи</label>
-    <input type="text" id="meeting-title" placeholder="Например: Встреча по проекту CRM — 18.04.2026">
+    <input type="text" id="meeting-title" placeholder="Например: Обследование отдела планирования">
+
+    <label>Дата проведения встречи</label>
+    <input type="text" id="meeting-date" placeholder="ДД.ММ.ГГГГ" maxlength="10"
+      oninput="formatDateInput(this)"
+      style="width:220px">
 
     <div style="margin-top:16px">
       <label>Видео или аудио файл — загрузка начинается сразу после выбора</label>
@@ -275,6 +286,82 @@ textarea{resize:vertical;line-height:1.6}
 </div>
 
 
+<!-- ======= NSI ======= -->
+<div class="page" id="page-nsi">
+
+  <!-- POSITIONS -->
+  <div class="card">
+    <div class="card-title"><div class="card-title-icon icon-purple">📋</div>Должности</div>
+    <div id="positions-list" style="margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="new-position" placeholder="Название должности" style="flex:1">
+      <button class="btn btn-primary" onclick="addPosition()">+ Добавить</button>
+    </div>
+  </div>
+
+  <!-- PARTICIPANTS -->
+  <div class="card">
+    <div class="card-title"><div class="card-title-icon icon-blue">👤 Участники</div></div>
+    <div id="participants-list" style="margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="new-participant" placeholder="ФИО участника" style="flex:1">
+      <button class="btn btn-primary" onclick="addParticipant()">+ Добавить</button>
+    </div>
+  </div>
+
+  <!-- PROJECTS -->
+  <div class="card">
+    <div class="card-title"><div class="card-title-icon icon-amber">🗂️</div>Проекты</div>
+    <div id="projects-list" style="margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="new-project" placeholder="Название проекта" style="flex:1">
+      <button class="btn btn-primary" onclick="addProject()">+ Создать проект</button>
+    </div>
+  </div>
+
+  <!-- PROJECT EDITOR -->
+  <div class="card" id="project-editor" style="display:none">
+    <div class="card-title"><div class="card-title-icon icon-green">✏️</div>
+      Редактирование проекта: <span id="editor-project-name" style="color:#3b82f6"></span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+      <!-- Команда исполнителя -->
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Команда исполнителя</div>
+        <div id="executor-team-list" style="margin-bottom:10px"></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <select id="executor-participant" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fafafa">
+            <option value="">— Участник —</option>
+          </select>
+          <select id="executor-position" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fafafa">
+            <option value="">— Должность —</option>
+          </select>
+          <button class="btn btn-secondary" onclick="addTeamMember('executor')" style="font-size:12px">+ Добавить в команду</button>
+        </div>
+      </div>
+
+      <!-- Команда заказчика -->
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Команда заказчика</div>
+        <div id="customer-team-list" style="margin-bottom:10px"></div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <select id="customer-participant" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fafafa">
+            <option value="">— Участник —</option>
+          </select>
+          <select id="customer-position" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fafafa">
+            <option value="">— Должность —</option>
+          </select>
+          <button class="btn btn-secondary" onclick="addTeamMember('customer')" style="font-size:12px">+ Добавить в команду</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
 <!-- ======= SETTINGS ======= -->
 <div class="modal-overlay" id="settings-modal" onclick="if(event.target===this)closeSettings()">
   <div class="modal">
@@ -325,9 +412,11 @@ function showTab(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('page-' + name).classList.add('active');
+  if (name === 'protocol') updateProjectSelect();
   if (name === 'report') renderList('report');
   if (name === 'registry') renderList('registry');
   if (name === 'library') renderLibrary();
+  if (name === 'nsi') renderNSI();
 }
 
 // ── UPLOAD AREA UI ────────────────────────────────────
@@ -743,62 +832,93 @@ function hideAP() { document.getElementById('analysis-progress').style.display =
 // ── PROMPTS ───────────────────────────────────────────
 const today = () => new Date().toLocaleDateString('ru-RU');
 
-function PROTOCOL_PROMPT(title, partInfo) {
-  return `Ты — эксперт по документированию IT-проектов. Составь протокол встречи и реестр требований строго по шаблону.${partInfo ? `\n\nВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент. Участники могут ссылаться на экран (документы, таблицы) — фиксируй что именно обсуждалось.` : ''}
+function PROTOCOL_PROMPT(title, partInfo, projectName, teamText, meetingDate) {
+  const dateStr = meetingDate || today();
+  return `Ты — профессиональный IT-аналитик. Составь протокол интервью строго по шаблону ниже.
+${partInfo ? `ВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент.` : ''}
 
-Название: ${title || 'не указано'} · Дата составления: ${today()}
+ДАННЫЕ ДЛЯ ШАПКИ:
+Проект: ${projectName || '[не указан]'}
+Тема: ${title || '[определи из контекста]'}
+Дата: ${dateStr}
+Команда проекта (используй эти данные для участников):
+${teamText || '[список участников не задан — определи из видео]'}
 
-Верни ДВА блока разделённых маркером ===ТРЕБОВАНИЯ===
+СПИСОК ФУНКЦИОНАЛЬНЫХ ОБЛАСТЕЙ (выбери одну или несколько):
+Закупки, Продажи, Планирование, Бюджетирование, Склады, Доставка, МСФО, Бухгалтерия, Финансы, Казначейство, CRM и маркетинг, НСИ, Производство, Ремонт
 
-БЛОК 1 — ПРОТОКОЛ:
+ВЕРНИ ДВА БЛОКА РАЗДЕЛЁННЫХ МАРКЕРОМ ===ТРЕБОВАНИЯ===
 
-ПРОТОКОЛ ВСТРЕЧИ
-Дата: [из контекста]
-Тема: [из контекста]
-Участники: [имена если звучат, иначе — уточнить]
+━━━ БЛОК 1: ПРОТОКОЛ ━━━
 
-─────────────────────────────────
-1. ПОВЕСТКА ВСТРЕЧИ
-─────────────────────────────────
-[нумерованный список]
+Протокол интервью №[номер]
 
-─────────────────────────────────
-2. КЛЮЧЕВЫЕ ОБСУЖДЕНИЯ
-─────────────────────────────────
-[включая содержимое экрана если показывали документы, таблицы, данные]
+| Проект: | ${projectName || ''} |
+| Функциональная область | [выбери из списка выше, через запятую если несколько] |
+| Тема интервью | ${title || '[определи из контекста]'} |
+| Дата интервью | ${dateStr} |
+| Цель проведения интервью | [напиши сам исходя из контекста встречи] |
 
-─────────────────────────────────
-3. ПРИНЯТЫЕ РЕШЕНИЯ
-─────────────────────────────────
-[нумерованный список, каждое с глагола]
+УЧАСТНИКИ:
+| Участники | Должность | ФИО |
+|-----------|-----------|-----|
+[заполни из команды проекта выше — сопоставь имена из видео с командой. Формат строки: | Команда исполнителя | Должность | ФИО | или | Команда заказчика | Должность | ФИО |]
 
-─────────────────────────────────
-4. ОТКРЫТЫЕ ВОПРОСЫ
-─────────────────────────────────
-[нерешённые вопросы]
+ГЛОССАРИЙ:
+[термины и аббревиатуры которые упоминались на встрече. Формат: Термин — определение. Если терминов нет — написать: Специальных терминов не использовалось.]
 
-─────────────────────────────────
-5. СЛЕДУЮЩИЕ ШАГИ
-─────────────────────────────────
-№ | Действие | Ответственный | Срок
-─────────────────────────────────
-Составлен: ${today()}
+ВОПРОСЫ ДЛЯ ОБСУЖДЕНИЯ:
+[пронумерованный список вопросов которые обсуждались на встрече]
+
+ТЕЗИСЫ ИНТЕРВЬЮ:
+
+[Если обсуждалось как сейчас ведётся работа — добавь:]
+Описание процессов «Как есть» («As Is»)
+[тезисы по текущим бизнес-процессам, разбитые по темам с подзаголовками]
+
+[Если обсуждалось как должно быть в новой системе — добавь:]
+Описание процессов «Как будет» («To Be»)
+[тезисы по будущим бизнес-процессам, разбитые по темам с подзаголовками]
+
+ИНФОРМАЦИОННЫЕ МАТЕРИАЛЫ:
+[Если исполнитель запрашивал документы/данные/файлы — перечисли в формате таблицы:]
+| Материал | ФИО ответственного | Плановая дата получения | Фактическая дата получения |
+[Плановую дату считай от даты встречи ${dateStr}. Если ничего не запрашивалось — написать: Информационные материалы не запрашивались.]
+
+ОТКРЫТЫЕ ВОПРОСЫ:
+| Содержание вопроса | ФИО ответственного | Плановая дата | Фактическая дата |
+[вопросы которые остались нерешёнными. Если нет — написать: Открытых вопросов не зафиксировано.]
+
+СЛЕДУЮЩИЕ ШАГИ:
+| № | Действие | Ответственный | Срок |
+[Срок считай от даты встречи ${dateStr}]
+
+Протокол составлен: [ФИО первого участника из команды исполнителя]
+
+ЛИСТ СОГЛАСОВАНИЯ:
+| ФИО | Должность | Дата | Подпись |
+[заполни всеми участниками встречи из команды проекта, Дата и Подпись оставь пустыми]
+
+━━━ КОНЕЦ БЛОКА 1 ━━━
 
 ===ТРЕБОВАНИЯ===
 
-БЛОК 2 — РЕЕСТР ТРЕБОВАНИЙ из этого фрагмента:
-Извлеки ВСЕ требования заказчика которые прозвучали в этом фрагменте.
-Смотри внимательно — требования могут быть явными ("нам нужно...") и неявными ("было бы хорошо если...").
-Также фиксируй требования к данным которые показывались на экране.
+━━━ БЛОК 2: ЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ ━━━
 
-Формат: ID | Описание | Тип | Приоритет | Источник | Статус
-Тип: Функциональное или Нефункциональное
-Приоритет: Высокий / Средний / Низкий
-Источник: "${title || 'встреча'}, ${partInfo || 'полная запись'}"
-Статус: Зафиксировано
+Извлеки ВСЕ требования из этого фрагмента.
+Требования — это то что заказчик хочет видеть в новой системе (To Be).
+Смотри внимательно: явные («нам нужно...», «хотелось бы...») и неявные (пожелания, проблемы которые нужно решить).
 
-Если требований не было — написать: "Требований в этом фрагменте не зафиксировано"`;
+Формат таблицы:
+| Содержание требования | ФИО владельца | Должность | Вид требования |
+[Вид требования всегда: Пользовательское требование]
+[ФИО и Должность — из команды заказчика]
+
+Если требований не было — написать: Требований в этом фрагменте не зафиксировано.
+
+━━━ КОНЕЦ БЛОКА 2 ━━━`;
 }
+
 
 function MERGE_PROMPT(parts, title) {
   return `Объедини фрагменты протокола встречи «${title || 'без названия'}» в единый связный документ.
@@ -947,7 +1067,7 @@ async function generateProtocol() {
       showStatus('protocol-status', 'info', 'Составляю протокол...');
       showAP('Анализ текста...', 30, '');
       protocolText = await callGemini([{
-        text: PROTOCOL_PROMPT(title, null) + '\n\nТЕКСТ ВСТРЕЧИ:\n' + manualText
+        text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate) + '\n\nТЕКСТ ВСТРЕЧИ:\n' + manualText
       }]);
       showAP('Готово', 90, '');
 
@@ -967,7 +1087,7 @@ async function generateProtocol() {
 
           const raw = await callGemini([
             { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-            { text: PROTOCOL_PROMPT(title, part.label) }
+            { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate) }
           ]);
 
           const marker = raw.indexOf('===ТРЕБОВАНИЯ===');
@@ -1018,7 +1138,7 @@ async function generateProtocol() {
       showAP('Gemini смотрит запись...', 40, 'Видит экран и слышит речь · ~1–2 минуты');
       protocolText = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null) }
+        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate) }
       ]);
       showAP('Протокол готов', 85, '');
     }
@@ -1053,8 +1173,10 @@ async function generateProtocol() {
 function saveProtocol() {
   if (!currentProtocolText) { alert('Сначала создай протокол'); return; }
   const title = document.getElementById('meeting-title').value.trim() || 'Встреча ' + today();
+  const proj = getProjectName();
+  const displayTitle = proj ? `[${proj}] ${title}` : title;
   const list = JSON.parse(localStorage.getItem('protocols') || '[]');
-  list.unshift({ id: Date.now(), title, date: today(), protocol: currentProtocolText, requirements: currentRequirementsText });
+  list.unshift({ id: Date.now(), title: displayTitle, date: today(), protocol: currentProtocolText, requirements: currentRequirementsText });
   localStorage.setItem('protocols', JSON.stringify(list));
   showStatus('protocol-status', 'success', `Протокол «${title}» сохранён`);
 }
@@ -1124,8 +1246,16 @@ async function generateRegistry() {
 
 // ── DOCX ──────────────────────────────────────────────
 async function downloadDocx(type) {
+  // Wait up to 10 seconds for docx library to load
+  if (!window.docx) {
+    let waited = 0;
+    while (!window.docx && waited < 10000) {
+      await sleep(200);
+      waited += 200;
+    }
+  }
   const docxLib = window.docx;
-  if (!docxLib) { alert('Библиотека docx не загружена — обнови страницу'); return; }
+  if (!docxLib) { alert('Библиотека docx не загружена. Обнови страницу (Ctrl+Shift+R) и попробуй снова.'); return; }
   const map = {
     protocol: { text: currentProtocolText, file: 'протокол.docx' },
     requirements: { text: currentRequirementsText, file: 'требования.docx' },
@@ -1327,7 +1457,7 @@ async function reprocessSession(id) {
         showStatus('library-status', 'info', `Gemini анализирует ${part.label}...`);
         const text = await callGemini([
           { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-          { text: PROTOCOL_PROMPT(title, part.label) }
+          { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate) }
         ]);
         partProtocols.push(text);
         if (i < uploadedParts.length - 1) await sleep(20000);
@@ -1338,7 +1468,7 @@ async function reprocessSession(id) {
       showStatus('library-status', 'info', 'Gemini анализирует запись...');
       protocolText = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null) }
+        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate) }
       ]);
     }
 
@@ -1367,8 +1497,246 @@ function saveProtocolFromLibrary() {
   showStatus('library-status', 'success', `Протокол «${title}» сохранён`);
 }
 
+
+// ══════════════════════════════════════════════════════
+// НСИ — Нормативно-справочная информация
+// ══════════════════════════════════════════════════════
+
+// ── NSI STORAGE HELPERS ───────────────────────────────
+const getNSI = () => JSON.parse(localStorage.getItem('nsi') || '{"positions":[],"participants":[],"projects":[]}');
+const saveNSI = d => localStorage.setItem('nsi', JSON.stringify(d));
+
+// ── DATE INPUT FORMATTER ──────────────────────────────
+function formatDateInput(el) {
+  let v = el.value.replace(/\D/g,'');
+  if (v.length > 2) v = v.slice(0,2) + '.' + v.slice(2);
+  if (v.length > 5) v = v.slice(0,5) + '.' + v.slice(5);
+  el.value = v.slice(0,10);
+}
+
+// ── POSITIONS ─────────────────────────────────────────
+function addPosition() {
+  const name = document.getElementById('new-position').value.trim();
+  if (!name) return;
+  const nsi = getNSI();
+  if (nsi.positions.includes(name)) return;
+  nsi.positions.push(name);
+  saveNSI(nsi);
+  document.getElementById('new-position').value = '';
+  renderNSI();
+}
+
+function deletePosition(idx) {
+  const nsi = getNSI();
+  nsi.positions.splice(idx, 1);
+  saveNSI(nsi);
+  renderNSI();
+}
+
+// ── PARTICIPANTS ──────────────────────────────────────
+function addParticipant() {
+  const name = document.getElementById('new-participant').value.trim();
+  if (!name) return;
+  const nsi = getNSI();
+  if (nsi.participants.find(p => p.name === name)) return;
+  nsi.participants.push({ id: Date.now(), name });
+  saveNSI(nsi);
+  document.getElementById('new-participant').value = '';
+  renderNSI();
+}
+
+function deleteParticipant(id) {
+  const nsi = getNSI();
+  nsi.participants = nsi.participants.filter(p => p.id !== id);
+  saveNSI(nsi);
+  renderNSI();
+}
+
+// ── PROJECTS ──────────────────────────────────────────
+function addProject() {
+  const name = document.getElementById('new-project').value.trim();
+  if (!name) return;
+  const nsi = getNSI();
+  if (nsi.projects.find(p => p.name === name)) return;
+  nsi.projects.push({ id: Date.now(), name, executor: [], customer: [] });
+  saveNSI(nsi);
+  document.getElementById('new-project').value = '';
+  renderNSI();
+  updateProjectSelect();
+}
+
+function deleteProject(id) {
+  if (!confirm('Удалить проект?')) return;
+  const nsi = getNSI();
+  nsi.projects = nsi.projects.filter(p => p.id !== id);
+  saveNSI(nsi);
+  renderNSI();
+  updateProjectSelect();
+}
+
+let editingProjectId = null;
+
+function openProjectEditor(id) {
+  editingProjectId = id;
+  const nsi = getNSI();
+  const proj = nsi.projects.find(p => p.id === id);
+  if (!proj) return;
+
+  document.getElementById('editor-project-name').textContent = proj.name;
+  document.getElementById('project-editor').style.display = 'block';
+  document.getElementById('project-editor').scrollIntoView({ behavior:'smooth', block:'start' });
+
+  // Populate participant selects
+  ['executor-participant','customer-participant'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    sel.innerHTML = '<option value="">— Участник —</option>' +
+      nsi.participants.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
+  });
+
+  // Populate position selects
+  ['executor-position','customer-position'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    sel.innerHTML = '<option value="">— Должность —</option>' +
+      nsi.positions.map(pos => `<option value="${escHtml(pos)}">${escHtml(pos)}</option>`).join('');
+  });
+
+  renderTeams(proj);
+}
+
+function renderTeams(proj) {
+  const nsi = getNSI();
+  ['executor','customer'].forEach(side => {
+    const list = document.getElementById(side + '-team-list');
+    const team = proj[side] || [];
+    if (!team.length) { list.innerHTML = '<div style="font-size:12px;color:#94a3b8;padding:4px 0">Нет участников</div>'; return; }
+    list.innerHTML = team.map((m, i) => {
+      const p = nsi.participants.find(x => x.id === m.participantId);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#f8fafc;border-radius:7px;margin-bottom:5px;font-size:13px">
+        <div>
+          <div style="font-weight:600;color:#1e293b">${escHtml(p?.name || '?')}</div>
+          <div style="color:#64748b;font-size:12px">${escHtml(m.position)}</div>
+        </div>
+        <button class="protocol-del" onclick="removeTeamMember('${side}',${i})">×</button>
+      </div>`;
+    }).join('');
+  });
+}
+
+function addTeamMember(side) {
+  const pId = parseInt(document.getElementById(side + '-participant').value);
+  const pos = document.getElementById(side + '-position').value;
+  if (!pId || !pos) { alert('Выбери участника и должность'); return; }
+
+  const nsi = getNSI();
+  const proj = nsi.projects.find(p => p.id === editingProjectId);
+  if (!proj) return;
+
+  // Check if already added
+  if (proj[side].find(m => m.participantId === pId)) {
+    alert('Этот участник уже добавлен'); return;
+  }
+
+  proj[side].push({ participantId: pId, position: pos });
+  saveNSI(nsi);
+  renderTeams(proj);
+}
+
+function removeTeamMember(side, idx) {
+  const nsi = getNSI();
+  const proj = nsi.projects.find(p => p.id === editingProjectId);
+  if (!proj) return;
+  proj[side].splice(idx, 1);
+  saveNSI(nsi);
+  renderTeams(proj);
+}
+
+// ── RENDER NSI PAGE ───────────────────────────────────
+function renderNSI() {
+  const nsi = getNSI();
+
+  // Positions
+  const posList = document.getElementById('positions-list');
+  posList.innerHTML = nsi.positions.length ? nsi.positions.map((pos, i) =>
+    `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px">
+      <span style="color:#1e293b">${escHtml(pos)}</span>
+      <button class="protocol-del" onclick="deletePosition(${i})">×</button>
+    </div>`).join('')
+    : '<div style="font-size:12px;color:#94a3b8;padding:4px 0">Нет должностей</div>';
+
+  // Participants
+  const partList = document.getElementById('participants-list');
+  partList.innerHTML = nsi.participants.length ? nsi.participants.map(p =>
+    `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px">
+      <span style="color:#1e293b">${escHtml(p.name)}</span>
+      <button class="protocol-del" onclick="deleteParticipant(${p.id})">×</button>
+    </div>`).join('')
+    : '<div style="font-size:12px;color:#94a3b8;padding:4px 0">Нет участников</div>';
+
+  // Projects
+  const projList = document.getElementById('projects-list');
+  projList.innerHTML = nsi.projects.length ? nsi.projects.map(proj => {
+    const execCount = proj.executor?.length || 0;
+    const custCount = proj.customer?.length || 0;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fafc;border-radius:9px;margin-bottom:7px;cursor:pointer;border:1px solid #e2e8f0" onclick="openProjectEditor(${proj.id})">
+      <div>
+        <div style="font-size:14px;font-weight:600;color:#1e293b">${escHtml(proj.name)}</div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">Исполнитель: ${execCount} · Заказчик: ${custCount}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:12px;color:#3b82f6">Редактировать →</span>
+        <button class="protocol-del" onclick="event.stopPropagation();deleteProject(${proj.id})">×</button>
+      </div>
+    </div>`;
+  }).join('')
+    : '<div style="font-size:12px;color:#94a3b8;padding:4px 0">Нет проектов</div>';
+
+  // Update project editor if open
+  if (editingProjectId) {
+    const proj = nsi.projects.find(p => p.id === editingProjectId);
+    if (proj) renderTeams(proj);
+  }
+}
+
+// ── UPDATE PROJECT SELECT IN PROTOCOL FORM ────────────
+function updateProjectSelect() {
+  const nsi = getNSI();
+  const sel = document.getElementById('meeting-project');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— Выбери проект —</option>' +
+    nsi.projects.map(p => `<option value="${p.id}"${p.id == current ? ' selected':''}>${escHtml(p.name)}</option>`).join('');
+}
+
+// ── GET PROJECT TEAM FOR PROMPT ───────────────────────
+function getProjectTeamText() {
+  const projId = parseInt(document.getElementById('meeting-project').value);
+  if (!projId) return '';
+  const nsi = getNSI();
+  const proj = nsi.projects.find(p => p.id === projId);
+  if (!proj) return '';
+
+  const lines = [];
+  (proj.executor || []).forEach(m => {
+    const p = nsi.participants.find(x => x.id === m.participantId);
+    if (p) lines.push(`Команда исполнителя | ${m.position} | ${p.name}`);
+  });
+  (proj.customer || []).forEach(m => {
+    const p = nsi.participants.find(x => x.id === m.participantId);
+    if (p) lines.push(`Команда заказчика | ${m.position} | ${p.name}`);
+  });
+  return lines.join('\n');
+}
+
+function getProjectName() {
+  const projId = parseInt(document.getElementById('meeting-project').value);
+  if (!projId) return '';
+  const nsi = getNSI();
+  return nsi.projects.find(p => p.id === projId)?.name || '';
+}
+
 // ── INIT ─────────────────────────────────────────────
 if (!getKey()) setTimeout(openSettings, 500);
+setTimeout(() => { renderNSI(); updateProjectSelect(); }, 100);
 </script>
 </body>
 </html>
