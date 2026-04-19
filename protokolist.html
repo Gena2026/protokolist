@@ -225,6 +225,7 @@ textarea{resize:vertical;line-height:1.6}
 
     <div class="btn-row">
       <button class="btn btn-primary" id="btn-generate" onclick="generateProtocol()">✨ Создать протокол</button>
+      <button class="btn btn-secondary" id="btn-download-transcript-main" disabled title="Транскрипция появится после обработки Whisper" onclick="downloadTranscript()">📄 Скачать транскрипцию</button>
     </div>
     <div id="protocol-status"></div>
   </div>
@@ -421,6 +422,7 @@ let currentTranscriptText = '';
 let uploadState = 'idle';
 let uploadedFile = null;      // { uri, mimeType } for short videos
 let uploadedParts = [];       // [{ uri, mimeType, label }] for long videos
+let currentFileKey = null;    // fileKey of current upload session (for transcript saving)
 
 // ── SETTINGS ─────────────────────────────────────────
 const getKey = () => localStorage.getItem('gemini_key') || '';
@@ -494,11 +496,18 @@ function setUIP(stage, pct, note) {
 }
 
 function showWhisperBadge() {
+  // Button inside upload-done-area (visible after upload completes)
   const badge = document.getElementById('whisper-done-badge');
   if (badge) badge.style.display = 'block';
-  // Also update the sub-text to show Whisper is ready
+  // Enable the always-visible button next to "Создать протокол"
+  const mainBtn = document.getElementById('btn-download-transcript-main');
+  if (mainBtn) {
+    mainBtn.disabled = false;
+    mainBtn.title = 'Скачать транскрипцию Whisper';
+  }
+  // Update the upload done sub-text
   const sub = document.getElementById('upload-done-sub');
-  if (sub && !sub.textContent.includes('Whisper')) {
+  if (sub && sub.textContent && !sub.textContent.includes('Whisper')) {
     sub.textContent = sub.textContent + ' · Whisper ✅';
   }
 }
@@ -539,8 +548,11 @@ async function startFileUpload(file) {
   uploadedFile = null;
   uploadedParts = [];
   currentTranscriptText = '';
+  currentFileKey = makeFileKey(file);
   const wBadge = document.getElementById('whisper-done-badge');
   if (wBadge) wBadge.style.display = 'none';
+  const mainBtn = document.getElementById('btn-download-transcript-main');
+  if (mainBtn) { mainBtn.disabled = true; mainBtn.title = 'Транскрипция появится после обработки Whisper'; }
   clearStatus('protocol-status');
 
   const mb = (file.size / 1024 / 1024).toFixed(1);
@@ -562,15 +574,14 @@ async function startFileUpload(file) {
 
       initSession(file, numParts, meetingTitle);
 
-      // Run Whisper transcription and ffmpeg splitting IN PARALLEL
+      // ── STEP 1: Whisper transcription ──────────────────
       setUploadUI('uploading', {
-        title: `Запуск: Whisper транскрипция + нарезка видео параллельно...`,
-        stage: 'Параллельная обработка',
-        pct: 3,
-        note: `${numParts} кусков · Groq Whisper + ffmpeg`
+        title: 'Шаг 1/3: Whisper транскрибирует аудио...',
+        stage: 'Groq Whisper',
+        pct: 5,
+        note: `Groq Whisper — точная транскрипция · ${numParts} частей видео`
       });
 
-      // Sequential: Whisper first (audio only, less RAM), then ffmpeg (video)
       let whisperTranscript = null;
       if (getGroqKey()) {
         try {
@@ -578,18 +589,38 @@ async function startFileUpload(file) {
         } catch(e) {
           console.warn('Whisper failed:', e.message);
           setUIP('Whisper не удался, продолжаем без транскрипции...', 48, e.message);
-          await sleep(2000);
+          await sleep(3000);
         }
+      } else {
+        setUIP('Groq не настроен — пропускаем транскрипцию', 10, 'Добавь ключ в ⚙️ API-ключи');
+        await sleep(2000);
       }
-      const chunks = await splitVideoIntoChunks(file);
 
-      // Save full transcript
+      // Save transcript immediately after Whisper completes
       if (whisperTranscript) {
         currentTranscriptText = whisperTranscript;
+        saveTranscriptToSession(currentFileKey, whisperTranscript);
         showWhisperBadge();
+        // Show completion message briefly
+        setUploadUI('uploading', {
+          title: '✅ Транскрипция готова! Теперь нарезаем видео...',
+          stage: 'Whisper завершён',
+          pct: 48,
+          note: 'Кнопка «Скачать транскрипцию» уже доступна'
+        });
+        await sleep(2500);
       }
 
-      // Upload chunks to Gemini
+      // ── STEP 2: ffmpeg split ────────────────────────────
+      setUploadUI('uploading', {
+        title: 'Шаг 2/3: Нарезаем видео на части...',
+        stage: 'ffmpeg',
+        pct: 50,
+        note: `${numParts} частей · без перекодирования`
+      });
+      const chunks = await splitVideoIntoChunks(file);
+
+      // ── STEP 3: Upload chunks to Gemini ────────────────
       uploadedParts = [];
       for (let i = 0; i < chunks.length; i++) {
         if (alreadyUploaded[i]) {
@@ -608,7 +639,7 @@ async function startFileUpload(file) {
         const pEnd  = 55 + ((i + 1) / chunks.length) * 40;
 
         setUploadUI('uploading', {
-          title: `Загрузка на Google: часть ${i + 1} из ${chunks.length}`,
+          title: `Шаг 3/3: Загрузка на Google — часть ${i + 1} из ${chunks.length}`,
           stage: `0 МБ`,
           pct: pBase,
           note: 'Не закрывай вкладку'
@@ -618,7 +649,7 @@ async function startFileUpload(file) {
           const loadedMb = (loaded / 1024 / 1024).toFixed(0);
           const totalMb  = (total  / 1024 / 1024).toFixed(0);
           setUploadUI('uploading', {
-            title: `Загрузка на Google: часть ${i + 1} из ${chunks.length}`,
+            title: `Шаг 3/3: Загрузка на Google — часть ${i + 1} из ${chunks.length}`,
             stage: `${loadedMb} / ${totalMb} МБ`,
             pct: pBase + (loaded / total) * (pEnd - pBase - 3),
             note: 'Не закрывай вкладку'
@@ -639,7 +670,7 @@ async function startFileUpload(file) {
       uploadState = 'ready';
       setUploadUI('ready', {
         title: `${file.name}${durationStr}`,
-        sub: `Видео разбито на ${numParts} части · ${whisperTranscript ? 'Whisper ✅ · ' : ''}готово к анализу`
+        sub: `${numParts} частей загружено · ${whisperTranscript ? 'Транскрипция ✅ · ' : 'Без транскрипции · '}готово к анализу`
       });
 
     } else {
@@ -683,7 +714,13 @@ async function startFileUpload(file) {
           note: 'Параллельно готовим транскрипцию'
         });
         transcribeWithWhisper(file)
-          .then(t => { if (t) { currentTranscriptText = t; showWhisperBadge(); } })
+          .then(t => {
+            if (t) {
+              currentTranscriptText = t;
+              saveTranscriptToSession(currentFileKey, t);
+              showWhisperBadge();
+            }
+          })
           .catch(e => console.warn('Whisper:', e.message));
       }
 
@@ -868,21 +905,27 @@ async function callGemini(parts, _attempt = 0) {
   const e = await res.json().catch(() => ({}));
   const msg = (e.error?.message || JSON.stringify(e)).slice(0, 300);
   const isRateLimit = res.status === 429 || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED');
+  const isOverload  = res.status === 503 || msg.includes('overloaded') || msg.includes('high demand') || msg.includes('unavailable');
 
-  if (isRateLimit && _attempt < 5) {
-    const waitSec = [60, 90, 120, 180, 240][_attempt];
-    await countdownWait(waitSec, _attempt + 1);
+  if ((isRateLimit || isOverload) && _attempt < 6) {
+    // Longer waits for overload (503), shorter for rate limit (429)
+    const waitSec = isOverload
+      ? [30, 60, 90, 120, 180, 240][_attempt]
+      : [60, 90, 120, 180, 240, 300][_attempt];
+    const reason = isOverload ? 'Gemini перегружен' : 'Лимит API';
+    await countdownWait(waitSec, _attempt + 1, reason);
     return callGemini(parts, _attempt + 1);
   }
 
   throw new Error('Gemini: ' + msg);
 }
 
-async function countdownWait(seconds, attempt) {
+async function countdownWait(seconds, attempt, reason) {
   document.getElementById('analysis-progress').style.display = 'block';
+  const label = reason || 'Лимит API';
   for (let i = seconds; i > 0; i--) {
     document.getElementById('ap-stage').textContent =
-      `Лимит API — автоповтор ${attempt}/5 через ${i} сек...`;
+      `${label} — автоповтор ${attempt}/6 через ${i} сек...`;
     document.getElementById('ap-pct').textContent = '';
     document.getElementById('ap-bar').style.width = Math.round(((seconds - i) / seconds) * 100) + '%';
     document.getElementById('ap-note').textContent = 'Это автоматически — ничего делать не нужно';
@@ -1978,6 +2021,16 @@ function getUploadSessions() {
   return JSON.parse(localStorage.getItem('upload_sessions') || '[]');
 }
 
+// Save transcript text into session by fileKey
+function saveTranscriptToSession(fileKey, transcriptText) {
+  if (!fileKey || !transcriptText) return;
+  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+  const s = sessions.find(s => s.fileKey === fileKey);
+  if (!s) return;
+  s.transcript = transcriptText;
+  localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+}
+
 
 function renderLibrary() {
   // Автоматически убираем истёкшие записи (старше 48 часов)
@@ -2021,7 +2074,10 @@ function renderLibrary() {
           ? `<div style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;width:100%">
                Загрузка прервалась. Выбери тот же файл <strong>${escHtml(s.fileName)}</strong> на вкладке «Протокол встречи» — приложение само пропустит уже загруженные части.
              </div>`
-          : `<button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="reprocessSession(${s.id})">✨ Переделать протокол</button>`
+          : `<div style="display:flex;gap:8px;flex-wrap:wrap">
+               <button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="reprocessSession(${s.id})">✨ Переделать протокол</button>
+               ${s.transcript ? `<button class="btn btn-secondary" style="padding:6px 14px;font-size:12px" onclick="downloadSessionTranscript(${s.id})">📄 Скачать транскрипцию</button>` : '<span style="font-size:11px;color:#94a3b8;align-self:center">Транскрипции нет (Groq не настроен или не сработал)</span>'}
+             </div>`
         }
       </div>`;
   }).join('');
@@ -2317,6 +2373,17 @@ async function transcribeWithWhisper(file) {
     const wavBlob = encodeWAV(slice, sr);
     const offsetSec = i * secPerChunk;
 
+    // Pause between chunks to avoid Groq audio-seconds-per-minute rate limit
+    if (i > 0) {
+      setUploadUI('uploading', {
+        title:`Whisper: пауза перед частью ${i+1}...`,
+        stage:`${Math.round(offsetSec/60)}–${Math.round(Math.min((i+1)*secPerChunk,durationSec)/60)} мин`,
+        pct: 10+(i/numChunks)*40,
+        note:'Соблюдаем лимит Groq (аудио-секунды в минуту)'
+      });
+      await sleep(65000); // 65 sec — Groq resets per-minute audio limit
+    }
+
     setUploadUI('uploading', {
       title:`Whisper транскрибирует часть ${i+1} из ${numChunks}...`,
       stage:`${Math.round(offsetSec/60)}–${Math.round(Math.min((i+1)*secPerChunk,durationSec)/60)} мин`,
@@ -2331,9 +2398,25 @@ async function transcribeWithWhisper(file) {
     formData.append('response_format','verbose_json');
     formData.append('timestamp_granularities[]','segment');
 
-    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
-      method:'POST', headers:{'Authorization':'Bearer '+key}, body:formData
-    });
+    // Retry on 429
+    let res, retries = 0;
+    while (true) {
+      res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
+        method:'POST', headers:{'Authorization':'Bearer '+key}, body:formData
+      });
+      if (res.status !== 429 || retries >= 3) break;
+      retries++;
+      const retryAfter = parseInt(res.headers.get('retry-after') || '60');
+      const waitSec = Math.max(retryAfter, 60);
+      setUploadUI('uploading', {
+        title:`Whisper: лимит Groq, жду ${waitSec} сек (попытка ${retries}/3)...`,
+        stage:`Часть ${i+1}`,
+        pct: 10+(i/numChunks)*40,
+        note:'429 rate limit — автоповтор'
+      });
+      await sleep(waitSec * 1000);
+    }
+
     if (!res.ok) { const e=await res.json().catch(()=>{}); throw new Error('Groq Whisper: '+(e?.error?.message||res.status)); }
     const data = await res.json();
     if (data.segments) {
