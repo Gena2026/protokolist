@@ -1782,10 +1782,8 @@ async function downloadSimpleDocx(text, filename) {
 }
 
 
-const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 
-const getProtocols = () => JSON.parse(localStorage.getItem('protocols') || '[]');
 
 function renderList(tab) {
   const isReport = tab === 'report';
@@ -1814,7 +1812,6 @@ function deleteProtocol(id) {
   renderList('report');
 }
 function selectAll(prefix) { document.querySelectorAll(`input[id^="${prefix}-"]`).forEach(c => c.checked = true); }
-const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // ── GENERATE REPORT ───────────────────────────────────
 
