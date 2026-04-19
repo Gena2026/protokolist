@@ -268,8 +268,6 @@ textarea{resize:vertical;line-height:1.6}
   </div>
 </div>
 
-</div>
-
 <!-- ======= LIBRARY ======= -->
 <div class="page" id="page-library">
   <div class="card">
@@ -365,6 +363,8 @@ textarea{resize:vertical;line-height:1.6}
   </div>
 
 </div>
+
+</div><!-- /main -->
 
 
 <!-- ======= SETTINGS ======= -->
@@ -881,70 +881,72 @@ const today = () => new Date().toLocaleDateString('ru-RU');
 
 function PROTOCOL_PROMPT(title, partInfo, projectName, teamText, meetingDate, transcriptSegment) {
   const dateStr = meetingDate || today();
-  return `Ты — профессиональный IT-аналитик. Составь протокол интервью строго по шаблону ниже.
+  return `Ты — профессиональный IT-аналитик. Составь протокол интервью СТРОГО по шаблону ниже.
 ${partInfo ? `ВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент.` : ''}
 
 ДАННЫЕ ДЛЯ ШАПКИ:
 Проект: ${projectName || '[не указан]'}
 Тема: ${title || '[определи из контекста]'}
 Дата: ${dateStr}
-Команда проекта (используй эти данные для участников):
-${teamText || '[список участников не задан — определи из видео]'}
+Команда проекта — используй ТОЛЬКО этих людей для заполнения таблиц:
+${teamText || '[список участников не задан — определи из видео по именам]'}
 
-СПИСОК ФУНКЦИОНАЛЬНЫХ ОБЛАСТЕЙ (выбери одну или несколько):
+СПИСОК ФУНКЦИОНАЛЬНЫХ ОБЛАСТЕЙ (выбери одну или несколько из списка):
 Закупки, Продажи, Планирование, Бюджетирование, Склады, Доставка, МСФО, Бухгалтерия, Финансы, Казначейство, CRM и маркетинг, НСИ, Производство, Ремонт
 
-ВЕРНИ ДВА БЛОКА РАЗДЕЛЁННЫХ МАРКЕРОМ ===ТРЕБОВАНИЯ===
+ВЕРНИ ДВА БЛОКА, РАЗДЕЛЁННЫХ МАРКЕРОМ ===ТРЕБОВАНИЯ===
 
 ━━━ БЛОК 1: ПРОТОКОЛ ━━━
 
-Протокол интервью №[номер]
+Протокол интервью №[порядковый номер]
 
 | Проект: | ${projectName || ''} |
-| Функциональная область | [выбери из списка выше, через запятую если несколько] |
+| Функциональная область | [одна или несколько из списка через запятую] |
 | Тема интервью | ${title || '[определи из контекста]'} |
 | Дата интервью | ${dateStr} |
-| Цель проведения интервью | [напиши сам исходя из контекста встречи] |
+| Цель проведения интервью | [2–3 предложения: зачем проводилась встреча, что изучалось] |
 
 УЧАСТНИКИ:
 | Участники | Должность | ФИО |
 |-----------|-----------|-----|
-[заполни из команды проекта выше — сопоставь имена из видео с командой. Формат строки: | Команда исполнителя | Должность | ФИО | или | Команда заказчика | Должность | ФИО |]
+[Заполни строками ниже. ВАЖНО: первая колонка — название команды (например "ИП ООО «Название»" или "Команда заказчика"), вторая — Должность, третья — ФИО. Сопоставь имена из записи с командой проекта.]
 
 ГЛОССАРИЙ:
-[термины и аббревиатуры которые упоминались на встрече. Формат: Термин — определение. Если терминов нет — написать: Специальных терминов не использовалось.]
+[Перечисли термины и аббревиатуры из встречи. Формат каждой строки: Термин — определение.
+Если специальных терминов не было — написать одной строкой: Специальных терминов не использовалось.]
 
 ВОПРОСЫ ДЛЯ ОБСУЖДЕНИЯ:
-[пронумерованный список вопросов которые обсуждались на встрече]
+[Пронумерованный список вопросов которые обсуждались. Формат: 1. Вопрос? 2. Вопрос?]
 
 ТЕЗИСЫ ИНТЕРВЬЮ:
+[Структурируй по темам обсуждения. Для каждой темы — отдельный подзаголовок.
+Внутри темы выноси подразделы «Как есть» и «Как будет» только если они реально обсуждались.]
 
-[Если обсуждалось как сейчас ведётся работа — добавь:]
+[Для текущих бизнес-процессов:]
 Описание процессов «Как есть» («As Is»)
-[тезисы по текущим бизнес-процессам, разбитые по темам с подзаголовками]
+[Тезисы по текущим процессам. Каждый тезис — отдельный абзац. Пиши развёрнуто и конкретно.]
 
-[Если обсуждалось как должно быть в новой системе — добавь:]
+[Для будущих процессов в новой системе:]
 Описание процессов «Как будет» («To Be»)
-[тезисы по будущим бизнес-процессам, разбитые по темам с подзаголовками]
+[Тезисы по будущим процессам. Каждый тезис начинается с «Необходимо реализовать...» или «Планируется...»]
 
 ИНФОРМАЦИОННЫЕ МАТЕРИАЛЫ:
-[Если исполнитель запрашивал документы/данные/файлы — перечисли в формате таблицы:]
+[Если исполнитель запрашивал документы, данные, файлы — заполни таблицу. Плановую дату считай через 5–7 рабочих дней от ${dateStr}. Если ничего не запрашивалось — написать одной строкой: Информационные материалы не запрашивались.]
 | Материал | ФИО ответственного | Плановая дата получения | Фактическая дата получения |
-[Плановую дату считай от даты встречи ${dateStr}. Если ничего не запрашивалось — написать: Информационные материалы не запрашивались.]
 
 ОТКРЫТЫЕ ВОПРОСЫ:
+[Вопросы которые остались без ответа или требуют уточнения. Если нет — написать: Открытых вопросов не зафиксировано.]
 | Содержание вопроса | ФИО ответственного | Плановая дата | Фактическая дата |
-[вопросы которые остались нерешёнными. Если нет — написать: Открытых вопросов не зафиксировано.]
 
 СЛЕДУЮЩИЕ ШАГИ:
+[Конкретные действия договорённости о которых достигнуты. Срок считай от ${dateStr}.]
 | № | Действие | Ответственный | Срок |
-[Срок считай от даты встречи ${dateStr}]
 
-Протокол составлен: [ФИО первого участника из команды исполнителя]
+ПРОТОКОЛ СОСТАВЛЕН: [ФИО первого участника из команды исполнителя]
 
 ЛИСТ СОГЛАСОВАНИЯ:
 | ФИО | Должность | Дата | Подпись |
-[заполни всеми участниками встречи из команды проекта, Дата и Подпись оставь пустыми]
+[Заполни всеми участниками встречи. Колонки Дата и Подпись оставь пустыми.]
 
 ━━━ КОНЕЦ БЛОКА 1 ━━━
 
@@ -952,14 +954,15 @@ ${teamText || '[список участников не задан — опред
 
 ━━━ БЛОК 2: ЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ ━━━
 
-Извлеки ВСЕ требования из этого фрагмента.
-Требования — это то что заказчик хочет видеть в новой системе (To Be).
-Смотри внимательно: явные («нам нужно...», «хотелось бы...») и неявные (пожелания, проблемы которые нужно решить).
+Извлеки ВСЕ требования заказчика из этого фрагмента.
+Требование — это то, что заказчик хочет видеть в новой системе.
+Ищи: явные («нам нужно...», «хотелось бы...», «должно быть...») и неявные (проблемы которые нужно решить, пожелания).
+Требование из «To Be» — тоже требование, включай его.
+Каждое требование формулируй: «Необходимо реализовать [что именно] с целью [зачем].»
 
-Формат таблицы:
-| Содержание требования | ФИО владельца | Должность | Вид требования |
+| Содержание требования | ФИО владельца требования | Должность | Вид требования |
 [Вид требования всегда: Пользовательское требование]
-[ФИО и Должность — из команды заказчика]
+[ФИО и Должность — из команды заказчика. Если не ясно кто именно — ставь первого участника со стороны заказчика.]
 
 Если требований не было — написать: Требований в этом фрагменте не зафиксировано.
 
@@ -970,8 +973,8 @@ ${teamText || '[список участников не задан — опред
 ━━━ БЛОК 3: ТРАНСКРИПЦИЯ ━━━
 
 ${transcriptSegment
-  ? 'Готовая транскрипция (от Whisper):\n' + transcriptSegment
-  : 'Транскрипция недоступна — напиши самостоятельно слово в слово.\nФормат: [ЧЧ:ММ:СС] текст'}
+  ? 'Готовая транскрипция от Whisper (используй её для анализа выше):\n' + transcriptSegment
+  : 'Транскрипция недоступна — напиши самостоятельно слово в слово все реплики.\nФормат каждой реплики: [ЧЧ:ММ:СС] Текст реплики'}
 
 ━━━ КОНЕЦ БЛОКА 3 ━━━`;
 }
@@ -979,9 +982,14 @@ ${transcriptSegment
 
 function MERGE_PROMPT(parts, title) {
   return `Объедини фрагменты протокола встречи «${title || 'без названия'}» в единый связный документ.
-Правила: сохрани хронологию · убери дубли · выглядит как один протокол, не склейка.
-Используй шаблон с разделами 1–5 (Повестка, Обсуждения, Решения, Открытые вопросы, Следующие шаги).
-НЕ добавляй раздел с требованиями — они обрабатываются отдельно.
+
+Правила:
+— Сохрани хронологию событий
+— Убери дублирующиеся тезисы и вопросы (схожие по смыслу → объединяй в одно)
+— Итог должен выглядеть как один цельный протокол, не склейка
+— Сохрани ТОЧНО ту же структуру разделов: шапка-таблица → Участники → Глоссарий → Вопросы для обсуждения → Тезисы интервью (As Is / To Be) → Информационные материалы → Открытые вопросы → Следующие шаги → Протокол составлен → Лист согласования
+— В разделе «Участники» объедини всех уникальных участников
+— НЕ добавляй раздел «Зафиксированные требования» — он обрабатывается отдельно
 
 ${parts.map((p, i) => `=== ФРАГМЕНТ ${i + 1} ===\n${p}`).join('\n\n')}`;
 }
@@ -1340,13 +1348,6 @@ function downloadTranscript(text, filename) {
   URL.revokeObjectURL(url);
 }
 
-function downloadSessionTranscript(sessionId) {
-  const sessions = getUploadSessions();
-  const s = sessions.find(x => x.id === sessionId);
-  if (!s || !s.transcript) { alert('Транскрипция недоступна'); return; }
-  const safeName = (s.fileName || 'транскрипция').replace(/[^а-яёА-ЯЁa-zA-Z0-9._-]/g, '_');
-  downloadTranscript(s.transcript, safeName + '_транскрипция.txt');
-}
 
 // ── DOCX GENERATION ───────────────────────────────────
 async function downloadDocx(type) {
@@ -1463,6 +1464,8 @@ async function downloadProtocolDocx(text, filename) {
 
   for (const line of lines) {
     const trimmed = line.trim();
+    // Skip structural markers from the prompt template
+    if (!trimmed || /^━+$|^═+$|^БЛОК\s|^КОНЕЦ\s|^===/.test(trimmed)) { buffer.push(trimmed); continue; }
     let matched = false;
     for (const [marker, key] of Object.entries(sectionMarkers)) {
       if (trimmed.toUpperCase().includes(marker)) {
@@ -1596,7 +1599,7 @@ async function downloadProtocolDocx(text, filename) {
         children.push(subHead('Описание процессов «Как есть» («As Is»)'));
       } else if (/to.be|как.будет/i.test(l)) {
         children.push(subHead('Описание процессов «Как будет» («To Be»)'));
-      } else if (l.match(/^#+\s/) || l.match(/^[А-ЯA-Z][а-яА-Яa-zA-Z\s]{3,30}$/)) {
+      } else if (l.match(/^#+\s/) || l.match(/^[А-ЯA-Z][а-яА-ЯёЁa-zA-Z0-9\s()\-«»\/]{3,65}$/)) {
         children.push(new Paragraph({
           spacing: { before: 160, after: 80 },
           children: [new TextRun({ text: l.replace(/^#+\s*/, ''), bold: true, size: 22, font: 'Arial' })]
@@ -1614,7 +1617,7 @@ async function downloadProtocolDocx(text, filename) {
   const reqRows = [
     new TableRow({ children: [
       headerCell('Содержание требования', Math.round(PAGE_W * 0.55)),
-      headerCell('ФИО владельца', Math.round(PAGE_W * 0.18)),
+      headerCell('ФИО владельца требования', Math.round(PAGE_W * 0.18)),
       headerCell('Должность', Math.round(PAGE_W * 0.15)),
       headerCell('Вид требования', Math.round(PAGE_W * 0.12))
     ]})
@@ -1686,6 +1689,27 @@ async function downloadProtocolDocx(text, filename) {
   children.push(new Table({ width: { size: PAGE_W, type: WidthType.DXA }, columnWidths: oqCols, rows: oqRows }));
   children.push(new Paragraph({ spacing: { after: 160 }, children: [] }));
 
+  // ── NEXT STEPS TABLE ──────────────────────────────────
+  const nsLines = (sections.next_steps || []).filter(l => l.includes('|'));
+  children.push(sectionHead('Следующие шаги'));
+  const nsCols = [Math.round(PAGE_W*0.06), Math.round(PAGE_W*0.44), Math.round(PAGE_W*0.3), Math.round(PAGE_W*0.2)];
+  const nsRows = [new TableRow({ children: [
+    headerCell('№', nsCols[0]),
+    headerCell('Действие', nsCols[1]),
+    headerCell('Ответственный', nsCols[2]),
+    headerCell('Срок', nsCols[3])
+  ]})];
+  for (const line of nsLines) {
+    const parts = line.split('|').map(p => p.trim()).filter(Boolean);
+    const firstUp = (parts[0] || '').toUpperCase();
+    if (parts.length >= 2 && !firstUp.includes('ДЕЙСТВИЕ') && !firstUp.includes('№') && !firstUp.includes('СЛЕДУЮЩИЕ')) {
+      nsRows.push(new TableRow({ children: parts.map((p, i) => dataCell(p, nsCols[i] || nsCols[3])) }));
+    }
+  }
+  for (let i = nsRows.length; i < 4; i++) nsRows.push(new TableRow({ children: nsCols.map(w => dataCell('', w)) }));
+  children.push(new Table({ width: { size: PAGE_W, type: WidthType.DXA }, columnWidths: nsCols, rows: nsRows }));
+  children.push(new Paragraph({ spacing: { after: 160 }, children: [] }));
+
   // ── ACKNOWLEDGEMENT + COMPOSED ─────────────────────────
   children.push(sectionHead('Список приложений'));
   children.push(new Paragraph({ spacing: { after: 240 }, children: [] }));
@@ -1697,7 +1721,7 @@ async function downloadProtocolDocx(text, filename) {
   children.push(new Paragraph({
     spacing: { after: 240 },
     children: [new TextRun({
-      text: 'Все участники интервью, перечисленные в данном документе, получили копию данного документа по электронной почте.',
+      text: 'Все участники интервью, перечисленные в данном документе, получили копию данного документа по электронной почте. Если, по вашему мнению, в протоколе отражены неверные сведения, просьба сообщить об этом составителю протокола встречи для корректировки протокола.',
       size: 20, font: 'Arial'
     })]
   }));
@@ -1783,69 +1807,6 @@ async function downloadSimpleDocx(text, filename) {
 
 
 
-
-
-function renderList(tab) {
-  const isReport = tab === 'report';
-  const el = document.getElementById(isReport ? 'report-protocol-list' : 'registry-protocol-list');
-  const prefix = isReport ? 'rp' : 'rg';
-  const list = getProtocols();
-  if (!list.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div>Нет сохранённых протоколов.<br>Создай протокол и нажми «Сохранить в список».</div>`;
-    return;
-  }
-  el.innerHTML = `<div style="font-size:12px;color:#64748b;margin-bottom:12px">${list.length} протокол(ов)</div>` +
-    list.map(p => `
-      <div class="protocol-item" onclick="document.getElementById('${prefix}-${p.id}').click()">
-        <input type="checkbox" id="${prefix}-${p.id}" value="${p.id}" onclick="event.stopPropagation()">
-        <div class="protocol-meta">
-          <div class="protocol-title">${escHtml(p.title)}</div>
-          <div class="protocol-date">${p.date}</div>
-        </div>
-        ${isReport ? `<button class="protocol-del" onclick="event.stopPropagation();deleteProtocol(${p.id})" title="Удалить">×</button>` : ''}
-      </div>`).join('');
-}
-
-function deleteProtocol(id) {
-  if (!confirm('Удалить?')) return;
-  localStorage.setItem('protocols', JSON.stringify(getProtocols().filter(x => x.id !== id)));
-  renderList('report');
-}
-function selectAll(prefix) { document.querySelectorAll(`input[id^="${prefix}-"]`).forEach(c => c.checked = true); }
-
-// ── GENERATE REPORT ───────────────────────────────────
-
-
-async function generateReport() {
-  const checked = [...document.querySelectorAll('input[id^="rp-"]:checked')].map(c => c.value);
-  if (!checked.length) { showStatus('report-status', 'error', 'Выбери хотя бы один протокол'); return; }
-  const sel = getProtocols().filter(p => checked.includes(String(p.id)));
-  const combined = sel.map(p => `=== ${p.title} (${p.date}) ===\n${p.protocol}`).join('\n\n');
-  try {
-    showStatus('report-status', 'info', `Формирую отчёт из ${sel.length} протоколов...`);
-    currentReportText = await callGemini([{ text: REPORT_PROMPT(combined, document.getElementById('report-instructions').value) }]);
-    document.getElementById('report-preview').textContent = currentReportText;
-    document.getElementById('report-result-card').style.display = 'block';
-    document.getElementById('report-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    showStatus('report-status', 'success', 'Отчёт готов!');
-  } catch (e) { showStatus('report-status', 'error', e.message); }
-}
-
-// ── GENERATE REGISTRY ─────────────────────────────────
-async function generateRegistry() {
-  const checked = [...document.querySelectorAll('input[id^="rg-"]:checked')].map(c => c.value);
-  if (!checked.length) { showStatus('registry-status', 'error', 'Выбери хотя бы один протокол'); return; }
-  const sel = getProtocols().filter(p => checked.includes(String(p.id)));
-  const combined = sel.map(p => `=== ${p.title} (${p.date}) ===\n${p.requirements}`).join('\n\n');
-  try {
-    showStatus('registry-status', 'info', `Формирую реестр из ${sel.length} протоколов...`);
-    currentRegistryText = await callGemini([{ text: REGISTRY_PROMPT(combined) }]);
-    document.getElementById('registry-preview').textContent = currentRegistryText;
-    document.getElementById('registry-result-card').style.display = 'block';
-    document.getElementById('registry-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    showStatus('registry-status', 'success', 'Реестр готов!');
-  } catch (e) { showStatus('registry-status', 'error', e.message); }
-}
 
 // ── FILE LIBRARY ─────────────────────────────────────
 // Session key = filename + filesize (unique fingerprint)
@@ -1995,41 +1956,61 @@ async function reprocessSession(id) {
   }
 
   const title = session.title;
+  // Get current project context from main tab
+  const projectName = typeof getProjectName === 'function' ? (getProjectName() || '') : '';
+  const teamText = typeof getProjectTeamText === 'function' ? (getProjectTeamText() || '') : '';
+  const meetingDate = (document.getElementById('meeting-date')?.value?.trim()) || today();
+
   showStatus('library-status', 'info', `Запускаю анализ: «${title}»...`);
   document.getElementById('library-result-card').style.display = 'none';
+  currentRequirementsText = '';
 
   const btn = event.target;
   btn.disabled = true;
 
   try {
     let protocolText = '';
-    const apEl = document.getElementById('analysis-progress');
 
     if (uploadedParts.length > 0) {
       const partProtocols = [];
+      const partRequirements = [];
       for (let i = 0; i < uploadedParts.length; i++) {
         const part = uploadedParts[i];
         showStatus('library-status', 'info', `Gemini анализирует ${part.label}...`);
-        const text = await callGemini([
+        const raw = await callGemini([
           { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-          { text: PROTOCOL_PROMPT(title, part.label) }
+          { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, '') }
         ]);
-        partProtocols.push(text);
+        const marker1 = raw.indexOf('===ТРЕБОВАНИЯ===');
+        if (marker1 > -1) {
+          partProtocols.push(raw.slice(0, marker1).trim());
+          partRequirements.push(raw.slice(marker1 + 16).replace(/===ТРАНСКРИПЦИЯ===[^]*/, '').trim());
+        } else {
+          partProtocols.push(raw.trim());
+          partRequirements.push('');
+        }
         if (i < uploadedParts.length - 1) await sleep(20000);
       }
       showStatus('library-status', 'info', 'Объединяю части...');
+      await sleep(20000);
       protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
+      showStatus('library-status', 'info', 'Объединяю реестры требований...');
+      await sleep(20000);
+      currentRequirementsText = await callGemini([{ text: MERGE_REQUIREMENTS_PROMPT(partRequirements, title) }]);
     } else {
       showStatus('library-status', 'info', 'Gemini анализирует запись...');
       protocolText = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null) }
+        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, '') }
       ]);
     }
 
     currentProtocolText = protocolText;
-    showStatus('library-status', 'info', 'Извлекаю требования...');
-    currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
+    if (!currentRequirementsText) {
+      showStatus('library-status', 'info', 'Извлекаю требования...');
+      await sleep(20000);
+      currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
+    }
 
     document.getElementById('library-preview').textContent = currentProtocolText;
     document.getElementById('library-result-card').style.display = 'block';
@@ -2284,6 +2265,32 @@ function getTranscriptSegment(fullTranscript, startSec, endSec) {
   return result.join('\n');
 }
 
+
+// ── ENCODE WAV ───────────────────────────────────────
+function encodeWAV(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+  writeStr(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeStr(8, 'WAVE');
+  writeStr(12, 'fmt ');
+  view.setUint32(16, 16, true);       // subchunk size
+  view.setUint16(20, 1, true);        // PCM format
+  view.setUint16(22, 1, true);        // mono
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); // byte rate
+  view.setUint16(32, 2, true);        // block align
+  view.setUint16(34, 16, true);       // bits per sample
+  writeStr(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
 
 // ── INIT ─────────────────────────────────────────────
 if (!getKey()) setTimeout(openSettings, 500);
