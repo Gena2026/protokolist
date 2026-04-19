@@ -540,16 +540,18 @@ async function startFileUpload(file) {
         note: `${numParts} кусков · Groq Whisper + ffmpeg`
       });
 
-      // Start both in parallel
-      const [whisperTranscript, chunks] = await Promise.all([
-        getGroqKey()
-          ? transcribeWithWhisper(file).catch(e => {
-              console.warn('Whisper failed:', e.message);
-              return null; // continue without transcript
-            })
-          : Promise.resolve(null),
-        splitVideoIntoChunks(file)
-      ]);
+      // Sequential: Whisper first (audio only, less RAM), then ffmpeg (video)
+      let whisperTranscript = null;
+      if (getGroqKey()) {
+        try {
+          whisperTranscript = await transcribeWithWhisper(file);
+        } catch(e) {
+          console.warn('Whisper failed:', e.message);
+          setUIP('Whisper не удался, продолжаем без транскрипции...', 48, e.message);
+          await sleep(2000);
+        }
+      }
+      const chunks = await splitVideoIntoChunks(file);
 
       // Save full transcript
       if (whisperTranscript) {
@@ -1327,29 +1329,42 @@ function downloadSessionTranscript(sessionId) {
   downloadTranscript(s.transcript, safeName + '_транскрипция.txt');
 }
 
+
 function downloadTranscript(text, filename) {
   const txt = text || currentTranscriptText;
   if (!txt) { alert('Транскрипция недоступна — пересоздай протокол из видео'); return; }
   const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = filename || 'транскрипция.txt';
-  a.click();
+  a.href = url; a.download = filename || 'транскрипция.txt'; a.click();
   URL.revokeObjectURL(url);
 }
 
+function downloadSessionTranscript(sessionId) {
+  const sessions = getUploadSessions();
+  const s = sessions.find(x => x.id === sessionId);
+  if (!s || !s.transcript) { alert('Транскрипция недоступна'); return; }
+  const safeName = (s.fileName || 'транскрипция').replace(/[^а-яёА-ЯЁa-zA-Z0-9._-]/g, '_');
+  downloadTranscript(s.transcript, safeName + '_транскрипция.txt');
+}
+
+// ── DOCX GENERATION ───────────────────────────────────
 async function downloadDocx(type) {
-  // Wait up to 15 seconds for docx library
+  const map = {
+    protocol:     { text: currentProtocolText,     file: 'протокол.docx' },
+    requirements: { text: currentRequirementsText,  file: 'требования.docx' },
+    report:       { text: currentReportText,        file: 'отчёт.docx' },
+    registry:     { text: currentRegistryText,      file: 'реестр.docx' }
+  };
+  const { text, file } = map[type] || {};
+  if (!text) { alert('Сначала сгенерируй документ'); return; }
+
+  // Wait for docx library
   if (!window.docx) {
     let waited = 0;
-    while (!window.docx && waited < 15000) {
-      await sleep(300);
-      waited += 300;
-    }
+    while (!window.docx && waited < 15000) { await sleep(300); waited += 300; }
   }
-  const docxLib = window.docx;
-  if (!docxLib) {
+  if (!window.docx) {
     if (window.location.protocol === 'file:') {
       alert('Открой приложение по ссылке GitHub Pages — с диска docx не работает.');
     } else {
@@ -1357,599 +1372,415 @@ async function downloadDocx(type) {
     }
     return;
   }
-  const map = {
-    protocol: { text: currentProtocolText, file: 'протокол.docx' },
-    requirements: { text: currentRequirementsText, file: 'требования.docx' },
-    report: { text: currentReportText, file: 'отчёт_об_обследовании.docx' },
-    registry: { text: currentRegistryText, file: 'реестр_требований.docx' }
-  };
-  const { text, file } = map[type];
-  if (!text) { alert('Сначала сгенерируй документ'); return; }
-  const { Document, Paragraph, TextRun, AlignmentType, Packer } = docxLib;
-  const children = [];
-  for (const raw of text.split('\n')) {
-    const line = raw.trimEnd();
-    if (!line || /^[─━═]{4,}$/.test(line)) { children.push(new Paragraph({ text: '', spacing: { after: 80 } })); continue; }
-    if (/^(ПРОТОКОЛ ВСТРЕЧИ|ОТЧЁТ ОБ ОБСЛЕДОВАНИИ|РЕЕСТР ТРЕБОВАНИЙ|СВОДНЫЙ РЕЕСТР)/.test(line))
-      children.push(new Paragraph({ children: [new TextRun({ text: line, bold: true, size: 30, color: '1e293b' })], alignment: AlignmentType.CENTER, spacing: { after: 240 } }));
-    else if (/^\d+\.\s+[А-ЯA-Z]/.test(line))
-      children.push(new Paragraph({ children: [new TextRun({ text: line, bold: true, size: 26, color: '1e40af' })], spacing: { before: 280, after: 120 } }));
-    else if (/^\d+\.\d+/.test(line))
-      children.push(new Paragraph({ children: [new TextRun({ text: line, bold: true, size: 24 })], spacing: { before: 160, after: 80 } }));
-    else if (/^REQ-\d+/.test(line))
-      children.push(new Paragraph({ children: [new TextRun({ text: line, size: 22, color: '1d4ed8' })], spacing: { before: 60, after: 60 }, indent: { left: 360 } }));
-    else if (/^[\-\•]\s|^\d+\.\s/.test(line))
-      children.push(new Paragraph({ children: [new TextRun({ text: line, size: 22 })], spacing: { after: 60 }, indent: { left: 360 } }));
-    else if (/^(Дата:|Тема:|Участники:|Период:|АННОТАЦИЯ|ИТОГО)/.test(line)) {
-      const c = line.indexOf(':');
-      if (c > 0) children.push(new Paragraph({ children: [new TextRun({ text: line.slice(0,c+1), bold: true, size: 22 }), new TextRun({ text: line.slice(c+1), size: 22 })], spacing: { after: 80 } }));
-      else children.push(new Paragraph({ children: [new TextRun({ text: line, bold: true, size: 22 })], spacing: { before: 160, after: 80 } }));
-    } else
-      children.push(new Paragraph({ children: [new TextRun({ text: line, size: 22 })], spacing: { after: 60 } }));
+
+  if (type === 'protocol') {
+    await downloadProtocolDocx(text, file);
+  } else {
+    await downloadSimpleDocx(text, file);
   }
-  const d = new Document({ sections: [{ properties: { page: { margin: { top: 1134, right: 850, bottom: 1134, left: 1701 } } }, children }] });
-  const blob = await Packer.toBlob(d);
+}
+
+// ── PROTOCOL DOCX — full structured format ─────────────
+async function downloadProtocolDocx(text, filename) {
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+          AlignmentType, WidthType, BorderStyle, ShadingType, LevelFormat,
+          HeadingLevel, VerticalAlign } = window.docx;
+
+  const border = { style: BorderStyle.SINGLE, size: 4, color: '2E4057' };
+  const borders = { top: border, bottom: border, left: border, right: border };
+  const headerBorder = { style: BorderStyle.SINGLE, size: 4, color: '2E4057' };
+  const headerBorders = { top: headerBorder, bottom: headerBorder, left: headerBorder, right: headerBorder };
+  const thinBorder = { style: BorderStyle.SINGLE, size: 2, color: 'AAAAAA' };
+  const thinBorders = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+  const cellPad = { top: 80, bottom: 80, left: 120, right: 120 };
+  const PAGE_W = 9360; // A4 with 2cm margins each side
+
+  const children = [];
+
+  // Parse sections from text
+  const lines = text.split('\n');
+
+  // Helper: make header cell
+  const headerCell = (txt, w) => new TableCell({
+    borders: headerBorders,
+    width: { size: w, type: WidthType.DXA },
+    shading: { fill: '2E4057', type: ShadingType.CLEAR },
+    margins: cellPad,
+    children: [new Paragraph({
+      children: [new TextRun({ text: String(txt || ''), bold: true, color: 'FFFFFF', size: 20, font: 'Arial' })]
+    })]
+  });
+
+  // Helper: make data cell
+  const dataCell = (txt, w, bold, italic, bg) => new TableCell({
+    borders: thinBorders,
+    width: { size: w, type: WidthType.DXA },
+    shading: bg ? { fill: bg, type: ShadingType.CLEAR } : undefined,
+    margins: cellPad,
+    children: [new Paragraph({
+      children: [new TextRun({ text: String(txt || ''), bold: !!bold, italic: !!italic, size: 20, font: 'Arial' })]
+    })]
+  });
+
+  // Helper: section heading
+  const sectionHead = (txt) => new Paragraph({
+    spacing: { before: 240, after: 120 },
+    children: [new TextRun({ text: txt, bold: true, size: 24, font: 'Arial', color: '2E4057' })]
+  });
+
+  // Helper: subsection heading (As Is / To Be)
+  const subHead = (txt) => new Paragraph({
+    spacing: { before: 160, after: 80 },
+    children: [new TextRun({ text: txt, italic: true, bold: true, size: 22, font: 'Arial' })]
+  });
+
+  // Helper: body paragraph
+  const bodyPara = (txt) => new Paragraph({
+    spacing: { after: 80 },
+    children: [new TextRun({ text: txt, size: 22, font: 'Arial' })]
+  });
+
+  // ── Parse the text into structured sections ──────────
+  const sections = {};
+  let currentSection = 'header';
+  let buffer = [];
+
+  const flush = () => { if (buffer.length) { sections[currentSection] = (sections[currentSection] || []).concat(buffer); buffer = []; } };
+
+  const sectionMarkers = {
+    'ГЛОССАРИЙ': 'glossary',
+    'ВОПРОСЫ ДЛЯ ОБСУЖДЕНИЯ': 'questions',
+    'ТЕЗИСЫ ИНТЕРВЬЮ': 'theses',
+    'ЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ': 'requirements',
+    'ИНФОРМАЦИОННЫЕ МАТЕРИАЛЫ': 'materials',
+    'ОТКРЫТЫЕ ВОПРОСЫ': 'open_questions',
+    'СЛЕДУЮЩИЕ ШАГИ': 'next_steps',
+    'С ПРОТОКОЛОМ ОЗНАКОМЛЕНЫ': 'acknowledged',
+    'ЛИСТ СОГЛАСОВАНИЯ': 'approval',
+    'ПРОТОКОЛ СОСТАВЛЕН': 'composed',
+    'СПИСОК ПРИЛОЖЕНИЙ': 'appendix',
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    let matched = false;
+    for (const [marker, key] of Object.entries(sectionMarkers)) {
+      if (trimmed.toUpperCase().includes(marker)) {
+        flush(); currentSection = key; matched = true; break;
+      }
+    }
+    if (!matched) buffer.push(trimmed);
+  }
+  flush();
+
+  // ── TITLE ────────────────────────────────────────────
+  const headerLines = sections.header || [];
+  const titleLine = headerLines.find(l => /протокол/i.test(l)) || 'Протокол интервью';
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 240 },
+    children: [new TextRun({ text: titleLine, bold: true, size: 32, font: 'Arial', color: '2E4057' })]
+  }));
+
+  // ── HEADER TABLE ─────────────────────────────────────
+  const parseHeaderField = (key) => {
+    const line = headerLines.find(l => l.toUpperCase().includes(key.toUpperCase()));
+    if (!line) return '';
+    const idx = line.indexOf(':');
+    return idx > -1 ? line.slice(idx + 1).trim() : '';
+  };
+  const parseTableField = (key) => {
+    // Look for | key | value | pattern
+    const line = headerLines.find(l => l.includes('|') && l.toUpperCase().includes(key.toUpperCase()));
+    if (!line) return '';
+    const parts = line.split('|').map(p => p.trim()).filter(Boolean);
+    return parts.length >= 2 ? parts[parts.length - 1] : '';
+  };
+
+  const hdrFields = [
+    ['Проект:', parseTableField('Проект') || parseHeaderField('Проект')],
+    ['Функциональная область', parseTableField('Функциональная') || parseHeaderField('Функциональная')],
+    ['Тема интервью', parseTableField('Тема') || parseHeaderField('Тема')],
+    ['Дата интервью', parseTableField('Дата') || parseHeaderField('Дата')],
+    ['Цель проведения интервью', parseTableField('Цель') || parseHeaderField('Цель')],
+  ];
+
+  children.push(new Table({
+    width: { size: PAGE_W, type: WidthType.DXA },
+    columnWidths: [3000, PAGE_W - 3000],
+    rows: hdrFields.map(([label, val]) => new TableRow({
+      children: [
+        new TableCell({
+          borders: thinBorders, width: { size: 3000, type: WidthType.DXA },
+          shading: { fill: 'EEF2F7', type: ShadingType.CLEAR }, margins: cellPad,
+          children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 20, font: 'Arial' })] })]
+        }),
+        new TableCell({
+          borders: thinBorders, width: { size: PAGE_W - 3000, type: WidthType.DXA },
+          margins: cellPad,
+          children: [new Paragraph({ children: [new TextRun({ text: val || '', size: 20, font: 'Arial' })] })]
+        })
+      ]
+    }))
+  }));
+
+  children.push(new Paragraph({ spacing: { after: 160 }, children: [] }));
+
+  // ── PARTICIPANTS TABLE ────────────────────────────────
+  const participantLines = headerLines.filter(l =>
+    l.includes('|') && (l.toUpperCase().includes('КОМАНДА') ||
+    l.toUpperCase().includes('ЗАКАЗЧИК') || l.toUpperCase().includes('ИСПОЛНИТЕЛЬ'))
+  );
+
+  if (participantLines.length) {
+    children.push(sectionHead('Участники'));
+    const partRows = [
+      new TableRow({
+        children: [
+          headerCell('Участники', 2800),
+          headerCell('Должность', 3200),
+          headerCell('ФИО', PAGE_W - 6000)
+        ]
+      })
+    ];
+    for (const line of participantLines) {
+      const parts = line.split('|').map(p => p.trim()).filter(Boolean);
+      if (parts.length >= 3) {
+        partRows.push(new TableRow({
+          children: [
+            dataCell(parts[0], 2800, false, false, null),
+            dataCell(parts[1], 3200, false, false, null),
+            dataCell(parts[2], PAGE_W - 6000, false, false, null)
+          ]
+        }));
+      }
+    }
+    children.push(new Table({
+      width: { size: PAGE_W, type: WidthType.DXA },
+      columnWidths: [2800, 3200, PAGE_W - 6000],
+      rows: partRows
+    }));
+    children.push(new Paragraph({ spacing: { after: 160 }, children: [] }));
+  }
+
+  // ── GLOSSARY ──────────────────────────────────────────
+  if (sections.glossary?.length) {
+    children.push(sectionHead('Глоссарий'));
+    for (const l of sections.glossary) {
+      if (l && !l.match(/^[-─━═]+$/)) children.push(bodyPara(l));
+    }
+    children.push(new Paragraph({ spacing: { after: 120 }, children: [] }));
+  }
+
+  // ── QUESTIONS ─────────────────────────────────────────
+  if (sections.questions?.length) {
+    children.push(sectionHead('Вопросы для обсуждения'));
+    for (const l of sections.questions) {
+      if (!l || l.match(/^[-─━═]+$/)) continue;
+      const clean = l.replace(/^[-•\d.]+\s*/, '').trim();
+      if (clean) children.push(new Paragraph({
+        spacing: { after: 60 },
+        indent: { left: 360 },
+        children: [new TextRun({ text: '— ' + clean, size: 22, font: 'Arial' })]
+      }));
+    }
+    children.push(new Paragraph({ spacing: { after: 120 }, children: [] }));
+  }
+
+  // ── THESES (As Is / To Be) ────────────────────────────
+  if (sections.theses?.length) {
+    children.push(sectionHead('Тезисы интервью'));
+    for (const l of sections.theses) {
+      if (!l || l.match(/^[-─━═]+$/)) continue;
+      if (/as.is|как.есть/i.test(l)) {
+        children.push(subHead('Описание процессов «Как есть» («As Is»)'));
+      } else if (/to.be|как.будет/i.test(l)) {
+        children.push(subHead('Описание процессов «Как будет» («To Be»)'));
+      } else if (l.match(/^#+\s/) || l.match(/^[А-ЯA-Z][а-яА-Яa-zA-Z\s]{3,30}$/)) {
+        children.push(new Paragraph({
+          spacing: { before: 160, after: 80 },
+          children: [new TextRun({ text: l.replace(/^#+\s*/, ''), bold: true, size: 22, font: 'Arial' })]
+        }));
+      } else {
+        children.push(bodyPara(l));
+      }
+    }
+    children.push(new Paragraph({ spacing: { after: 120 }, children: [] }));
+  }
+
+  // ── REQUIREMENTS TABLE ────────────────────────────────
+  const reqLines = sections.requirements?.filter(l => l.includes('|')) || [];
+  children.push(sectionHead('Зафиксированные требования'));
+  const reqRows = [
+    new TableRow({ children: [
+      headerCell('Содержание требования', Math.round(PAGE_W * 0.55)),
+      headerCell('ФИО владельца', Math.round(PAGE_W * 0.18)),
+      headerCell('Должность', Math.round(PAGE_W * 0.15)),
+      headerCell('Вид требования', Math.round(PAGE_W * 0.12))
+    ]})
+  ];
+  for (const line of reqLines) {
+    const parts = line.split('|').map(p => p.trim()).filter(Boolean);
+    if (parts.length >= 2 && !parts[0].toUpperCase().includes('СОДЕРЖАНИЕ')) {
+      reqRows.push(new TableRow({ children: [
+        dataCell(parts[0] || '', Math.round(PAGE_W * 0.55)),
+        dataCell(parts[1] || '', Math.round(PAGE_W * 0.18)),
+        dataCell(parts[2] || '', Math.round(PAGE_W * 0.15)),
+        dataCell(parts[3] || 'Пользовательское требование', Math.round(PAGE_W * 0.12))
+      ]}));
+    }
+  }
+  // Add empty rows if none
+  if (reqRows.length === 1) {
+    for (let i = 0; i < 3; i++) reqRows.push(new TableRow({ children: [
+      dataCell('', Math.round(PAGE_W * 0.55)),
+      dataCell('', Math.round(PAGE_W * 0.18)),
+      dataCell('', Math.round(PAGE_W * 0.15)),
+      dataCell('', Math.round(PAGE_W * 0.12))
+    ]}));
+  }
+  children.push(new Table({
+    width: { size: PAGE_W, type: WidthType.DXA },
+    columnWidths: [Math.round(PAGE_W*0.55), Math.round(PAGE_W*0.18), Math.round(PAGE_W*0.15), Math.round(PAGE_W*0.12)],
+    rows: reqRows
+  }));
+  children.push(new Paragraph({ spacing: { after: 160 }, children: [] }));
+
+  // ── MATERIALS TABLE ────────────────────────────────────
+  const matLines = (sections.materials || []).filter(l => l.includes('|'));
+  children.push(sectionHead('Информационные материалы'));
+  const matCols = [Math.round(PAGE_W*0.4), Math.round(PAGE_W*0.2), Math.round(PAGE_W*0.2), Math.round(PAGE_W*0.2)];
+  const matRows = [new TableRow({ children: [
+    headerCell('Материалы, запрошенные исполнителем', matCols[0]),
+    headerCell('ФИО ответственного', matCols[1]),
+    headerCell('Плановая дата получения', matCols[2]),
+    headerCell('Фактическая дата получения', matCols[3])
+  ]})];
+  for (const line of matLines) {
+    const parts = line.split('|').map(p => p.trim()).filter(Boolean);
+    if (parts.length >= 2 && !parts[0].toUpperCase().includes('МАТЕРИАЛ')) {
+      matRows.push(new TableRow({ children: parts.map((p,i) => dataCell(p, matCols[i] || matCols[3])) }));
+    }
+  }
+  for (let i = matRows.length; i < 3; i++) matRows.push(new TableRow({ children: matCols.map(w => dataCell('', w)) }));
+  children.push(new Table({ width: { size: PAGE_W, type: WidthType.DXA }, columnWidths: matCols, rows: matRows }));
+  children.push(new Paragraph({ spacing: { after: 160 }, children: [] }));
+
+  // ── OPEN QUESTIONS TABLE ───────────────────────────────
+  const oqLines = (sections.open_questions || []).filter(l => l.includes('|'));
+  children.push(sectionHead('Открытые вопросы'));
+  const oqCols = [Math.round(PAGE_W*0.4), Math.round(PAGE_W*0.2), Math.round(PAGE_W*0.2), Math.round(PAGE_W*0.2)];
+  const oqRows = [new TableRow({ children: [
+    headerCell('Содержание вопроса', oqCols[0]),
+    headerCell('ФИО ответственного', oqCols[1]),
+    headerCell('Плановая дата', oqCols[2]),
+    headerCell('Фактическая дата', oqCols[3])
+  ]})];
+  for (const line of oqLines) {
+    const parts = line.split('|').map(p => p.trim()).filter(Boolean);
+    if (parts.length >= 2 && !parts[0].toUpperCase().includes('СОДЕРЖАНИЕ')) {
+      oqRows.push(new TableRow({ children: parts.map((p,i) => dataCell(p, oqCols[i] || oqCols[3])) }));
+    }
+  }
+  for (let i = oqRows.length; i < 4; i++) oqRows.push(new TableRow({ children: oqCols.map(w => dataCell('', w)) }));
+  children.push(new Table({ width: { size: PAGE_W, type: WidthType.DXA }, columnWidths: oqCols, rows: oqRows }));
+  children.push(new Paragraph({ spacing: { after: 160 }, children: [] }));
+
+  // ── ACKNOWLEDGEMENT + COMPOSED ─────────────────────────
+  children.push(sectionHead('Список приложений'));
+  children.push(new Paragraph({ spacing: { after: 240 }, children: [] }));
+
+  children.push(new Paragraph({
+    spacing: { after: 120 },
+    children: [new TextRun({ text: 'С протоколом ознакомлены', bold: true, size: 22, font: 'Arial' })]
+  }));
+  children.push(new Paragraph({
+    spacing: { after: 240 },
+    children: [new TextRun({
+      text: 'Все участники интервью, перечисленные в данном документе, получили копию данного документа по электронной почте.',
+      size: 20, font: 'Arial'
+    })]
+  }));
+
+  const composedLine = (sections.composed || []).find(l => l.trim()) || '';
+  const composedText = composedLine || 'Протокол составлен: ____________________';
+  children.push(new Paragraph({
+    spacing: { after: 240 },
+    children: [new TextRun({ text: composedText, bold: true, size: 22, font: 'Arial' })]
+  }));
+
+  // ── APPROVAL TABLE ────────────────────────────────────
+  children.push(sectionHead('Лист согласования'));
+  children.push(new Paragraph({
+    spacing: { after: 120 },
+    children: [new TextRun({ text: 'Согласовано:', bold: true, size: 22, font: 'Arial' })]
+  }));
+  const apprCols = [Math.round(PAGE_W*0.35), Math.round(PAGE_W*0.3), Math.round(PAGE_W*0.175), Math.round(PAGE_W*0.175)];
+  const apprRows = [new TableRow({ children: [
+    headerCell('ФИО', apprCols[0]),
+    headerCell('Должность', apprCols[1]),
+    headerCell('Дата', apprCols[2]),
+    headerCell('Подпись', apprCols[3])
+  ]})];
+
+  // Parse approval participants from text
+  const apprLines = (sections.approval || []).filter(l => l.includes('|') && !l.toUpperCase().includes('ФИО'));
+  for (const line of apprLines) {
+    const parts = line.split('|').map(p => p.trim()).filter(Boolean);
+    if (parts.length >= 2) apprRows.push(new TableRow({ children: parts.map((p,i) => dataCell(p, apprCols[i] || apprCols[3])) }));
+  }
+  // Add empty rows up to 8
+  for (let i = apprRows.length; i < 9; i++) apprRows.push(new TableRow({ children: apprCols.map(w => dataCell('', w)) }));
+  children.push(new Table({ width: { size: PAGE_W, type: WidthType.DXA }, columnWidths: apprCols, rows: apprRows }));
+
+  // ── BUILD DOCUMENT ────────────────────────────────────
+  const doc = new Document({
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 11906, height: 16838 },
+          margin: { top: 1134, right: 851, bottom: 1134, left: 1701 }
+        }
+      },
+      children
+    }]
+  });
+
+  const blob = await Packer.toBlob(doc);
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = file; a.click();
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
 }
 
-// ── FILE LIBRARY ─────────────────────────────────────
-// Session key = filename + filesize (unique fingerprint)
-function makeFileKey(file) {
-  return `${file.name}__${file.size}`;
-}
-
-// Initialize or get existing session for this file
-function initSession(file, numParts, meetingTitle) {
-  const key = makeFileKey(file);
-  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
-  const existing = sessions.find(s => s.fileKey === key);
-  if (existing) return existing;
-
-  const session = {
-    id: Date.now(),
-    fileKey: key,
-    fileName: file.name,
-    fileSize: file.size,
-    title: meetingTitle || file.name,
-    date: today(),
-    uploadedAt: Date.now(),
-    numParts,
-    parts: Array(numParts).fill(null) // null = not uploaded yet
-  };
-  sessions.unshift(session);
-  localStorage.setItem('upload_sessions', JSON.stringify(sessions.slice(0, 20)));
-  return session;
-}
-
-// Save a single chunk URI after successful upload
-function saveChunkURI(fileKey, chunkIndex, uri, mimeType, label) {
-  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
-  const s = sessions.find(s => s.fileKey === fileKey);
-  if (!s) return;
-  s.parts[chunkIndex] = { uri, mimeType, label };
-  localStorage.setItem('upload_sessions', JSON.stringify(sessions));
-}
-
-// Save single-file URI (short video, no splitting)
-function saveSingleFileURI(file, uri, mimeType, meetingTitle) {
-  const key = makeFileKey(file);
-  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
-  const session = {
-    id: Date.now(),
-    fileKey: key,
-    fileName: file.name,
-    fileSize: file.size,
-    title: meetingTitle || file.name,
-    date: today(),
-    uploadedAt: Date.now(),
-    numParts: 1,
-    parts: [{ uri, mimeType, label: 'полное видео' }]
-  };
-  // remove duplicate if exists
-  const filtered = sessions.filter(s => s.fileKey !== key);
-  filtered.unshift(session);
-  localStorage.setItem('upload_sessions', JSON.stringify(filtered.slice(0, 20)));
-}
-
-// Find existing session by file (to resume)
-function findSession(file) {
-  const key = makeFileKey(file);
-  return JSON.parse(localStorage.getItem('upload_sessions') || '[]')
-    .find(s => s.fileKey === key) || null;
-}
-
-function getUploadSessions() {
-  return JSON.parse(localStorage.getItem('upload_sessions') || '[]');
-}
-
-function renderLibrary() {
-  // Автоматически убираем истёкшие записи (старше 48 часов)
-  const now = Date.now();
-  let sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
-  localStorage.setItem('upload_sessions', JSON.stringify(sessions));
-
-  const el = document.getElementById('library-list');
-  if (!sessions.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div>Нет активных файлов.<br>Загрузи видео на вкладке «Протокол встречи».</div>';
-    return;
-  }
-
-  el.innerHTML = sessions.map(s => {
-    const hoursLeft = Math.round(48 - (now - s.uploadedAt) / 1000 / 60 / 60);
-    const isWarn = hoursLeft < 12;
-    const badgeBg = isWarn ? '#fffbeb' : '#f0fdf4';
-    const badgeTx = isWarn ? '#92400e' : '#166534';
-    const badgeBd = isWarn ? '#fde68a' : '#bbf7d0';
-    const doneCount = s.parts.filter(p => p !== null).length;
-    const isPartial = doneCount < s.numParts;
-    const partsLabel = isPartial
-      ? `${doneCount} из ${s.numParts} частей загружено`
-      : s.numParts === 1 ? '1 файл' : `${s.numParts} части`;
-    const statusColor = isPartial ? '#fffbeb' : '#f0fdf4';
-    const statusTx = isPartial ? '#92400e' : '#166534';
-    const statusBd = isPartial ? '#fde68a' : '#bbf7d0';
-    const statusText = isPartial ? `⚠️ ${doneCount}/${s.numParts} частей` : '✅ Готово';
-    return `
-      <div class="protocol-item" style="flex-direction:column;align-items:flex-start;gap:10px">
-        <div style="display:flex;align-items:center;gap:10px;width:100%">
-          <div class="protocol-meta">
-            <div class="protocol-title">${escHtml(s.fileName)}</div>
-            <div class="protocol-date">${s.date} · ${partsLabel}</div>
-          </div>
-          <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${statusColor};color:${statusTx};border:1px solid ${statusBd};white-space:nowrap">${statusText}</span>
-          <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${badgeBg};color:${badgeTx};border:1px solid ${badgeBd};white-space:nowrap">⏱ ${hoursLeft}ч</span>
-          <button class="protocol-del" onclick="deleteSession(${s.id})" title="Удалить">×</button>
-        </div>
-        ${isPartial
-          ? `<div style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;width:100%">
-               Загрузка прервалась. Выбери тот же файл <strong>${escHtml(s.fileName)}</strong> на вкладке «Протокол встречи» — приложение само пропустит уже загруженные части.
-             </div>`
-          : (function() {
-               const transBtnHtml = s.transcript
-                 ? '<button class="btn btn-secondary" style="padding:6px 14px;font-size:12px" onclick="downloadSessionTranscript(' + s.id + ')">📄 Транскрипция.txt</button>'
-                 : '';
-               return '<div style="display:flex;gap:8px;flex-wrap:wrap">'
-                 + '<button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="reprocessSession(' + s.id + ')">✨ Переделать протокол</button>'
-                 + transBtnHtml
-                 + '</div>';
-             })()
-        }
-      </div>`;
-  }).join('');
-}
-
-function deleteSession(id) {
-  const sessions = getUploadSessions().filter(s => s.id !== id);
-  localStorage.setItem('upload_sessions', JSON.stringify(sessions));
-  renderLibrary();
-}
-
-async function reprocessSession(id) {
-  const session = getUploadSessions().find(s => s.id === id);
-  if (!session) return;
-
-  // Check if files still active
-  showStatus('library-status', 'info', 'Проверяю файлы на серверах Google...');
-  const now = Date.now();
-  const age = (now - session.uploadedAt) / 1000 / 60 / 60;
-  if (age >= 48) {
-    showStatus('library-status', 'error', 'Файлы истекли (прошло более 48 часов). Загрузи видео заново.');
-    return;
-  }
-
-  // Restore state and process
-  if (session.parts.length === 1 && session.parts[0].label === 'полное видео') {
-    uploadedFile = { uri: session.parts[0].uri, mimeType: session.parts[0].mimeType };
-    uploadedParts = [];
-  } else {
-    uploadedFile = null;
-    uploadedParts = session.parts.map(p => ({ uri: p.uri, mimeType: p.mimeType, label: p.label }));
-  }
-
-  const title = session.title;
-  showStatus('library-status', 'info', `Запускаю анализ: «${title}»...`);
-  document.getElementById('library-result-card').style.display = 'none';
-
-  const btn = event.target;
-  btn.disabled = true;
-
-  try {
-    let protocolText = '';
-    const apEl = document.getElementById('analysis-progress');
-
-    if (uploadedParts.length > 0) {
-      const partProtocols = [];
-      for (let i = 0; i < uploadedParts.length; i++) {
-        const part = uploadedParts[i];
-        showStatus('library-status', 'info', `Gemini анализирует ${part.label}...`);
-        const text = await callGemini([
-          { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-          { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate) }
-        ]);
-        partProtocols.push(text);
-        if (i < uploadedParts.length - 1) await sleep(20000);
-      }
-      showStatus('library-status', 'info', 'Объединяю части...');
-      protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
+// ── SIMPLE DOCX (requirements, report, registry) ──────
+async function downloadSimpleDocx(text, filename) {
+  const { Document, Packer, Paragraph, TextRun, AlignmentType } = window.docx;
+  const children = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trimEnd();
+    if (!line || /^[─━═]{4,}$/.test(line)) {
+      children.push(new Paragraph({ text: '', spacing: { after: 80 } })); continue;
+    }
+    if (/^(ПРОТОКОЛ|ОТЧЁТ|РЕЕСТР|СВОДНЫЙ)/.test(line)) {
+      children.push(new Paragraph({ children: [new TextRun({ text: line, bold: true, size: 28, font: 'Arial' })], alignment: AlignmentType.CENTER, spacing: { after: 200 } }));
+    } else if (/^\d+\.\s+[А-ЯA-Z]/.test(line)) {
+      children.push(new Paragraph({ children: [new TextRun({ text: line, bold: true, size: 24, font: 'Arial', color: '2E4057' })], spacing: { before: 240, after: 120 } }));
+    } else if (/^REQ-\d+/.test(line)) {
+      children.push(new Paragraph({ children: [new TextRun({ text: line, size: 22, font: 'Arial', color: '1d4ed8' })], spacing: { before: 60, after: 60 }, indent: { left: 360 } }));
+    } else if (/^[-•]/.test(line)) {
+      children.push(new Paragraph({ children: [new TextRun({ text: line, size: 22, font: 'Arial' })], spacing: { after: 60 }, indent: { left: 360 } }));
     } else {
-      showStatus('library-status', 'info', 'Gemini анализирует запись...');
-      protocolText = await callGemini([
-        { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '') }
-      ]);
-    }
-
-    currentProtocolText = protocolText;
-    showStatus('library-status', 'info', 'Извлекаю требования...');
-    currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
-
-    document.getElementById('library-preview').textContent = currentProtocolText;
-    document.getElementById('library-result-card').style.display = 'block';
-    document.getElementById('library-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    showStatus('library-status', 'success', 'Готово!');
-
-  } catch (e) {
-    showStatus('library-status', 'error', e.message);
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-function saveProtocolFromLibrary() {
-  if (!currentProtocolText) return;
-  const title = (getUploadSessions()[0]?.title) || 'Встреча ' + today();
-  const list = JSON.parse(localStorage.getItem('protocols') || '[]');
-  list.unshift({ id: Date.now(), title, date: today(), protocol: currentProtocolText, requirements: currentRequirementsText });
-  localStorage.setItem('protocols', JSON.stringify(list));
-  showStatus('library-status', 'success', `Протокол «${title}» сохранён`);
-}
-
-
-// ══════════════════════════════════════════════════════
-// НСИ — Нормативно-справочная информация
-// ══════════════════════════════════════════════════════
-
-// ── NSI STORAGE HELPERS ───────────────────────────────
-const getNSI = () => JSON.parse(localStorage.getItem('nsi') || '{"positions":[],"participants":[],"projects":[]}');
-const saveNSI = d => localStorage.setItem('nsi', JSON.stringify(d));
-
-// ── DATE INPUT FORMATTER ──────────────────────────────
-function formatDateInput(el) {
-  let v = el.value.replace(/\D/g,'');
-  if (v.length > 2) v = v.slice(0,2) + '.' + v.slice(2);
-  if (v.length > 5) v = v.slice(0,5) + '.' + v.slice(5);
-  el.value = v.slice(0,10);
-}
-
-// ── POSITIONS ─────────────────────────────────────────
-function addPosition() {
-  const name = document.getElementById('new-position').value.trim();
-  if (!name) return;
-  const nsi = getNSI();
-  if (nsi.positions.includes(name)) return;
-  nsi.positions.push(name);
-  saveNSI(nsi);
-  document.getElementById('new-position').value = '';
-  renderNSI();
-}
-
-function deletePosition(idx) {
-  const nsi = getNSI();
-  nsi.positions.splice(idx, 1);
-  saveNSI(nsi);
-  renderNSI();
-}
-
-// ── PARTICIPANTS ──────────────────────────────────────
-function addParticipant() {
-  const name = document.getElementById('new-participant').value.trim();
-  if (!name) return;
-  const nsi = getNSI();
-  if (nsi.participants.find(p => p.name === name)) return;
-  nsi.participants.push({ id: Date.now(), name });
-  saveNSI(nsi);
-  document.getElementById('new-participant').value = '';
-  renderNSI();
-}
-
-function deleteParticipant(id) {
-  const nsi = getNSI();
-  nsi.participants = nsi.participants.filter(p => p.id !== id);
-  saveNSI(nsi);
-  renderNSI();
-}
-
-// ── PROJECTS ──────────────────────────────────────────
-function addProject() {
-  const name = document.getElementById('new-project').value.trim();
-  if (!name) return;
-  const nsi = getNSI();
-  if (nsi.projects.find(p => p.name === name)) return;
-  nsi.projects.push({ id: Date.now(), name, executor: [], customer: [] });
-  saveNSI(nsi);
-  document.getElementById('new-project').value = '';
-  renderNSI();
-  updateProjectSelect();
-}
-
-function deleteProject(id) {
-  if (!confirm('Удалить проект?')) return;
-  const nsi = getNSI();
-  nsi.projects = nsi.projects.filter(p => p.id !== id);
-  saveNSI(nsi);
-  renderNSI();
-  updateProjectSelect();
-}
-
-let editingProjectId = null;
-
-function openProjectEditor(id) {
-  editingProjectId = id;
-  const nsi = getNSI();
-  const proj = nsi.projects.find(p => p.id === id);
-  if (!proj) return;
-
-  document.getElementById('editor-project-name').textContent = proj.name;
-  document.getElementById('project-editor').style.display = 'block';
-  document.getElementById('project-editor').scrollIntoView({ behavior:'smooth', block:'start' });
-
-  // Populate participant selects
-  ['executor-participant','customer-participant'].forEach(selId => {
-    const sel = document.getElementById(selId);
-    sel.innerHTML = '<option value="">— Участник —</option>' +
-      nsi.participants.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
-  });
-
-  // Populate position selects
-  ['executor-position','customer-position'].forEach(selId => {
-    const sel = document.getElementById(selId);
-    sel.innerHTML = '<option value="">— Должность —</option>' +
-      nsi.positions.map(pos => `<option value="${escHtml(pos)}">${escHtml(pos)}</option>`).join('');
-  });
-
-  renderTeams(proj);
-}
-
-function renderTeams(proj) {
-  const nsi = getNSI();
-  ['executor','customer'].forEach(side => {
-    const list = document.getElementById(side + '-team-list');
-    const team = proj[side] || [];
-    if (!team.length) { list.innerHTML = '<div style="font-size:12px;color:#94a3b8;padding:4px 0">Нет участников</div>'; return; }
-    list.innerHTML = team.map((m, i) => {
-      const p = nsi.participants.find(x => x.id === m.participantId);
-      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#f8fafc;border-radius:7px;margin-bottom:5px;font-size:13px">
-        <div>
-          <div style="font-weight:600;color:#1e293b">${escHtml(p?.name || '?')}</div>
-          <div style="color:#64748b;font-size:12px">${escHtml(m.position)}</div>
-        </div>
-        <button class="protocol-del" onclick="removeTeamMember('${side}',${i})">×</button>
-      </div>`;
-    }).join('');
-  });
-}
-
-function addTeamMember(side) {
-  const pId = parseInt(document.getElementById(side + '-participant').value);
-  const pos = document.getElementById(side + '-position').value;
-  if (!pId || !pos) { alert('Выбери участника и должность'); return; }
-
-  const nsi = getNSI();
-  const proj = nsi.projects.find(p => p.id === editingProjectId);
-  if (!proj) return;
-
-  // Check if already added
-  if (proj[side].find(m => m.participantId === pId)) {
-    alert('Этот участник уже добавлен'); return;
-  }
-
-  proj[side].push({ participantId: pId, position: pos });
-  saveNSI(nsi);
-  renderTeams(proj);
-}
-
-function removeTeamMember(side, idx) {
-  const nsi = getNSI();
-  const proj = nsi.projects.find(p => p.id === editingProjectId);
-  if (!proj) return;
-  proj[side].splice(idx, 1);
-  saveNSI(nsi);
-  renderTeams(proj);
-}
-
-// ── RENDER NSI PAGE ───────────────────────────────────
-function renderNSI() {
-  const nsi = getNSI();
-
-  // Positions
-  const posList = document.getElementById('positions-list');
-  posList.innerHTML = nsi.positions.length ? nsi.positions.map((pos, i) =>
-    `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px">
-      <span style="color:#1e293b">${escHtml(pos)}</span>
-      <button class="protocol-del" onclick="deletePosition(${i})">×</button>
-    </div>`).join('')
-    : '<div style="font-size:12px;color:#94a3b8;padding:4px 0">Нет должностей</div>';
-
-  // Participants
-  const partList = document.getElementById('participants-list');
-  partList.innerHTML = nsi.participants.length ? nsi.participants.map(p =>
-    `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px">
-      <span style="color:#1e293b">${escHtml(p.name)}</span>
-      <button class="protocol-del" onclick="deleteParticipant(${p.id})">×</button>
-    </div>`).join('')
-    : '<div style="font-size:12px;color:#94a3b8;padding:4px 0">Нет участников</div>';
-
-  // Projects
-  const projList = document.getElementById('projects-list');
-  projList.innerHTML = nsi.projects.length ? nsi.projects.map(proj => {
-    const execCount = proj.executor?.length || 0;
-    const custCount = proj.customer?.length || 0;
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fafc;border-radius:9px;margin-bottom:7px;cursor:pointer;border:1px solid #e2e8f0" onclick="openProjectEditor(${proj.id})">
-      <div>
-        <div style="font-size:14px;font-weight:600;color:#1e293b">${escHtml(proj.name)}</div>
-        <div style="font-size:12px;color:#64748b;margin-top:2px">Исполнитель: ${execCount} · Заказчик: ${custCount}</div>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <span style="font-size:12px;color:#3b82f6">Редактировать →</span>
-        <button class="protocol-del" onclick="event.stopPropagation();deleteProject(${proj.id})">×</button>
-      </div>
-    </div>`;
-  }).join('')
-    : '<div style="font-size:12px;color:#94a3b8;padding:4px 0">Нет проектов</div>';
-
-  // Update project editor if open
-  if (editingProjectId) {
-    const proj = nsi.projects.find(p => p.id === editingProjectId);
-    if (proj) renderTeams(proj);
-  }
-}
-
-// ── UPDATE PROJECT SELECT IN PROTOCOL FORM ────────────
-function updateProjectSelect() {
-  const nsi = getNSI();
-  const sel = document.getElementById('meeting-project');
-  if (!sel) return;
-  const current = sel.value;
-  sel.innerHTML = '<option value="">— Выбери проект —</option>' +
-    nsi.projects.map(p => `<option value="${p.id}"${p.id == current ? ' selected':''}>${escHtml(p.name)}</option>`).join('');
-}
-
-// ── GET PROJECT TEAM FOR PROMPT ───────────────────────
-function getProjectTeamText() {
-  const projId = parseInt(document.getElementById('meeting-project').value);
-  if (!projId) return '';
-  const nsi = getNSI();
-  const proj = nsi.projects.find(p => p.id === projId);
-  if (!proj) return '';
-
-  const lines = [];
-  (proj.executor || []).forEach(m => {
-    const p = nsi.participants.find(x => x.id === m.participantId);
-    if (p) lines.push(`Команда исполнителя | ${m.position} | ${p.name}`);
-  });
-  (proj.customer || []).forEach(m => {
-    const p = nsi.participants.find(x => x.id === m.participantId);
-    if (p) lines.push(`Команда заказчика | ${m.position} | ${p.name}`);
-  });
-  return lines.join('\n');
-}
-
-function getProjectName() {
-  const projId = parseInt(document.getElementById('meeting-project').value);
-  if (!projId) return '';
-  const nsi = getNSI();
-  return nsi.projects.find(p => p.id === projId)?.name || '';
-}
-
-
-// ══════════════════════════════════════════════════════
-// GROQ WHISPER — транскрипция аудио
-// ══════════════════════════════════════════════════════
-
-const GROQ_WHISPER_MODEL = 'whisper-large-v3';
-const WHISPER_MAX_MB = 24; // Groq limit is 25MB, stay safe
-
-async function transcribeWithWhisper(file) {
-  const key = getGroqKey();
-  if (!key) throw new Error('Не указан Groq API Key — добавь в ⚙️ API-ключи');
-
-  // Extract audio from video using Web Audio API
-  setUploadUI('uploading', {
-    title: 'Извлечение аудиодорожки...',
-    stage: 'Web Audio API',
-    pct: 5,
-    note: 'Подготовка для Whisper'
-  });
-
-  const arrayBuffer = await file.arrayBuffer();
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
-  await audioCtx.close();
-
-  const sr = audioBuffer.sampleRate;
-  const channelData = audioBuffer.getChannelData(0);
-  const durationSec = audioBuffer.duration;
-
-  // Split into chunks of ~24MB WAV (16kHz mono = 32KB/sec)
-  const secPerChunk = Math.floor((WHISPER_MAX_MB * 1024 * 1024) / (sr * 2));
-  const numChunks = Math.ceil(durationSec / secPerChunk);
-
-  let fullTranscript = '';
-  let offsetSec = 0;
-
-  for (let i = 0; i < numChunks; i++) {
-    const start = Math.floor(i * secPerChunk * sr);
-    const end = Math.min(Math.floor((i + 1) * secPerChunk * sr), channelData.length);
-    const slice = channelData.slice(start, end);
-    const wavBlob = encodeWAV(slice, sr);
-
-    setUploadUI('uploading', {
-      title: `Whisper транскрибирует часть ${i + 1} из ${numChunks}...`,
-      stage: `${Math.round(i * secPerChunk / 60)}–${Math.round(Math.min((i+1)*secPerChunk, durationSec)/60)} мин`,
-      pct: 10 + (i / numChunks) * 40,
-      note: 'Groq Whisper — точная транскрипция'
-    });
-
-    const formData = new FormData();
-    formData.append('file', new File([wavBlob], 'audio.wav', { type: 'audio/wav' }));
-    formData.append('model', GROQ_WHISPER_MODEL);
-    formData.append('language', 'ru');
-    formData.append('response_format', 'verbose_json');
-    formData.append('timestamp_granularities[]', 'segment');
-
-    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + key },
-      body: formData
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error('Groq Whisper: ' + (err.error?.message || res.status));
-    }
-
-    const data = await res.json();
-
-    // Adjust timestamps by offset and append
-    if (data.segments) {
-      for (const seg of data.segments) {
-        const t = offsetSec + seg.start;
-        const hh = String(Math.floor(t / 3600)).padStart(2, '0');
-        const mm = String(Math.floor((t % 3600) / 60)).padStart(2, '0');
-        const ss = String(Math.floor(t % 60)).padStart(2, '0');
-        fullTranscript += `[${hh}:${mm}:${ss}] ${seg.text.trim()}\n`;
-      }
-    } else if (data.text) {
-      fullTranscript += data.text + '\n';
-    }
-
-    offsetSec += i * secPerChunk;
-  }
-
-  return fullTranscript;
-}
-
-// Get transcript segment for a time range (in seconds)
-function getTranscriptSegment(fullTranscript, startSec, endSec) {
-  if (!fullTranscript) return '';
-  const lines = fullTranscript.split('\n').filter(l => l.trim());
-  const result = [];
-
-  for (const line of lines) {
-    const match = line.match(/^\[(\d{2}):(\d{2}):(\d{2})\]/);
-    if (match) {
-      const t = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]);
-      if (t >= startSec - 5 && t <= endSec + 5) {
-        result.push(line);
-      }
-    } else {
-      if (result.length > 0) result.push(line);
+      children.push(new Paragraph({ children: [new TextRun({ text: line, size: 22, font: 'Arial' })], spacing: { after: 60 } }));
     }
   }
-  return result.join('\n');
+  const doc = new Document({ sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1134, right: 851, bottom: 1134, left: 1701 } } }, children }] });
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
 }
+
 
 // ── INIT ─────────────────────────────────────────────
 if (!getKey()) setTimeout(openSettings, 500);
