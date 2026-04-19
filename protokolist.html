@@ -1782,6 +1782,512 @@ async function downloadSimpleDocx(text, filename) {
 }
 
 
+const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+
+const getProtocols = () => JSON.parse(localStorage.getItem('protocols') || '[]');
+
+function renderList(tab) {
+  const isReport = tab === 'report';
+  const el = document.getElementById(isReport ? 'report-protocol-list' : 'registry-protocol-list');
+  const prefix = isReport ? 'rp' : 'rg';
+  const list = getProtocols();
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div>Нет сохранённых протоколов.<br>Создай протокол и нажми «Сохранить в список».</div>`;
+    return;
+  }
+  el.innerHTML = `<div style="font-size:12px;color:#64748b;margin-bottom:12px">${list.length} протокол(ов)</div>` +
+    list.map(p => `
+      <div class="protocol-item" onclick="document.getElementById('${prefix}-${p.id}').click()">
+        <input type="checkbox" id="${prefix}-${p.id}" value="${p.id}" onclick="event.stopPropagation()">
+        <div class="protocol-meta">
+          <div class="protocol-title">${escHtml(p.title)}</div>
+          <div class="protocol-date">${p.date}</div>
+        </div>
+        ${isReport ? `<button class="protocol-del" onclick="event.stopPropagation();deleteProtocol(${p.id})" title="Удалить">×</button>` : ''}
+      </div>`).join('');
+}
+
+function deleteProtocol(id) {
+  if (!confirm('Удалить?')) return;
+  localStorage.setItem('protocols', JSON.stringify(getProtocols().filter(x => x.id !== id)));
+  renderList('report');
+}
+function selectAll(prefix) { document.querySelectorAll(`input[id^="${prefix}-"]`).forEach(c => c.checked = true); }
+const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// ── GENERATE REPORT ───────────────────────────────────
+
+
+async function generateReport() {
+  const checked = [...document.querySelectorAll('input[id^="rp-"]:checked')].map(c => c.value);
+  if (!checked.length) { showStatus('report-status', 'error', 'Выбери хотя бы один протокол'); return; }
+  const sel = getProtocols().filter(p => checked.includes(String(p.id)));
+  const combined = sel.map(p => `=== ${p.title} (${p.date}) ===\n${p.protocol}`).join('\n\n');
+  try {
+    showStatus('report-status', 'info', `Формирую отчёт из ${sel.length} протоколов...`);
+    currentReportText = await callGemini([{ text: REPORT_PROMPT(combined, document.getElementById('report-instructions').value) }]);
+    document.getElementById('report-preview').textContent = currentReportText;
+    document.getElementById('report-result-card').style.display = 'block';
+    document.getElementById('report-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showStatus('report-status', 'success', 'Отчёт готов!');
+  } catch (e) { showStatus('report-status', 'error', e.message); }
+}
+
+// ── GENERATE REGISTRY ─────────────────────────────────
+async function generateRegistry() {
+  const checked = [...document.querySelectorAll('input[id^="rg-"]:checked')].map(c => c.value);
+  if (!checked.length) { showStatus('registry-status', 'error', 'Выбери хотя бы один протокол'); return; }
+  const sel = getProtocols().filter(p => checked.includes(String(p.id)));
+  const combined = sel.map(p => `=== ${p.title} (${p.date}) ===\n${p.requirements}`).join('\n\n');
+  try {
+    showStatus('registry-status', 'info', `Формирую реестр из ${sel.length} протоколов...`);
+    currentRegistryText = await callGemini([{ text: REGISTRY_PROMPT(combined) }]);
+    document.getElementById('registry-preview').textContent = currentRegistryText;
+    document.getElementById('registry-result-card').style.display = 'block';
+    document.getElementById('registry-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showStatus('registry-status', 'success', 'Реестр готов!');
+  } catch (e) { showStatus('registry-status', 'error', e.message); }
+}
+
+// ── FILE LIBRARY ─────────────────────────────────────
+// Session key = filename + filesize (unique fingerprint)
+function makeFileKey(file) {
+  return `${file.name}__${file.size}`;
+}
+
+// Initialize or get existing session for this file
+function initSession(file, numParts, meetingTitle) {
+  const key = makeFileKey(file);
+  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+  const existing = sessions.find(s => s.fileKey === key);
+  if (existing) return existing;
+
+  const session = {
+    id: Date.now(),
+    fileKey: key,
+    fileName: file.name,
+    fileSize: file.size,
+    title: meetingTitle || file.name,
+    date: today(),
+    uploadedAt: Date.now(),
+    numParts,
+    parts: Array(numParts).fill(null) // null = not uploaded yet
+  };
+  sessions.unshift(session);
+  localStorage.setItem('upload_sessions', JSON.stringify(sessions.slice(0, 20)));
+  return session;
+}
+
+// Save a single chunk URI after successful upload
+function saveChunkURI(fileKey, chunkIndex, uri, mimeType, label) {
+  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+  const s = sessions.find(s => s.fileKey === fileKey);
+  if (!s) return;
+  s.parts[chunkIndex] = { uri, mimeType, label };
+  localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+}
+
+// Save single-file URI (short video, no splitting)
+function saveSingleFileURI(file, uri, mimeType, meetingTitle) {
+  const key = makeFileKey(file);
+  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+  const session = {
+    id: Date.now(),
+    fileKey: key,
+    fileName: file.name,
+    fileSize: file.size,
+    title: meetingTitle || file.name,
+    date: today(),
+    uploadedAt: Date.now(),
+    numParts: 1,
+    parts: [{ uri, mimeType, label: 'полное видео' }]
+  };
+  // remove duplicate if exists
+  const filtered = sessions.filter(s => s.fileKey !== key);
+  filtered.unshift(session);
+  localStorage.setItem('upload_sessions', JSON.stringify(filtered.slice(0, 20)));
+}
+
+// Find existing session by file (to resume)
+function findSession(file) {
+  const key = makeFileKey(file);
+  return JSON.parse(localStorage.getItem('upload_sessions') || '[]')
+    .find(s => s.fileKey === key) || null;
+}
+
+function getUploadSessions() {
+  return JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+}
+
+
+function renderLibrary() {
+  // Автоматически убираем истёкшие записи (старше 48 часов)
+  const now = Date.now();
+  let sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
+  localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+
+  const el = document.getElementById('library-list');
+  if (!sessions.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div>Нет активных файлов.<br>Загрузи видео на вкладке «Протокол встречи».</div>';
+    return;
+  }
+
+  el.innerHTML = sessions.map(s => {
+    const hoursLeft = Math.round(48 - (now - s.uploadedAt) / 1000 / 60 / 60);
+    const isWarn = hoursLeft < 12;
+    const badgeBg = isWarn ? '#fffbeb' : '#f0fdf4';
+    const badgeTx = isWarn ? '#92400e' : '#166534';
+    const badgeBd = isWarn ? '#fde68a' : '#bbf7d0';
+    const doneCount = s.parts.filter(p => p !== null).length;
+    const isPartial = doneCount < s.numParts;
+    const partsLabel = isPartial
+      ? `${doneCount} из ${s.numParts} частей загружено`
+      : s.numParts === 1 ? '1 файл' : `${s.numParts} части`;
+    const statusColor = isPartial ? '#fffbeb' : '#f0fdf4';
+    const statusTx = isPartial ? '#92400e' : '#166534';
+    const statusBd = isPartial ? '#fde68a' : '#bbf7d0';
+    const statusText = isPartial ? `⚠️ ${doneCount}/${s.numParts} частей` : '✅ Готово';
+    return `
+      <div class="protocol-item" style="flex-direction:column;align-items:flex-start;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px;width:100%">
+          <div class="protocol-meta">
+            <div class="protocol-title">${escHtml(s.fileName)}</div>
+            <div class="protocol-date">${s.date} · ${partsLabel}</div>
+          </div>
+          <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${statusColor};color:${statusTx};border:1px solid ${statusBd};white-space:nowrap">${statusText}</span>
+          <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${badgeBg};color:${badgeTx};border:1px solid ${badgeBd};white-space:nowrap">⏱ ${hoursLeft}ч</span>
+          <button class="protocol-del" onclick="deleteSession(${s.id})" title="Удалить">×</button>
+        </div>
+        ${isPartial
+          ? `<div style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;width:100%">
+               Загрузка прервалась. Выбери тот же файл <strong>${escHtml(s.fileName)}</strong> на вкладке «Протокол встречи» — приложение само пропустит уже загруженные части.
+             </div>`
+          : `<button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="reprocessSession(${s.id})">✨ Переделать протокол</button>`
+        }
+      </div>`;
+  }).join('');
+}
+
+function deleteSession(id) {
+  const sessions = getUploadSessions().filter(s => s.id !== id);
+  localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+  renderLibrary();
+}
+
+async function reprocessSession(id) {
+  const session = getUploadSessions().find(s => s.id === id);
+  if (!session) return;
+
+  // Check if files still active
+  showStatus('library-status', 'info', 'Проверяю файлы на серверах Google...');
+  const now = Date.now();
+  const age = (now - session.uploadedAt) / 1000 / 60 / 60;
+  if (age >= 48) {
+    showStatus('library-status', 'error', 'Файлы истекли (прошло более 48 часов). Загрузи видео заново.');
+    return;
+  }
+
+  // Restore state and process
+  if (session.parts.length === 1 && session.parts[0].label === 'полное видео') {
+    uploadedFile = { uri: session.parts[0].uri, mimeType: session.parts[0].mimeType };
+    uploadedParts = [];
+  } else {
+    uploadedFile = null;
+    uploadedParts = session.parts.map(p => ({ uri: p.uri, mimeType: p.mimeType, label: p.label }));
+  }
+
+  const title = session.title;
+  showStatus('library-status', 'info', `Запускаю анализ: «${title}»...`);
+  document.getElementById('library-result-card').style.display = 'none';
+
+  const btn = event.target;
+  btn.disabled = true;
+
+  try {
+    let protocolText = '';
+    const apEl = document.getElementById('analysis-progress');
+
+    if (uploadedParts.length > 0) {
+      const partProtocols = [];
+      for (let i = 0; i < uploadedParts.length; i++) {
+        const part = uploadedParts[i];
+        showStatus('library-status', 'info', `Gemini анализирует ${part.label}...`);
+        const text = await callGemini([
+          { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
+          { text: PROTOCOL_PROMPT(title, part.label) }
+        ]);
+        partProtocols.push(text);
+        if (i < uploadedParts.length - 1) await sleep(20000);
+      }
+      showStatus('library-status', 'info', 'Объединяю части...');
+      protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
+    } else {
+      showStatus('library-status', 'info', 'Gemini анализирует запись...');
+      protocolText = await callGemini([
+        { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
+        { text: PROTOCOL_PROMPT(title, null) }
+      ]);
+    }
+
+    currentProtocolText = protocolText;
+    showStatus('library-status', 'info', 'Извлекаю требования...');
+    currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
+
+    document.getElementById('library-preview').textContent = currentProtocolText;
+    document.getElementById('library-result-card').style.display = 'block';
+    document.getElementById('library-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    showStatus('library-status', 'success', 'Готово!');
+
+  } catch (e) {
+    showStatus('library-status', 'error', e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function saveProtocolFromLibrary() {
+  if (!currentProtocolText) return;
+  const title = (getUploadSessions()[0]?.title) || 'Встреча ' + today();
+  const list = JSON.parse(localStorage.getItem('protocols') || '[]');
+  list.unshift({ id: Date.now(), title, date: today(), protocol: currentProtocolText, requirements: currentRequirementsText });
+  localStorage.setItem('protocols', JSON.stringify(list));
+  showStatus('library-status', 'success', `Протокол «${title}» сохранён`);
+}
+
+
+// ── NSI — Нормативно-справочная информация ───────────────
+const getNSI = () => JSON.parse(localStorage.getItem('nsi') || '{"positions":[],"participants":[],"projects":[]}');
+const saveNSI = d => localStorage.setItem('nsi', JSON.stringify(d));
+
+function formatDateInput(el) {
+  let v = el.value.replace(/\D/g,'');
+  if (v.length > 2) v = v.slice(0,2) + '.' + v.slice(2);
+  if (v.length > 5) v = v.slice(0,5) + '.' + v.slice(5);
+  el.value = v.slice(0,10);
+}
+
+function addPosition() {
+  const name = document.getElementById('new-position').value.trim();
+  if (!name) return;
+  const nsi = getNSI();
+  if (nsi.positions.includes(name)) return;
+  nsi.positions.push(name); saveNSI(nsi);
+  document.getElementById('new-position').value = ''; renderNSI();
+}
+function deletePosition(idx) { const nsi=getNSI(); nsi.positions.splice(idx,1); saveNSI(nsi); renderNSI(); }
+
+function addParticipant() {
+  const name = document.getElementById('new-participant').value.trim();
+  if (!name) return;
+  const nsi = getNSI();
+  if (nsi.participants.find(p=>p.name===name)) return;
+  nsi.participants.push({id:Date.now(),name}); saveNSI(nsi);
+  document.getElementById('new-participant').value = ''; renderNSI();
+}
+function deleteParticipant(id) { const nsi=getNSI(); nsi.participants=nsi.participants.filter(p=>p.id!==id); saveNSI(nsi); renderNSI(); }
+
+function addProject() {
+  const name = document.getElementById('new-project').value.trim();
+  if (!name) return;
+  const nsi = getNSI();
+  if (nsi.projects.find(p=>p.name===name)) return;
+  nsi.projects.push({id:Date.now(),name,executor:[],customer:[]}); saveNSI(nsi);
+  document.getElementById('new-project').value = ''; renderNSI(); updateProjectSelect();
+}
+function deleteProject(id) {
+  if (!confirm('Удалить проект?')) return;
+  const nsi=getNSI(); nsi.projects=nsi.projects.filter(p=>p.id!==id); saveNSI(nsi); renderNSI(); updateProjectSelect();
+}
+
+let editingProjectId = null;
+function openProjectEditor(id) {
+  editingProjectId = id;
+  const nsi = getNSI();
+  const proj = nsi.projects.find(p=>p.id===id);
+  if (!proj) return;
+  document.getElementById('editor-project-name').textContent = proj.name;
+  document.getElementById('project-editor').style.display = 'block';
+  document.getElementById('project-editor').scrollIntoView({behavior:'smooth',block:'start'});
+  ['executor-participant','customer-participant'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    sel.innerHTML = '<option value="">— Участник —</option>' +
+      nsi.participants.map(p=>`<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
+  });
+  ['executor-position','customer-position'].forEach(selId => {
+    const sel = document.getElementById(selId);
+    sel.innerHTML = '<option value="">— Должность —</option>' +
+      nsi.positions.map(pos=>`<option value="${escHtml(pos)}">${escHtml(pos)}</option>`).join('');
+  });
+  renderTeams(proj);
+}
+function renderTeams(proj) {
+  const nsi = getNSI();
+  ['executor','customer'].forEach(side => {
+    const list = document.getElementById(side+'-team-list');
+    const team = proj[side]||[];
+    if (!team.length) { list.innerHTML='<div style="font-size:12px;color:#94a3b8;padding:4px 0">Нет участников</div>'; return; }
+    list.innerHTML = team.map((m,i) => {
+      const p = nsi.participants.find(x=>x.id===m.participantId);
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#f8fafc;border-radius:7px;margin-bottom:5px;font-size:13px">
+        <div><div style="font-weight:600;color:#1e293b">${escHtml(p?.name||'?')}</div>
+        <div style="color:#64748b;font-size:12px">${escHtml(m.position)}</div></div>
+        <button class="protocol-del" onclick="removeTeamMember('${side}',${i})">×</button></div>`;
+    }).join('');
+  });
+}
+function addTeamMember(side) {
+  const pId = parseInt(document.getElementById(side+'-participant').value);
+  const pos = document.getElementById(side+'-position').value;
+  if (!pId||!pos) { alert('Выбери участника и должность'); return; }
+  const nsi=getNSI(); const proj=nsi.projects.find(p=>p.id===editingProjectId);
+  if (!proj) return;
+  if (proj[side].find(m=>m.participantId===pId)) { alert('Уже добавлен'); return; }
+  proj[side].push({participantId:pId,position:pos}); saveNSI(nsi); renderTeams(proj);
+}
+function removeTeamMember(side,idx) {
+  const nsi=getNSI(); const proj=nsi.projects.find(p=>p.id===editingProjectId);
+  if (!proj) return; proj[side].splice(idx,1); saveNSI(nsi); renderTeams(proj);
+}
+
+function renderNSI() {
+  const nsi = getNSI();
+  const posList = document.getElementById('positions-list');
+  if (posList) posList.innerHTML = nsi.positions.length ? nsi.positions.map((pos,i)=>
+    `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px">
+      <span>${escHtml(pos)}</span><button class="protocol-del" onclick="deletePosition(${i})">×</button></div>`).join('')
+    : '<div style="font-size:12px;color:#94a3b8">Нет должностей</div>';
+
+  const partList = document.getElementById('participants-list');
+  if (partList) partList.innerHTML = nsi.participants.length ? nsi.participants.map(p=>
+    `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px">
+      <span>${escHtml(p.name)}</span><button class="protocol-del" onclick="deleteParticipant(${p.id})">×</button></div>`).join('')
+    : '<div style="font-size:12px;color:#94a3b8">Нет участников</div>';
+
+  const projList = document.getElementById('projects-list');
+  if (projList) projList.innerHTML = nsi.projects.length ? nsi.projects.map(proj => {
+    const ec=proj.executor?.length||0, cc=proj.customer?.length||0;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fafc;border-radius:9px;margin-bottom:7px;cursor:pointer;border:1px solid #e2e8f0" onclick="openProjectEditor(${proj.id})">
+      <div><div style="font-size:14px;font-weight:600">${escHtml(proj.name)}</div>
+      <div style="font-size:12px;color:#64748b">Исполнитель: ${ec} · Заказчик: ${cc}</div></div>
+      <div style="display:flex;gap:6px;align-items:center"><span style="font-size:12px;color:#3b82f6">Редактировать →</span>
+      <button class="protocol-del" onclick="event.stopPropagation();deleteProject(${proj.id})">×</button></div></div>`;
+  }).join('') : '<div style="font-size:12px;color:#94a3b8">Нет проектов</div>';
+
+  if (editingProjectId) {
+    const proj = nsi.projects.find(p=>p.id===editingProjectId);
+    if (proj) renderTeams(proj);
+  }
+}
+
+function updateProjectSelect() {
+  const nsi = getNSI();
+  const sel = document.getElementById('meeting-project');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">— Выбери проект —</option>' +
+    nsi.projects.map(p=>`<option value="${p.id}"${p.id==current?' selected':''}>${escHtml(p.name)}</option>`).join('');
+}
+
+function getProjectTeamText() {
+  const projId = parseInt(document.getElementById('meeting-project')?.value||0);
+  if (!projId) return '';
+  const nsi = getNSI();
+  const proj = nsi.projects.find(p=>p.id===projId);
+  if (!proj) return '';
+  const lines = [];
+  (proj.executor||[]).forEach(m=>{ const p=nsi.participants.find(x=>x.id===m.participantId); if(p) lines.push(`Команда исполнителя | ${m.position} | ${p.name}`); });
+  (proj.customer||[]).forEach(m=>{ const p=nsi.participants.find(x=>x.id===m.participantId); if(p) lines.push(`Команда заказчика | ${m.position} | ${p.name}`); });
+  return lines.join('\n');
+}
+
+function getProjectName() {
+  const projId = parseInt(document.getElementById('meeting-project')?.value||0);
+  if (!projId) return '';
+  return getNSI().projects.find(p=>p.id===projId)?.name||'';
+}
+
+
+// ══════════════════════════════════════════════════════
+// GROQ WHISPER — транскрипция аудио
+// ══════════════════════════════════════════════════════
+const GROQ_WHISPER_MODEL = 'whisper-large-v3';
+const WHISPER_MAX_MB = 24;
+
+async function transcribeWithWhisper(file) {
+  const key = getGroqKey();
+  if (!key) throw new Error('Не указан Groq API Key');
+
+  setUploadUI('uploading', {title:'Извлечение аудиодорожки...',stage:'Web Audio API',pct:5,note:'Подготовка для Whisper'});
+
+  const arrayBuffer = await file.arrayBuffer();
+  const audioCtx = new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000});
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+  await audioCtx.close();
+
+  const sr = audioBuffer.sampleRate;
+  const channelData = audioBuffer.getChannelData(0);
+  const durationSec = audioBuffer.duration;
+  const secPerChunk = Math.floor((WHISPER_MAX_MB*1024*1024)/(sr*2));
+  const numChunks = Math.ceil(durationSec/secPerChunk);
+  let fullTranscript = '';
+
+  for (let i=0; i<numChunks; i++) {
+    const start = Math.floor(i*secPerChunk*sr);
+    const end = Math.min(Math.floor((i+1)*secPerChunk*sr), channelData.length);
+    const slice = channelData.slice(start, end);
+    const wavBlob = encodeWAV(slice, sr);
+    const offsetSec = i * secPerChunk;
+
+    setUploadUI('uploading', {
+      title:`Whisper транскрибирует часть ${i+1} из ${numChunks}...`,
+      stage:`${Math.round(offsetSec/60)}–${Math.round(Math.min((i+1)*secPerChunk,durationSec)/60)} мин`,
+      pct: 10+(i/numChunks)*40,
+      note:'Groq Whisper — точная транскрипция'
+    });
+
+    const formData = new FormData();
+    formData.append('file', new File([wavBlob],'audio.wav',{type:'audio/wav'}));
+    formData.append('model', GROQ_WHISPER_MODEL);
+    formData.append('language','ru');
+    formData.append('response_format','verbose_json');
+    formData.append('timestamp_granularities[]','segment');
+
+    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
+      method:'POST', headers:{'Authorization':'Bearer '+key}, body:formData
+    });
+    if (!res.ok) { const e=await res.json().catch(()=>{}); throw new Error('Groq Whisper: '+(e?.error?.message||res.status)); }
+    const data = await res.json();
+    if (data.segments) {
+      for (const seg of data.segments) {
+        const t = offsetSec + seg.start;
+        const hh=String(Math.floor(t/3600)).padStart(2,'0');
+        const mm=String(Math.floor((t%3600)/60)).padStart(2,'0');
+        const ss=String(Math.floor(t%60)).padStart(2,'0');
+        fullTranscript += `[${hh}:${mm}:${ss}] ${seg.text.trim()}\n`;
+      }
+    } else if (data.text) {
+      fullTranscript += data.text + '\n';
+    }
+  }
+  return fullTranscript;
+}
+
+function getTranscriptSegment(fullTranscript, startSec, endSec) {
+  if (!fullTranscript) return '';
+  const lines = fullTranscript.split('\n').filter(l=>l.trim());
+  const result = [];
+  for (const line of lines) {
+    const match = line.match(/^\[(\d{2}):(\d{2}):(\d{2})\]/);
+    if (match) {
+      const t = parseInt(match[1])*3600+parseInt(match[2])*60+parseInt(match[3]);
+      if (t >= startSec-5 && t <= endSec+5) result.push(line);
+    } else if (result.length>0) result.push(line);
+  }
+  return result.join('\n');
+}
+
+
 // ── INIT ─────────────────────────────────────────────
 if (!getKey()) setTimeout(openSettings, 500);
 setTimeout(() => {
