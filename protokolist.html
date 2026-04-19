@@ -221,6 +221,8 @@ textarea{resize:vertical;line-height:1.6}
       <button class="btn btn-success" onclick="downloadDocx('protocol')">⬇️ Протокол.docx</button>
       <button class="btn btn-success" onclick="downloadDocx('requirements')">⬇️ Требования.docx</button>
       <button class="btn btn-secondary" onclick="downloadTranscript()">📄 Транскрипция.txt</button>
+      <button class="btn btn-secondary" onclick="copyToClipboard(currentProtocolText, this)">📋 Скопировать</button>
+      <button class="btn btn-secondary" id="btn-edit-protocol" onclick="toggleEditMode(this)">✏️ Редактировать</button>
       <button class="btn btn-secondary" onclick="saveProtocol()">💾 Сохранить в список</button>
     </div>
   </div>
@@ -1030,14 +1032,16 @@ ${mergedReqs}
 }
 
 function REQUIREMENTS_PROMPT(protocol) {
-  return `Извлеки все требования заказчика из протокола, оформи реестр.
+  return `Извлеки все требования заказчика из протокола и оформи в виде таблицы.
+Требование — это то что заказчик хочет видеть в новой системе.
+Каждое требование формулируй: «Необходимо реализовать [что именно] с целью [зачем].»
+Включай требования из раздела «To Be» — они тоже являются требованиями.
 
-РЕЕСТР ТРЕБОВАНИЙ · Дата: ${today()}
+| Содержание требования | ФИО владельца требования | Должность | Вид требования |
+[Вид требования всегда: Пользовательское требование]
+[ФИО и Должность — из команды заказчика из протокола]
 
-Формат: ID | Описание | Тип | Приоритет | Источник | Статус
-Тип: Функциональное или Нефункциональное · Статус: Зафиксировано
-
-После таблицы: Всего: N | Функциональных: N | Нефункциональных: N | Высокий приоритет: N
+Если требований нет — написать: Требований не зафиксировано.
 
 ПРОТОКОЛ:
 ${protocol}`;
@@ -1101,6 +1105,23 @@ function REGISTRY_PROMPT(reqs) {
 ${reqs}`;
 }
 
+// ── PARSE GEMINI RESPONSE BLOCKS ────────────────────
+// Splits raw Gemini output into protocol / requirements / transcript
+function parseGeminiBlocks(raw) {
+  const m1 = raw.indexOf('===ТРЕБОВАНИЯ===');
+  const m2 = raw.indexOf('===ТРАНСКРИПЦИЯ===');
+  if (m1 === -1) {
+    // No markers — treat whole response as protocol
+    return { protocolText: raw.trim(), requirementsText: '', transcriptText: '' };
+  }
+  const protocolText = raw.slice(0, m1).trim();
+  const afterReq = raw.slice(m1 + 16); // skip marker length
+  const relM2 = m2 > m1 ? m2 - (m1 + 16) : -1;
+  const requirementsText = relM2 > 0 ? afterReq.slice(0, relM2).trim() : afterReq.trim();
+  const transcriptText   = relM2 > 0 ? raw.slice(m2 + 18).trim() : '';
+  return { protocolText, requirementsText, transcriptText };
+}
+
 // ── GENERATE PROTOCOL ─────────────────────────────────
 async function generateProtocol() {
   const manualText = document.getElementById('manual-transcript').value.trim();
@@ -1127,7 +1148,8 @@ async function generateProtocol() {
   btn.disabled = true;
   clearStatus('protocol-status');
   hideAP();
-  currentTranscriptText = '';
+  // Don't reset currentTranscriptText here — Whisper may have already populated it in background
+  currentRequirementsText = '';
 
   try {
     let protocolText = '';
@@ -1135,9 +1157,13 @@ async function generateProtocol() {
     if (manualText) {
       showStatus('protocol-status', 'info', 'Составляю протокол...');
       showAP('Анализ текста...', 30, '');
-      protocolText = await callGemini([{
-        text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '') + '\n\nТЕКСТ ВСТРЕЧИ:\n' + manualText
+      const raw = await callGemini([{
+        text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, '') + '\n\nТЕКСТ ВСТРЕЧИ:\n' + manualText
       }]);
+      const blocks = parseGeminiBlocks(raw);
+      protocolText = blocks.protocolText;
+      if (blocks.requirementsText) currentRequirementsText = blocks.requirementsText;
+      if (blocks.transcriptText && !currentTranscriptText) currentTranscriptText = blocks.transcriptText;
       showAP('Готово', 90, '');
 
     } else if (uploadedParts.length > 0) {
@@ -1220,22 +1246,26 @@ async function generateProtocol() {
       // Single file
       showStatus('protocol-status', 'info', 'Gemini анализирует запись...');
       showAP('Gemini смотрит запись...', 40, 'Видит экран и слышит речь · ~1–2 минуты');
-      protocolText = await callGemini([
+      const raw = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
         { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '') }
       ]);
+      const blocks = parseGeminiBlocks(raw);
+      protocolText = blocks.protocolText;
+      if (blocks.requirementsText) currentRequirementsText = blocks.requirementsText;
+      if (blocks.transcriptText && !currentTranscriptText) currentTranscriptText = blocks.transcriptText;
       showAP('Протокол готов', 85, '');
     }
 
     currentProtocolText = protocolText;
 
     if (!currentRequirementsText) {
-      // Single file or text path — extract requirements from final protocol
-      showStatus('protocol-status', 'info', 'Извлекаю требования...');
-      showAP('Извлечение требований...', 92, '');
+      // Single file or text path — requirements not yet extracted (no markers found in response)
+      showStatus('protocol-status', 'info', 'Извлекаю требования (2-й запрос)...');
+      showAP('Извлечение требований...', 92, 'Последний запрос');
       currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
+      showAP('Готово', 99, '');
     } else {
-      // Multi-part path — requirements already extracted and verified
       showAP('Готово', 99, '');
     }
 
@@ -1250,6 +1280,48 @@ async function generateProtocol() {
     showStatus('protocol-status', 'error', e.message);
   } finally {
     btn.disabled = false;
+  }
+}
+
+// ── COPY TO CLIPBOARD ─────────────────────────────────
+async function copyToClipboard(text, btn) {
+  if (!text) { alert('Нет текста для копирования'); return; }
+  try {
+    await navigator.clipboard.writeText(text);
+    const orig = btn.textContent;
+    btn.textContent = '✅ Скопировано';
+    setTimeout(() => btn.textContent = orig, 2000);
+  } catch (e) {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = '✅ Скопировано';
+    setTimeout(() => btn.textContent = '📋 Скопировать', 2000);
+  }
+}
+
+// ── TOGGLE EDIT MODE ──────────────────────────────────
+function toggleEditMode(btn) {
+  const preview = document.getElementById('protocol-preview');
+  const isEdit = preview.contentEditable === 'true';
+  if (isEdit) {
+    // Save edits back to state
+    currentProtocolText = preview.textContent;
+    preview.contentEditable = 'false';
+    preview.style.background = '';
+    preview.style.border = '';
+    btn.textContent = '✏️ Редактировать';
+    btn.className = 'btn btn-secondary';
+  } else {
+    preview.contentEditable = 'true';
+    preview.style.background = '#fffef0';
+    preview.style.border = '2px solid #f59e0b';
+    preview.focus();
+    btn.textContent = '💾 Сохранить правки';
+    btn.className = 'btn btn-primary';
   }
 }
 
