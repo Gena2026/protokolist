@@ -193,6 +193,11 @@ textarea{resize:vertical;line-height:1.6}
           <div class="upload-title" id="upload-done-title">Файл готов к обработке</div>
           <div class="upload-sub" id="upload-done-sub"></div>
           <div class="upload-ready-badge">✅ Загружен и готов — нажми «Создать протокол»</div>
+          <div id="whisper-done-badge" style="display:none;margin-top:8px">
+            <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="event.stopPropagation();downloadTranscript()">
+              📄 Скачать транскрипцию Whisper
+            </button>
+          </div>
         </div>
         <div id="upload-error-area" style="display:none">
           <div class="upload-icon">❌</div>
@@ -488,6 +493,16 @@ function setUIP(stage, pct, note) {
   document.getElementById('uip-note').textContent = note || '';
 }
 
+function showWhisperBadge() {
+  const badge = document.getElementById('whisper-done-badge');
+  if (badge) badge.style.display = 'block';
+  // Also update the sub-text to show Whisper is ready
+  const sub = document.getElementById('upload-done-sub');
+  if (sub && !sub.textContent.includes('Whisper')) {
+    sub.textContent = sub.textContent + ' · Whisper ✅';
+  }
+}
+
 // ── UPLOAD AREA CLICK ─────────────────────────────────
 function onUploadAreaClick() {
   // Allow re-select only if not currently uploading
@@ -523,6 +538,9 @@ async function startFileUpload(file) {
   uploadState = 'uploading';
   uploadedFile = null;
   uploadedParts = [];
+  currentTranscriptText = '';
+  const wBadge = document.getElementById('whisper-done-badge');
+  if (wBadge) wBadge.style.display = 'none';
   clearStatus('protocol-status');
 
   const mb = (file.size / 1024 / 1024).toFixed(1);
@@ -568,6 +586,7 @@ async function startFileUpload(file) {
       // Save full transcript
       if (whisperTranscript) {
         currentTranscriptText = whisperTranscript;
+        showWhisperBadge();
       }
 
       // Upload chunks to Gemini
@@ -664,7 +683,7 @@ async function startFileUpload(file) {
           note: 'Параллельно готовим транскрипцию'
         });
         transcribeWithWhisper(file)
-          .then(t => { if (t) currentTranscriptText = t; })
+          .then(t => { if (t) { currentTranscriptText = t; showWhisperBadge(); } })
           .catch(e => console.warn('Whisper:', e.message));
       }
 
@@ -804,7 +823,6 @@ async function uploadFileToGemini(file, onProgress) {
   const fileUri = await new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', uploadUrl);
-    xhr.setRequestHeader('Content-Length', file.size);
     xhr.setRequestHeader('X-Goog-Upload-Command', 'upload, finalize');
     xhr.setRequestHeader('X-Goog-Upload-Offset', '0');
     xhr.setRequestHeader('Content-Type', mimeType);
