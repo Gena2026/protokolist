@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Протоколист — ИИ-ассистент</title>
-<script src="https://unpkg.com/docx@8.5.0/build/index.js" onload="window.docxReady=true" onerror="console.error('docx failed to load')"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js" onload="window.docxReady=true;console.log('docx loaded')" onerror="window.docxFailed=true;console.error('docx failed')"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
@@ -120,7 +120,10 @@ textarea{resize:vertical;line-height:1.6}
     <div class="logo-icon">📋</div>
     <div><h1>Протоколист <span class="header-sub">AI</span></h1></div>
   </div>
-  <button class="btn-settings" onclick="openSettings()">⚙️ API-ключ</button>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span id="groq-status" style="font-size:11px;color:#94a3b8"></span>
+    <button class="btn-settings" onclick="openSettings()">⚙️ API-ключи</button>
+  </div>
 </div>
 
 <div class="tabs">
@@ -372,6 +375,10 @@ textarea{resize:vertical;line-height:1.6}
     <label>Gemini API Key</label>
     <input type="password" id="gemini-key" placeholder="AIza...">
     <div class="key-hint">Бесплатно: aistudio.google.com → Get API key</div>
+
+    <label style="margin-top:14px">Groq API Key (для транскрипции Whisper)</label>
+    <input type="password" id="groq-key" placeholder="gsk_...">
+    <div class="key-hint">Бесплатно без карты: console.groq.com → API Keys</div>
     <div class="modal-footer">
       <button class="btn btn-primary" onclick="saveSettings()">Сохранить</button>
       <button class="btn btn-secondary" onclick="closeSettings()">Закрыть</button>
@@ -383,7 +390,7 @@ textarea{resize:vertical;line-height:1.6}
 // ── CONFIG ───────────────────────────────────────────
 const CHUNK_MINUTES = 14; // 14 мин × 60 × 263 токена/сек = ~221K — с запасом до лимита 250K TPM
 const CHUNK_SEC = CHUNK_MINUTES * 60;
-const MODEL = 'gemini-2.5-flash-lite'; // free tier: 1000 RPD
+const MODEL = 'gemini-3.1-flash-lite-preview'; // free tier: 500 RPD, качество выше
 
 // ── STATE ────────────────────────────────────────────
 let currentProtocolText = '';
@@ -400,13 +407,20 @@ let uploadedParts = [];       // [{ uri, mimeType, label }] for long videos
 
 // ── SETTINGS ─────────────────────────────────────────
 const getKey = () => localStorage.getItem('gemini_key') || '';
-function openSettings() { document.getElementById('gemini-key').value = getKey(); document.getElementById('settings-modal').classList.add('open'); }
+const getGroqKey = () => localStorage.getItem('groq_key') || '';
+function openSettings() {
+  document.getElementById('gemini-key').value = getKey();
+  document.getElementById('groq-key').value = localStorage.getItem('groq_key') || '';
+  document.getElementById('settings-modal').classList.add('open');
+}
 function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
 function saveSettings() {
   const k = document.getElementById('gemini-key').value.trim();
   if (k) localStorage.setItem('gemini_key', k);
+  const gk = document.getElementById('groq-key').value.trim();
+  if (gk) localStorage.setItem('groq_key', gk);
   closeSettings();
-  showStatus('protocol-status', 'success', 'Ключ сохранён');
+  showStatus('protocol-status', 'success', 'Ключи сохранены');
 }
 
 // ── TABS ─────────────────────────────────────────────
@@ -507,50 +521,62 @@ async function startFileUpload(file) {
     const durationStr = duration > 0 ? ` · ${Math.round(duration / 60)} мин` : '';
 
     if (numParts > 1) {
-      // ── LONG VIDEO: split → upload parts (with resume support) ──
+      // ── LONG VIDEO: Whisper + ffmpeg split in parallel ──
       const meetingTitle = document.getElementById('meeting-title').value.trim() || file.name;
       const fileKey = makeFileKey(file);
 
-      // Check if we have an existing partial session for this file
+      // Check resume session
       const existingSession = findSession(file);
       const alreadyUploaded = existingSession?.parts || [];
       const doneCount = alreadyUploaded.filter(p => p !== null).length;
 
-      if (doneCount > 0 && doneCount < numParts) {
-        setUploadUI('uploading', {
-          title: `Продолжаю загрузку: ${doneCount} из ${numParts} уже загружено`,
-          stage: 'Нарезаю оставшиеся части...',
-          pct: 5,
-          note: `Пропускаем уже загруженные ${doneCount} части`
-        });
-      } else {
-        setUploadUI('uploading', {
-          title: `Нарезаю видео на ${numParts} части...`,
-          stage: 'Подготовка...',
-          pct: 2,
-          note: ''
-        });
+      initSession(file, numParts, meetingTitle);
+
+      // Run Whisper transcription and ffmpeg splitting IN PARALLEL
+      setUploadUI('uploading', {
+        title: `Запуск: Whisper транскрипция + нарезка видео параллельно...`,
+        stage: 'Параллельная обработка',
+        pct: 3,
+        note: `${numParts} кусков · Groq Whisper + ffmpeg`
+      });
+
+      // Start both in parallel
+      const [whisperTranscript, chunks] = await Promise.all([
+        getGroqKey()
+          ? transcribeWithWhisper(file).catch(e => {
+              console.warn('Whisper failed:', e.message);
+              return null; // continue without transcript
+            })
+          : Promise.resolve(null),
+        splitVideoIntoChunks(file)
+      ]);
+
+      // Save full transcript
+      if (whisperTranscript) {
+        currentTranscriptText = whisperTranscript;
       }
 
-      // Init or reuse session
-      initSession(file, numParts, meetingTitle);
-      const chunks = await splitVideoIntoChunks(file);
-
-      // Restore already-uploaded parts
+      // Upload chunks to Gemini
       uploadedParts = [];
       for (let i = 0; i < chunks.length; i++) {
         if (alreadyUploaded[i]) {
-          uploadedParts.push({ ...alreadyUploaded[i] });
-          continue; // skip — already on Google
+          // restore URI from existing session - also restore transcript segment
+          uploadedParts.push({
+            ...alreadyUploaded[i],
+            transcriptSegment: whisperTranscript
+              ? getTranscriptSegment(whisperTranscript, i * CHUNK_SEC, (i+1) * CHUNK_SEC)
+              : ''
+          });
+          continue;
         }
 
         const chunk = chunks[i];
-        const pBase = 50 + (i / chunks.length) * 45;
-        const pEnd  = 50 + ((i + 1) / chunks.length) * 45;
+        const pBase = 55 + (i / chunks.length) * 40;
+        const pEnd  = 55 + ((i + 1) / chunks.length) * 40;
 
         setUploadUI('uploading', {
-          title: `Загрузка части ${i + 1} из ${chunks.length}`,
-          stage: `Часть ${i + 1}: 0 МБ`,
+          title: `Загрузка на Google: часть ${i + 1} из ${chunks.length}`,
+          stage: `0 МБ`,
           pct: pBase,
           note: 'Не закрывай вкладку'
         });
@@ -558,11 +584,10 @@ async function startFileUpload(file) {
         const result = await uploadFileToGemini(chunk.file, (loaded, total) => {
           const loadedMb = (loaded / 1024 / 1024).toFixed(0);
           const totalMb  = (total  / 1024 / 1024).toFixed(0);
-          const pct = pBase + (loaded / total) * (pEnd - pBase - 3);
           setUploadUI('uploading', {
-            title: `Загрузка части ${i + 1} из ${chunks.length}`,
+            title: `Загрузка на Google: часть ${i + 1} из ${chunks.length}`,
             stage: `${loadedMb} / ${totalMb} МБ`,
-            pct,
+            pct: pBase + (loaded / total) * (pEnd - pBase - 3),
             note: 'Не закрывай вкладку'
           });
         });
@@ -570,15 +595,18 @@ async function startFileUpload(file) {
         setUIP(`Часть ${i + 1}: ожидание Google...`, pEnd - 2, 'Обычно 10–30 сек');
         await waitForActive(result.uri);
 
-        // Save this chunk immediately so it survives a crash
+        const transcriptSegment = whisperTranscript
+          ? getTranscriptSegment(whisperTranscript, i * CHUNK_SEC, (i + 1) * CHUNK_SEC)
+          : '';
+
         saveChunkURI(fileKey, i, result.uri, result.mimeType, chunk.label);
-        uploadedParts.push({ ...result, label: chunk.label });
+        uploadedParts.push({ ...result, label: chunk.label, transcriptSegment });
       }
 
       uploadState = 'ready';
       setUploadUI('ready', {
         title: `${file.name}${durationStr}`,
-        sub: `Видео разбито на ${numParts} части · готово к анализу (видео + звук)`
+        sub: `Видео разбито на ${numParts} части · ${whisperTranscript ? 'Whisper ✅ · ' : ''}готово к анализу`
       });
 
     } else {
@@ -612,6 +640,20 @@ async function startFileUpload(file) {
       await waitForActive(result.uri);
 
       uploadedFile = result;
+
+      // Run Whisper for short video too
+      if (getGroqKey()) {
+        setUploadUI('uploading', {
+          title: 'Whisper транскрибирует аудио...',
+          stage: 'Groq Whisper',
+          pct: 94,
+          note: 'Параллельно готовим транскрипцию'
+        });
+        transcribeWithWhisper(file)
+          .then(t => { if (t) currentTranscriptText = t; })
+          .catch(e => console.warn('Whisper:', e.message));
+      }
+
       uploadState = 'ready';
       setUploadUI('ready', {
         title: file.name,
@@ -835,7 +877,7 @@ function hideAP() { document.getElementById('analysis-progress').style.display =
 // ── PROMPTS ───────────────────────────────────────────
 const today = () => new Date().toLocaleDateString('ru-RU');
 
-function PROTOCOL_PROMPT(title, partInfo, projectName, teamText, meetingDate) {
+function PROTOCOL_PROMPT(title, partInfo, projectName, teamText, meetingDate, transcriptSegment) {
   const dateStr = meetingDate || today();
   return `Ты — профессиональный IT-аналитик. Составь протокол интервью строго по шаблону ниже.
 ${partInfo ? `ВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент.` : ''}
@@ -925,9 +967,9 @@ ${teamText || '[список участников не задан — опред
 
 ━━━ БЛОК 3: ТРАНСКРИПЦИЯ ━━━
 
-Напиши полную транскрипцию слово в слово.
-Формат: [ЧЧ:ММ:СС] Имя (если известно): текст
-Если имя неизвестно — [ЧЧ:ММ:СС]: текст
+${transcriptSegment
+  ? 'Готовая транскрипция (от Whisper):\n' + transcriptSegment
+  : 'Транскрипция недоступна — напиши самостоятельно слово в слово.\nФормат: [ЧЧ:ММ:СС] текст'}
 
 ━━━ КОНЕЦ БЛОКА 3 ━━━`;
 }
@@ -1084,7 +1126,7 @@ async function generateProtocol() {
       showStatus('protocol-status', 'info', 'Составляю протокол...');
       showAP('Анализ текста...', 30, '');
       protocolText = await callGemini([{
-        text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate) + '\n\nТЕКСТ ВСТРЕЧИ:\n' + manualText
+        text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '') + '\n\nТЕКСТ ВСТРЕЧИ:\n' + manualText
       }]);
       showAP('Готово', 90, '');
 
@@ -1105,7 +1147,7 @@ async function generateProtocol() {
 
           const raw = await callGemini([
             { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-            { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate) }
+            { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, part.transcriptSegment || '') }
           ]);
 
           const marker1 = raw.indexOf('===ТРЕБОВАНИЯ===');
@@ -1170,7 +1212,7 @@ async function generateProtocol() {
       showAP('Gemini смотрит запись...', 40, 'Видит экран и слышит речь · ~1–2 минуты');
       protocolText = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate) }
+        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '') }
       ]);
       showAP('Протокол готов', 85, '');
     }
@@ -1298,16 +1340,23 @@ function downloadTranscript(text, filename) {
 }
 
 async function downloadDocx(type) {
-  // Wait up to 10 seconds for docx library to load
+  // Wait up to 15 seconds for docx library
   if (!window.docx) {
     let waited = 0;
-    while (!window.docx && waited < 10000) {
-      await sleep(200);
-      waited += 200;
+    while (!window.docx && waited < 15000) {
+      await sleep(300);
+      waited += 300;
     }
   }
   const docxLib = window.docx;
-  if (!docxLib) { alert('Библиотека docx не загружена. Обнови страницу (Ctrl+Shift+R) и попробуй снова.'); return; }
+  if (!docxLib) {
+    if (window.location.protocol === 'file:') {
+      alert('Открой приложение по ссылке GitHub Pages — с диска docx не работает.');
+    } else {
+      alert('Библиотека docx не загрузилась. Обнови страницу (Ctrl+Shift+R).');
+    }
+    return;
+  }
   const map = {
     protocol: { text: currentProtocolText, file: 'протокол.docx' },
     requirements: { text: currentRequirementsText, file: 'требования.docx' },
@@ -1528,7 +1577,7 @@ async function reprocessSession(id) {
       showStatus('library-status', 'info', 'Gemini анализирует запись...');
       protocolText = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate) }
+        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '') }
       ]);
     }
 
@@ -1794,9 +1843,126 @@ function getProjectName() {
   return nsi.projects.find(p => p.id === projId)?.name || '';
 }
 
+
+// ══════════════════════════════════════════════════════
+// GROQ WHISPER — транскрипция аудио
+// ══════════════════════════════════════════════════════
+
+const GROQ_WHISPER_MODEL = 'whisper-large-v3';
+const WHISPER_MAX_MB = 24; // Groq limit is 25MB, stay safe
+
+async function transcribeWithWhisper(file) {
+  const key = getGroqKey();
+  if (!key) throw new Error('Не указан Groq API Key — добавь в ⚙️ API-ключи');
+
+  // Extract audio from video using Web Audio API
+  setUploadUI('uploading', {
+    title: 'Извлечение аудиодорожки...',
+    stage: 'Web Audio API',
+    pct: 5,
+    note: 'Подготовка для Whisper'
+  });
+
+  const arrayBuffer = await file.arrayBuffer();
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+  await audioCtx.close();
+
+  const sr = audioBuffer.sampleRate;
+  const channelData = audioBuffer.getChannelData(0);
+  const durationSec = audioBuffer.duration;
+
+  // Split into chunks of ~24MB WAV (16kHz mono = 32KB/sec)
+  const secPerChunk = Math.floor((WHISPER_MAX_MB * 1024 * 1024) / (sr * 2));
+  const numChunks = Math.ceil(durationSec / secPerChunk);
+
+  let fullTranscript = '';
+  let offsetSec = 0;
+
+  for (let i = 0; i < numChunks; i++) {
+    const start = Math.floor(i * secPerChunk * sr);
+    const end = Math.min(Math.floor((i + 1) * secPerChunk * sr), channelData.length);
+    const slice = channelData.slice(start, end);
+    const wavBlob = encodeWAV(slice, sr);
+
+    setUploadUI('uploading', {
+      title: `Whisper транскрибирует часть ${i + 1} из ${numChunks}...`,
+      stage: `${Math.round(i * secPerChunk / 60)}–${Math.round(Math.min((i+1)*secPerChunk, durationSec)/60)} мин`,
+      pct: 10 + (i / numChunks) * 40,
+      note: 'Groq Whisper — точная транскрипция'
+    });
+
+    const formData = new FormData();
+    formData.append('file', new File([wavBlob], 'audio.wav', { type: 'audio/wav' }));
+    formData.append('model', GROQ_WHISPER_MODEL);
+    formData.append('language', 'ru');
+    formData.append('response_format', 'verbose_json');
+    formData.append('timestamp_granularities[]', 'segment');
+
+    const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + key },
+      body: formData
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error('Groq Whisper: ' + (err.error?.message || res.status));
+    }
+
+    const data = await res.json();
+
+    // Adjust timestamps by offset and append
+    if (data.segments) {
+      for (const seg of data.segments) {
+        const t = offsetSec + seg.start;
+        const hh = String(Math.floor(t / 3600)).padStart(2, '0');
+        const mm = String(Math.floor((t % 3600) / 60)).padStart(2, '0');
+        const ss = String(Math.floor(t % 60)).padStart(2, '0');
+        fullTranscript += `[${hh}:${mm}:${ss}] ${seg.text.trim()}\n`;
+      }
+    } else if (data.text) {
+      fullTranscript += data.text + '\n';
+    }
+
+    offsetSec += i * secPerChunk;
+  }
+
+  return fullTranscript;
+}
+
+// Get transcript segment for a time range (in seconds)
+function getTranscriptSegment(fullTranscript, startSec, endSec) {
+  if (!fullTranscript) return '';
+  const lines = fullTranscript.split('\n').filter(l => l.trim());
+  const result = [];
+
+  for (const line of lines) {
+    const match = line.match(/^\[(\d{2}):(\d{2}):(\d{2})\]/);
+    if (match) {
+      const t = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseInt(match[3]);
+      if (t >= startSec - 5 && t <= endSec + 5) {
+        result.push(line);
+      }
+    } else {
+      if (result.length > 0) result.push(line);
+    }
+  }
+  return result.join('\n');
+}
+
 // ── INIT ─────────────────────────────────────────────
 if (!getKey()) setTimeout(openSettings, 500);
-setTimeout(() => { renderNSI(); updateProjectSelect(); }, 100);
+setTimeout(() => {
+  renderNSI();
+  updateProjectSelect();
+  // Show Groq status in header
+  const groqStatusEl = document.getElementById('groq-status');
+  if (groqStatusEl) {
+    groqStatusEl.textContent = getGroqKey() ? '🎙️ Whisper готов' : '⚠️ Groq не настроен';
+    groqStatusEl.style.color = getGroqKey() ? '#10b981' : '#f59e0b';
+  }
+}, 100);
 </script>
 </body>
 </html>
