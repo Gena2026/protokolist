@@ -205,7 +205,9 @@ textarea{resize:vertical;line-height:1.6}
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <span class="upload-ready-badge" style="background:#dcfce7;color:#166534;border:1px solid #bbf7d0">✅ Шаг 2: Транскрипция готова</span>
                 <button class="btn btn-secondary" style="font-size:12px;padding:5px 12px" onclick="event.stopPropagation();downloadTranscript()">📄 Скачать</button>
+                <button class="btn btn-secondary" id="btn-cleanup" style="font-size:12px;padding:5px 12px" onclick="event.stopPropagation();retryGeminiCleanup()" title="Повторить постобработку Gemini">✨ Улучшить</button>
               </div>
+              <div id="cleanup-status" style="font-size:12px;color:#475569;margin-top:4px"></div>
             </div>
             <div id="whisper-done-badge" style="display:none;margin-top:2px">
               <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="event.stopPropagation();downloadTranscript()">
@@ -746,23 +748,44 @@ async function startTranscription() {
   clearStatus('protocol-status');
 
   try {
-    const whisperTranscript = await transcribeWithWhisper(currentRawFile);
+    // ── Step A: Whisper raw transcription ──
+    const whisperRaw = await transcribeWithWhisper(currentRawFile);
 
-    if (whisperTranscript) {
-      currentTranscriptText = whisperTranscript;
-      saveTranscriptToSession(currentFileKey, whisperTranscript);
+    if (whisperRaw) {
+      let finalTranscript = whisperRaw;
+
+      // ── Step B: Gemini cleanup ──
+      if (getKey()) {
+        if (tBtn) tBtn.textContent = '✨ Постобработка Gemini...';
+        showProgressUI('Постобработка транскрипции...', 'Gemini', 95, 'Восстановление предложений и пунктуации');
+        const cleanupStatus = document.getElementById('cleanup-status');
+        try {
+          finalTranscript = await cleanTranscriptWithGemini(whisperRaw);
+          if (cleanupStatus) cleanupStatus.textContent = '✨ Постобработка Gemini выполнена';
+        } catch(e) {
+          console.warn('Gemini cleanup failed, using raw Whisper:', e.message);
+          finalTranscript = whisperRaw; // fallback to raw
+          if (cleanupStatus) cleanupStatus.innerHTML =
+            `⚠️ Постобработка не удалась (${e.message.slice(0,60)}). Нажми «✨ Улучшить» чтобы повторить.`;
+        }
+        hideProgressUI();
+      }
+
+      // Save raw Whisper separately so cleanup can be retried without re-running Whisper
+      try { localStorage.setItem('whisper_raw_' + currentFileKey, whisperRaw); } catch(e) {}
+      currentTranscriptText = finalTranscript;
+      saveTranscriptToSession(currentFileKey, finalTranscript);
 
       // Attach transcript segments to uploaded parts
       if (uploadedParts.length) {
         uploadedParts = uploadedParts.map((p, i) => ({
           ...p,
-          transcriptSegment: getTranscriptSegment(whisperTranscript, i * CHUNK_SEC, (i+1) * CHUNK_SEC)
+          transcriptSegment: getTranscriptSegment(finalTranscript, i * CHUNK_SEC, (i+1) * CHUNK_SEC)
         }));
       }
 
       uploadState = 'transcribed';
       showWhisperBadge();
-      // Show step 2 badge
       const s2 = document.getElementById('step2-badge');
       if (s2) s2.style.display = 'block';
       const mainBtn = document.getElementById('btn-download-transcript-main');
@@ -771,10 +794,91 @@ async function startTranscription() {
   } catch(e) {
     uploadState = 'ready';
     const statusEl = document.getElementById('protocol-status');
-    if (statusEl) statusEl.innerHTML = `<div style="color:#dc2626;margin-top:8px">❌ Whisper: ${e.message}</div>`;
+    if (statusEl) statusEl.innerHTML = `<div style="color:#dc2626;margin-top:8px">❌ Транскрипция: ${e.message}</div>`;
   }
 
   if (tBtn) { tBtn.disabled = false; tBtn.textContent = '🎙️ Транскрибировать'; }
+}
+
+// ── GEMINI TRANSCRIPT CLEANUP ─────────────────────────
+async function cleanTranscriptWithGemini(rawTranscript) {
+  const prompt = `Ты — редактор транскрипций. Тебе дана сырая расшифровка речи от Whisper STT.
+
+Задача: улучши читаемость транскрипции по следующим правилам:
+1. Восстанови целостность предложений — убери обрывы, склей разорванные фразы
+2. Расставь знаки препинания (запятые, точки, вопросительные знаки)
+3. Исправь очевидные ошибки распознавания (например "сэфи т-стоп" → "safety stock", "арпе" → "ERP")
+4. Сохрани временные метки [ЧЧ:ММ:СС] — они важны, не удаляй и не меняй их
+5. НЕ добавляй ничего от себя, НЕ переформулируй смысл, НЕ убирай слова
+6. НЕ указывай кто говорит — просто улучши текст
+7. Сохрани разговорный стиль речи
+
+Верни ТОЛЬКО улучшенный текст транскрипции, без пояснений.
+
+ТРАНСКРИПЦИЯ:
+${rawTranscript}`;
+
+  const raw = await callGemini([{ text: prompt }]);
+  return raw || rawTranscript;
+}
+
+// ── RETRY GEMINI CLEANUP (without re-running Whisper) ─
+async function retryGeminiCleanup() {
+  if (!getKey()) { openSettings(); return; }
+
+  const rawTranscript = localStorage.getItem('whisper_raw_' + currentFileKey)
+    || currentTranscriptText;
+
+  if (!rawTranscript) {
+    alert('Нет сохранённой транскрипции. Сначала выполни транскрибацию.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-cleanup');
+  const statusEl = document.getElementById('cleanup-status');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Улучшаю...'; }
+  if (statusEl) statusEl.textContent = 'Gemini обрабатывает транскрипцию...';
+
+  showProgressUI('Постобработка транскрипции...', 'Gemini', 50, 'Восстановление предложений и пунктуации');
+
+  try {
+    const cleaned = await cleanTranscriptWithGemini(rawTranscript);
+    currentTranscriptText = cleaned;
+    saveTranscriptToSession(currentFileKey, cleaned);
+    // Re-attach to uploaded parts
+    if (uploadedParts.length) {
+      uploadedParts = uploadedParts.map((p, i) => ({
+        ...p,
+        transcriptSegment: getTranscriptSegment(cleaned, i * CHUNK_SEC, (i+1) * CHUNK_SEC)
+      }));
+    }
+    if (statusEl) statusEl.textContent = '✨ Транскрипция улучшена';
+  } catch(e) {
+    if (statusEl) statusEl.innerHTML =
+      `⚠️ Ошибка: ${e.message.slice(0,80)}. <a href="#" onclick="retryGeminiCleanup();return false">Повторить</a>`;
+  }
+
+  hideProgressUI();
+  if (btn) { btn.disabled = false; btn.textContent = '✨ Улучшить'; }
+}
+
+// ── PROGRESS UI HELPERS (for transcription step) ──────
+function showProgressUI(title, stage, pct, note) {
+  const apWrap = document.getElementById('analysis-progress');
+  const apStage = document.getElementById('ap-stage');
+  const apPct = document.getElementById('ap-pct');
+  const apBar = document.getElementById('ap-bar');
+  const apNote = document.getElementById('ap-note');
+  if (apWrap) apWrap.style.display = 'block';
+  if (apStage) apStage.textContent = title + (stage ? ' · ' + stage : '');
+  if (apPct) apPct.textContent = Math.round(pct) + '%';
+  if (apBar) apBar.style.width = Math.round(pct) + '%';
+  if (apNote) apNote.textContent = note || '';
+}
+
+function hideProgressUI() {
+  const apWrap = document.getElementById('analysis-progress');
+  if (apWrap) apWrap.style.display = 'none';
 }
 
 // ── WAIT FOR FILE ACTIVE ──────────────────────────────
