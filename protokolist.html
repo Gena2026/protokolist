@@ -309,7 +309,14 @@ textarea{resize:vertical;line-height:1.6}
 <div class="page" id="page-library">
   <div class="card">
     <div class="card-title"><div class="card-title-icon icon-blue">📂</div>Файлы на серверах Google</div>
-    <p style="font-size:13px;color:#64748b;margin-bottom:16px">Файлы хранятся 48 часов. Нажми на встречу чтобы переделать протокол без повторной загрузки видео.</p>
+    <p style="font-size:13px;color:#64748b;margin-bottom:12px">Файлы хранятся 48 часов. Нажми на встречу чтобы переделать протокол без повторной загрузки видео.</p>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="clearLibrary()">🗑️ Очистить библиотеку</button>
+      <span id="google-space-info" style="font-size:12px;color:#64748b;cursor:pointer" onclick="refreshGoogleSpace()" title="Нажми чтобы обновить">
+        <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="event.stopPropagation();refreshGoogleSpace()">🔄 Место на Google</button>
+      </span>
+      <span id="google-space-text" style="font-size:12px;color:#64748b"></span>
+    </div>
     <div id="library-list"><div class="empty-state"><div class="empty-state-icon">📂</div>Нет сохранённых сессий загрузки</div></div>
     <div id="library-status"></div>
   </div>
@@ -472,7 +479,7 @@ function showTab(name, el) {
   if (name === 'protocol') updateProjectSelect();
   if (name === 'report') renderList('report');
   if (name === 'registry') renderList('registry');
-  if (name === 'library') renderLibrary();
+  if (name === 'library') { renderLibrary(); refreshGoogleSpace(); }
   if (name === 'nsi') renderNSI();
 }
 
@@ -563,6 +570,24 @@ async function startFileUpload(file) {
   if (!getKey()) { openSettings(); return; }
 
   audioOnlyMode = document.getElementById('audio-only-flag')?.checked || false;
+
+  // Auto-convert unsupported formats to MP4 via ffmpeg
+  const _ext = file.name.split('.').pop().toLowerCase();
+  const _unsupported = ['webm', 'wmv', 'flv', 'ts', 'mts', 'm2ts'];
+  if (_unsupported.includes(_ext)) {
+    setUploadUI('uploading', {
+      title: `Конвертация ${_ext.toUpperCase()} → MP4...`,
+      stage: 'ffmpeg', pct: 2,
+      note: 'Формат не поддерживается Google напрямую — конвертируем'
+    });
+    try {
+      file = await convertToMp4(file);
+    } catch(convErr) {
+      setUploadUI('error', { msg: `Ошибка конвертации ${_ext}: ${convErr.message}` });
+      return;
+    }
+  }
+
   uploadState = 'uploading';
   uploadedFile = null;
   uploadedParts = [];
@@ -714,6 +739,35 @@ async function startFileUpload(file) {
     uploadState = 'error';
     setUploadUI('error', { msg: e.message });
   }
+}
+
+// ── CONVERT UNSUPPORTED FORMAT TO MP4 ───────────────
+async function convertToMp4(file) {
+  const ff = await loadFFmpeg();
+  const ext = file.name.split('.').pop().toLowerCase();
+  const inputName = `input_conv.${ext}`;
+  const outputName = 'converted.mp4';
+
+  setUIP('Копирование файла...', 3, `${(file.size/1024/1024).toFixed(0)} МБ`);
+  const inputData = new Uint8Array(await file.arrayBuffer());
+  await ff.writeFile(inputName, inputData);
+
+  setUIP(`Конвертация ${ext.toUpperCase()} → MP4...`, 10, 'Это может занять несколько минут');
+  // Re-encode video to H.264 + AAC — universally supported by Google
+  await ff.exec([
+    '-i', inputName,
+    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+    '-c:a', 'aac', '-b:a', '128k',
+    '-movflags', '+faststart',
+    outputName
+  ]);
+
+  const outData = await ff.readFile(outputName);
+  await ff.deleteFile(inputName);
+  await ff.deleteFile(outputName);
+
+  const newName = file.name.replace(/\.[^.]+$/, '') + '_converted.mp4';
+  return new File([outData], newName, { type: 'video/mp4' });
 }
 
 // ── EXTRACT AUDIO WITH FFMPEG (for audio-only mode) ──
@@ -2252,10 +2306,86 @@ function renderLibrary() {
   }).join('');
 }
 
-function deleteSession(id) {
+async function deleteSession(id) {
+  const session = getUploadSessions().find(s => s.id === id);
+  if (!session) return;
+
+  // Delete from Google File API
+  if (session.parts) {
+    for (const part of session.parts) {
+      if (part?.uri) await deleteGoogleFile(part.uri).catch(() => {});
+    }
+  }
+  // Single file upload
+  if (session.fileUri) {
+    await deleteGoogleFile(session.fileUri).catch(() => {});
+  }
+
   const sessions = getUploadSessions().filter(s => s.id !== id);
   localStorage.setItem('upload_sessions', JSON.stringify(sessions));
   renderLibrary();
+}
+
+async function deleteGoogleFile(uri) {
+  const key = getKey();
+  if (!key || !uri) return;
+  // Extract file name from URI: .../v1beta/files/FILE_ID
+  const match = uri.match(/files\/([^/?]+)/);
+  if (!match) return;
+  const fileName = 'files/' + match[1];
+  await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${key}`,
+    { method: 'DELETE' }
+  );
+}
+
+async function clearLibrary() {
+  if (!confirm('Удалить все файлы из приложения И с серверов Google? Действие необратимо.')) return;
+  const sessions = getUploadSessions();
+  const statusEl = document.getElementById('library-status');
+  if (statusEl) statusEl.innerHTML = '<div style="color:#64748b;font-size:13px">🗑️ Удаляю файлы с Google...</div>';
+
+  for (const s of sessions) {
+    if (s.parts) {
+      for (const p of s.parts) {
+        if (p?.uri) await deleteGoogleFile(p.uri).catch(() => {});
+      }
+    }
+    if (s.fileUri) await deleteGoogleFile(s.fileUri).catch(() => {});
+  }
+
+  localStorage.setItem('upload_sessions', JSON.stringify([]));
+  if (statusEl) statusEl.innerHTML = '<div style="color:#166534;font-size:13px">✅ Библиотека очищена</div>';
+  setTimeout(() => { if (statusEl) statusEl.innerHTML = ''; }, 3000);
+  renderLibrary();
+  refreshGoogleSpace();
+}
+
+async function refreshGoogleSpace() {
+  const key = getKey();
+  const textEl = document.getElementById('google-space-text');
+  if (!key) { if (textEl) textEl.textContent = '(нет ключа)'; return; }
+  if (textEl) textEl.textContent = '⏳ Проверяю...';
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/files?key=${key}&pageSize=100`
+    );
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    const files = data.files || [];
+    let usedBytes = 0;
+    for (const f of files) { usedBytes += parseInt(f.sizeBytes || 0); }
+    const usedGb = usedBytes / 1024 / 1024 / 1024;
+    const totalGb = 20;
+    const freeGb = totalGb - usedGb;
+    const freePct = Math.round((freeGb / totalGb) * 100);
+    const failedCount = files.filter(f => f.state === 'FAILED').length;
+    let txt = `Свободно: ${freeGb.toFixed(2)} ГБ из ${totalGb} ГБ (${freePct}%)`;
+    if (failedCount > 0) txt += ` · ⚠️ ${failedCount} файлов с ошибкой`;
+    if (textEl) textEl.textContent = txt;
+  } catch(e) {
+    if (textEl) textEl.textContent = `Ошибка: ${e.message}`;
+  }
 }
 
 async function reprocessSession(id) {
