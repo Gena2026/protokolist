@@ -571,14 +571,14 @@ async function startFileUpload(file) {
 
   audioOnlyMode = document.getElementById('audio-only-flag')?.checked || false;
 
-  // Auto-convert unsupported formats to MP4 via ffmpeg
+  // Formats Google does NOT support at all — convert those only
   const _ext = file.name.split('.').pop().toLowerCase();
-  const _unsupported = ['webm', 'wmv', 'flv', 'ts', 'mts', 'm2ts'];
-  if (_unsupported.includes(_ext)) {
+  const _mustConvert = ['wmv', 'flv', 'ts', 'mts', 'm2ts'];
+  if (_mustConvert.includes(_ext)) {
     setUploadUI('uploading', {
       title: `Конвертация ${_ext.toUpperCase()} → MP4...`,
       stage: 'ffmpeg', pct: 2,
-      note: 'Формат не поддерживается Google напрямую — конвертируем'
+      note: 'Формат не поддерживается Google — конвертируем'
     });
     try {
       file = await convertToMp4(file);
@@ -587,6 +587,7 @@ async function startFileUpload(file) {
       return;
     }
   }
+  // WEBM, MP4, MOV, MKV, AVI — отправляем как есть, Google поддерживает
 
   uploadState = 'uploading';
   uploadedFile = null;
@@ -1022,31 +1023,41 @@ async function splitVideoIntoChunks(file) {
   const duration = await getVideoDuration(file);
   const numParts = Math.ceil(duration / CHUNK_SEC);
 
+  // Preserve original format — WEBM stays WEBM, MP4 stays MP4
+  const origExt = file.name.split('.').pop().toLowerCase() || 'mp4';
+  const mimeMap = {
+    'mp4': 'video/mp4', 'webm': 'video/webm', 'mkv': 'video/x-matroska',
+    'mov': 'video/quicktime', 'avi': 'video/x-msvideo', 'm4v': 'video/mp4'
+  };
+  const chunkMime = mimeMap[origExt] || file.type || 'video/mp4';
+  const chunkExt  = origExt;
+  const inputName = `input.${chunkExt}`;
+
   setUIP('Копирование файла в память...', 8, `${(file.size/1024/1024).toFixed(0)} МБ`);
   const inputData = new Uint8Array(await file.arrayBuffer());
-  await ff.writeFile('input.mp4', inputData);
+  await ff.writeFile(inputName, inputData);
 
   const chunks = [];
   for (let i = 0; i < numParts; i++) {
     const start = i * CHUNK_SEC;
-    const partName = `part${i+1}.mp4`;
+    const partName = `part${i+1}.${chunkExt}`;
     const startMin = Math.round(start / 60);
     const endMin = Math.round(Math.min(start + CHUNK_SEC, duration) / 60);
 
     setUIP(`Нарезка: часть ${i+1} из ${numParts}...`,
       50 + (i / numParts) * 45, `${startMin}–${endMin} мин`);
 
-    await ff.exec(['-i','input.mp4','-ss',String(start),'-t',String(CHUNK_SEC),
-      '-c','copy','-avoid_negative_ts','make_zero', partName]);
+    await ff.exec(['-i', inputName, '-ss', String(start), '-t', String(CHUNK_SEC),
+      '-c', 'copy', '-avoid_negative_ts', 'make_zero', partName]);
 
     const partData = await ff.readFile(partName);
     await ff.deleteFile(partName);
     chunks.push({
-      file: new File([partData], `part${i+1}.mp4`, { type: 'video/mp4' }),
+      file: new File([partData], partName, { type: chunkMime }),
       label: `часть ${i+1} из ${numParts} (${startMin}–${endMin} мин)`
     });
   }
-  await ff.deleteFile('input.mp4');
+  await ff.deleteFile(inputName);
   return chunks;
 }
 
