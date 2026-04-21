@@ -747,26 +747,47 @@ async function convertToMp4(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   const inputName = `input_conv.${ext}`;
   const outputName = 'converted.mp4';
+  const newName = file.name.replace(/\.[^.]+$/, '') + '.mp4';
 
   setUIP('Копирование файла...', 3, `${(file.size/1024/1024).toFixed(0)} МБ`);
   const inputData = new Uint8Array(await file.arrayBuffer());
   await ff.writeFile(inputName, inputData);
 
-  setUIP(`Конвертация ${ext.toUpperCase()} → MP4...`, 10, 'Это может занять несколько минут');
-  // Re-encode video to H.264 + AAC — universally supported by Google
-  await ff.exec([
-    '-i', inputName,
-    '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
-    '-c:a', 'aac', '-b:a', '128k',
-    '-movflags', '+faststart',
-    outputName
-  ]);
+  // ── Способ 1: просто перепаковать контейнер (быстро, без потерь) ──
+  setUIP(`Перепаковка ${ext.toUpperCase()} → MP4...`, 10, 'Быстро, без потери качества');
+  let success = false;
+  try {
+    await ff.exec([
+      '-i', inputName,
+      '-c', 'copy',
+      '-movflags', '+faststart',
+      outputName
+    ]);
+    // Check output has content
+    const probe = await ff.readFile(outputName).catch(() => null);
+    if (probe && probe.length > 10000) success = true;
+  } catch(e) {
+    console.warn('Способ 1 (copy) не сработал:', e.message);
+  }
+
+  // ── Способ 2: перекодировать (медленно, если Способ 1 не сработал) ──
+  if (!success) {
+    setUIP(`Перекодирование ${ext.toUpperCase()} → MP4...`, 15,
+      'Перепаковка не сработала — перекодируем (займёт несколько минут)');
+    try { await ff.deleteFile(outputName); } catch(e) {}
+    await ff.exec([
+      '-i', inputName,
+      '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart',
+      outputName
+    ]);
+  }
 
   const outData = await ff.readFile(outputName);
   await ff.deleteFile(inputName);
   await ff.deleteFile(outputName);
 
-  const newName = file.name.replace(/\.[^.]+$/, '') + '_converted.mp4';
   return new File([outData], newName, { type: 'video/mp4' });
 }
 
