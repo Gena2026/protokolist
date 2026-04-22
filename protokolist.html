@@ -860,6 +860,25 @@ async function startTranscription() {
         }));
       }
 
+      // ── Step C: Video enrichment ──
+      if (getKey() && (uploadedParts.length > 0 || uploadedFile)) {
+        if (tBtn) tBtn.textContent = '🎬 Добавляю экранный контекст...';
+        const cleanupStatus = document.getElementById('cleanup-status');
+        try {
+          const enriched = await enrichTranscriptWithVideo();
+          if (enriched) {
+            currentTranscriptText = enriched;
+            saveTranscriptToSession(currentFileKey, enriched);
+          }
+          if (cleanupStatus) cleanupStatus.textContent = '✨ Транскрипция готова: текст улучшен + экранный контекст добавлен';
+        } catch(e) {
+          console.warn('Video enrichment failed:', e.message);
+          if (cleanupStatus) cleanupStatus.innerHTML =
+            `⚠️ Добавление контекста не удалось (${e.message.slice(0,60)}). Нажми «✨ Улучшить» чтобы повторить.`;
+        }
+        hideProgressUI();
+      }
+
       uploadState = 'transcribed';
       showWhisperBadge();
       const s2 = document.getElementById('step2-badge');
@@ -898,6 +917,99 @@ ${rawTranscript}`;
   return raw || rawTranscript;
 }
 
+// ── ENRICH TRANSCRIPT WITH VIDEO CONTEXT ─────────────
+function ENRICH_PROMPT(transcriptSegment) {
+  return `Ты — помощник-аналитик. Тебе дана видеозапись рабочей встречи и транскрипция к ней.
+
+Задача: обогати транскрипцию экранным контекстом из видео.
+
+Правила:
+1. Используй таймкоды для синхронизации: при каждой фразе с расплывчатым указателем («вот это», «вот здесь», «тут», «вот эта штука», «вот эта херня», «это вот», «здесь», «сюда», «отсюда») — посмотри что именно на экране в этот момент по таймкоду.
+2. Добавляй экранный контекст в квадратных скобках сразу после таймкода на отдельной строке:
+   [00:08:21] [🖥 экран: поле «Вид транспортного средства» — обязательное, отмечено звёздочкой]
+   Вот эта херня мешает, надо убрать.
+3. Если на экране в данный момент ничего важного или экран не виден — не добавляй ничего.
+4. Не меняй слова участников, не переформулируй их речь.
+5. Сохрани все таймкоды без изменений.
+6. Верни ТОЛЬКО обогащённую транскрипцию, без пояснений.
+
+ТРАНСКРИПЦИЯ WHISPER:
+${transcriptSegment}`;
+}
+
+async function enrichTranscriptWithVideo() {
+  const hasParts = uploadedParts.length > 0;
+  const hasSingle = !!uploadedFile;
+  if (!hasParts && !hasSingle) return null;
+
+  const statusEl = document.getElementById('cleanup-status');
+
+  if (hasParts) {
+    const enrichedSegments = [];
+    for (let i = 0; i < uploadedParts.length; i++) {
+      const part = uploadedParts[i];
+      const pct = 10 + Math.round((i / uploadedParts.length) * 75);
+      showProgressUI(
+        `Шаг 2 из 2 — добавляю экранный контекст`,
+        `часть ${i + 1} из ${uploadedParts.length}`,
+        pct,
+        `Gemini смотрит видео и расшифровывает что на экране · ${part.label}`
+      );
+      if (statusEl) statusEl.textContent =
+        `🎬 Анализирую экран: часть ${i + 1} из ${uploadedParts.length} (${part.label})...`;
+
+      try {
+        const enriched = await callGemini([
+          { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
+          { text: ENRICH_PROMPT(part.transcriptSegment || '') }
+        ]);
+        enrichedSegments.push(enriched || part.transcriptSegment || '');
+      } catch(e) {
+        enrichedSegments.push(part.transcriptSegment || ''); // fallback to original
+      }
+
+      if (i < uploadedParts.length - 1) {
+        showProgressUI(
+          `Шаг 2 из 2 — добавляю экранный контекст`,
+          `пауза перед частью ${i + 2}`,
+          pct + 3,
+          `✓ Часть ${i + 1} готова · ждём лимит API`
+        );
+        if (statusEl) statusEl.textContent =
+          `✓ Часть ${i + 1} обработана, пауза перед следующей...`;
+        await sleep(20000);
+      }
+    }
+
+    // Update parts with enriched segments
+    uploadedParts = uploadedParts.map((p, i) => ({
+      ...p,
+      transcriptSegment: enrichedSegments[i] !== undefined ? enrichedSegments[i] : p.transcriptSegment
+    }));
+
+    return enrichedSegments.join('\n\n');
+
+  } else {
+    showProgressUI(
+      'Шаг 2 из 2 — добавляю экранный контекст',
+      'полное видео',
+      50,
+      'Gemini синхронизирует таймкоды транскрипции с тем что на экране'
+    );
+    if (statusEl) statusEl.textContent = '🎬 Gemini смотрит видео и расшифровывает экран...';
+
+    try {
+      const enriched = await callGemini([
+        { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
+        { text: ENRICH_PROMPT(currentTranscriptText || '') }
+      ]);
+      return enriched || currentTranscriptText;
+    } catch(e) {
+      return null; // fallback to existing
+    }
+  }
+}
+
 // ── RETRY GEMINI CLEANUP (without re-running Whisper) ─
 async function retryGeminiCleanup() {
   if (!getKey()) { openSettings(); return; }
@@ -912,23 +1024,44 @@ async function retryGeminiCleanup() {
 
   const btn = document.getElementById('btn-cleanup');
   const statusEl = document.getElementById('cleanup-status');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Улучшаю...'; }
-  if (statusEl) statusEl.textContent = 'Gemini обрабатывает транскрипцию...';
+  const hasVideo = uploadedParts.length > 0 || !!uploadedFile;
+  const totalSteps = hasVideo ? 2 : 1;
 
-  showProgressUI('Постобработка транскрипции...', 'Gemini', 50, 'Восстановление предложений и пунктуации');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Улучшаю...'; }
 
   try {
+    // ── Шаг 1: Whisper cleanup ──
+    showProgressUI(
+      `Шаг 1 из ${totalSteps} — улучшаю текст транскрипции`,
+      'Gemini',
+      hasVideo ? 20 : 50,
+      'Восстановление предложений, пунктуации и терминов'
+    );
+    if (statusEl) statusEl.textContent = `✍️ Шаг 1 из ${totalSteps} — исправляю пунктуацию и предложения...`;
+
     const cleaned = await cleanTranscriptWithGemini(rawTranscript);
     currentTranscriptText = cleaned;
     saveTranscriptToSession(currentFileKey, cleaned);
-    // Re-attach to uploaded parts
     if (uploadedParts.length) {
       uploadedParts = uploadedParts.map((p, i) => ({
         ...p,
         transcriptSegment: getTranscriptSegment(cleaned, i * CHUNK_SEC, (i+1) * CHUNK_SEC)
       }));
     }
-    if (statusEl) statusEl.textContent = '✨ Транскрипция улучшена';
+
+    // ── Шаг 2: Video enrichment (если видео доступно) ──
+    if (hasVideo) {
+      const enriched = await enrichTranscriptWithVideo();
+      if (enriched) {
+        currentTranscriptText = enriched;
+        saveTranscriptToSession(currentFileKey, enriched);
+      }
+      showProgressUI('Готово', '', 100, '');
+      if (statusEl) statusEl.textContent = '✨ Готово: текст улучшен + экранный контекст добавлен';
+    } else {
+      if (statusEl) statusEl.textContent = '✨ Транскрипция улучшена';
+    }
+
   } catch(e) {
     if (statusEl) statusEl.innerHTML =
       `⚠️ Ошибка: ${e.message.slice(0,80)}. <a href="#" onclick="retryGeminiCleanup();return false">Повторить</a>`;
