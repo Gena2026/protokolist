@@ -1313,7 +1313,54 @@ function hideAP() { document.getElementById('analysis-progress').style.display =
 // ── PROMPTS ───────────────────────────────────────────
 const today = () => new Date().toLocaleDateString('ru-RU');
 
-function PROTOCOL_PROMPT(title, partInfo, projectName, teamText, meetingDate, transcriptSegment, hasVideo) {
+// ── PASS 1: ТОЛЬКО ТЕЗИСЫ ─────────────────────────────
+function THESES_PROMPT(partInfo, transcriptSegment, hasVideo) {
+  return `Ты — IT-аналитик. Твоя единственная задача прямо сейчас: написать раздел «Тезисы интервью».
+${partInfo ? `\nВАЖНО: Это ${partInfo} одной встречи. Анализируй только этот фрагмент.` : ''}
+
+${hasVideo
+  ? `ИСТОЧНИКИ — используй оба:
+1. ВИДЕО — для экранного контекста: названия полей, кнопок, документов, статусов интерфейса.
+   При каждом таймкоде [ЧЧ:ММ:СС] смотри что на экране — заменяй «вот это», «тут» на конкретные названия.
+2. ТРАНСКРИПЦИЯ — для слов участников, намерений и договорённостей.`
+  : `ИСТОЧНИК: транскрипция встречи. Разговорный стиль и жаргон — норма, переформулируй профессионально.`}
+
+СТРОГИЕ ПРАВИЛА:
+— Буллеты (•, -, *) ЗАПРЕЩЕНЫ. Только связные абзацы.
+— Каждая тема — подзаголовок строкой (без скобок, без двоеточий).
+— Для каждой темы — «Как есть» и «Как будет» (если обсуждалось).
+— As Is: минимум 2 абзаца. Конкретно: система, документ, поле, статус, проблема.
+— To Be: ТОЛЬКО если участники явно говорили что изменить. Не придумывай.
+— НИКОГДА не оставляй раздел пустым — если тема названа, информация в записи есть.
+
+СТРУКТУРА КАЖДОЙ ТЕМЫ:
+[Название темы]
+
+Описание процессов «Как есть» («As Is»)
+[минимум 2 абзаца]
+
+Описание процессов «Как будет» («To Be»)
+[абзацы — только если обсуждалось]
+
+ПРИМЕР:
+Дублирование заданий на перевозку
+
+Описание процессов «Как есть» («As Is»)
+В системе предусмотрена вкладка «Доставка» в документе «Заказ поставщику». При установке статуса «Подтверждён» система автоматически создаёт задание на перевозку. Однако компания применяет статус «Согласовано», поэтому автоматическое создание задания в текущем процессе не срабатывает.
+
+Параллельно логисты вручную создают поручения экспедитору, на основании которых формируются задания на перевозку. Если одновременно заполнена вкладка «Доставка» и создано поручение, в систему попадают два задания на одну перевозку — одно из поручения, второе из заказа по статусу. Это дублирование вызывает путаницу в рабочем месте диспетчера.
+
+Описание процессов «Как будет» («To Be»)
+Необходимо установить значение «Силами поставщика» по умолчанию в поле «Доставка» заказа поставщику. Данный вариант нейтрален: задание на перевозку не создаётся автоматически ни при каком статусе — дублирование исключается.
+
+Верни ТОЛЬКО текст тезисов. Без шапки, без таблиц, без пояснений — только темы с As Is и To Be.
+
+${transcriptSegment
+  ? `[ТРАНСКРИПЦИЯ WHISPER]\n${transcriptSegment}\n[КОНЕЦ ТРАНСКРИПЦИИ]`
+  : hasVideo ? '[Транскрипция недоступна — используй только видео]' : '[Транскрипция не предоставлена]'}`;
+}
+
+function PROTOCOL_PROMPT(title, partInfo, projectName, teamText, meetingDate, transcriptSegment, hasVideo, thesesText) {
   const dateStr = meetingDate || today();
   return `Ты — профессиональный IT-аналитик. Составь протокол интервью СТРОГО по шаблону ниже.
 ${partInfo ? `ВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент.` : ''}
@@ -1368,37 +1415,25 @@ ${teamText || '[список участников не задан — опред
 [Пронумерованный список вопросов которые обсуждались. Формат: 1. Вопрос? 2. Вопрос?]
 
 ТЕЗИСЫ ИНТЕРВЬЮ:
-ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА ДЛЯ ТЕЗИСОВ:
+${thesesText
+  ? `ВАЖНО: Тезисы уже написаны отдельным анализом. Вставь их ДОСЛОВНО, ничего не меняй, не сокращай, не переформулируй.
+[ГОТОВЫЕ ТЕЗИСЫ — вставить дословно]
+${thesesText}
+[КОНЕЦ ТЕЗИСОВ]`
+  : `ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА ДЛЯ ТЕЗИСОВ:
 — СТРОГО ЗАПРЕЩЕНО использовать маркированные списки (•, -, *). Только связные абзацы.
-— Структурируй по темам беседы. Каждая отдельная тема — отдельный подзаголовок без двоеточия (например: «Дублирование заданий на перевозку», «Связи между документами», «Обязательные поля», «Интеграции» и т.д.).
+— Структурируй по темам беседы. Каждая тема — подзаголовок без двоеточий.
 — Для каждой темы пиши ОТДЕЛЬНЫЕ подразделы As Is и To Be.
-— Каждый подраздел — 2–6 развёрнутых абзацев. Пиши конкретно: имена систем, документов, статусов, полей, кто ответственный, какие проблемы.
-— Объём тезисов должен соответствовать длительности встречи. Встреча на 15–20 минут = тезисы на 1–2 страницы текста. Встреча на 1–1,5 часа = тезисы на 4–8 страниц.
-— НИКОГДА не оставляй раздел «Как есть» пустым. Если тема упомянута — значит информация есть. Напиши хотя бы 2 абзаца.
+— Каждый подраздел — 2–6 развёрнутых абзацев с конкретикой.
+— НИКОГДА не оставляй раздел «Как есть» пустым.
 
-ПРИМЕР ХОРОШЕГО ТЕЗИСА (используй как образец стиля и объёма):
----
-Дублирование заданий на перевозку
+[НАЗВАНИЕ ТЕМЫ]
 
 Описание процессов «Как есть» («As Is»)
-В системе предусмотрена вкладка «Доставка» в документе «Заказ поставщику». При установке статуса «Подтверждён» система автоматически создаёт задание на перевозку. Однако компания применяет статус «Согласовано» вместо «Подтверждён», поэтому автоматическое создание задания в текущем процессе не срабатывает.
-
-Параллельно логисты вручную создают поручения экспедитору, на основании которых формируются задания на перевозку. Если сотрудник одновременно заполняет вкладку «Доставка» и создаёт поручение, в систему попадают два задания на одну и ту же перевозку — одно из поручения, второе из заказа по статусу. Это дублирование вызывает путаницу и лишние записи в рабочем месте диспетчера.
+[2–6 абзацев без буллетов]
 
 Описание процессов «Как будет» («To Be»)
-Необходимо установить значение «Силами поставщика» по умолчанию в поле «Доставка» заказа поставщику. Данный вариант является нейтральным: при любом статусе заказа задание на перевозку автоматически создаваться не будет, что исключит дублирование.
----
-
-[Для каждой темы из транскрипции используй эту структуру:]
-
-[НАЗВАНИЕ ТЕМЫ — строкой без скобок и двоеточий]
-
-Описание процессов «Как есть» («As Is»)
-[2–6 абзацев. Кто делает, в чём делает (какая система, какой документ, какое поле), как именно, какие проблемы и ограничения. Полные предложения, без буллетов. ОБЯЗАТЕЛЕН минимум 2 абзаца.]
-
-Описание процессов «Как будет» («To Be»)
-ВАЖНО: пиши этот раздел ТОЛЬКО если участники явно обсуждали что хотят изменить / реализовать. НИКОГДА не придумывай To Be самостоятельно. Если To Be не обсуждался — пропусти подраздел полностью.
-[2–6 абзацев. Что должна делать система, зачем. Каждый абзац начинается с «Необходимо реализовать...» или «Планируется...». Без буллетов.]
+[2–6 абзацев — только если обсуждалось]`}
 
 ИНФОРМАЦИОННЫЕ МАТЕРИАЛЫ:
 [Если исполнитель запрашивал документы, данные, файлы — заполни таблицу. Плановую дату считай через 5–7 рабочих дней от ${dateStr}. Если ничего не запрашивалось — написать одной строкой: Информационные материалы не запрашивались.]
@@ -1625,105 +1660,130 @@ async function generateProtocol() {
     let protocolText = '';
 
     if (manualText) {
-      showStatus('protocol-status', 'info', 'Составляю протокол...');
-      showAP('Анализ текста...', 30, '');
+      // ── Режим: ручная транскрипция (2 прохода) ──
+      showStatus('protocol-status', 'info', 'Шаг 1 из 2 — извлекаю тезисы...');
+      showAP('Шаг 1 из 2 — тезисы', 20, 'Фокусированный анализ содержания без отвлечения на шаблон');
+      const thesesRaw = await callGemini([{
+        text: THESES_PROMPT(null, manualText, false)
+      }]);
+
+      showStatus('protocol-status', 'info', 'Шаг 2 из 2 — составляю протокол...');
+      showAP('Шаг 2 из 2 — протокол', 60, 'Заполняю шаблон с готовыми тезисами');
       const raw = await callGemini([{
-        text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, manualText, false)
+        text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, manualText, false, thesesRaw)
       }]);
       const blocks = parseGeminiBlocks(raw);
       protocolText = blocks.protocolText;
       if (blocks.requirementsText) currentRequirementsText = blocks.requirementsText;
-      if (blocks.transcriptText && !currentTranscriptText) currentTranscriptText = blocks.transcriptText;
       showAP('Готово', 90, '');
 
     } else if (uploadedParts.length > 0) {
-      // Multi-part
+      // ── Режим: многочастное видео (2 прохода на каждую часть) ──
       const partProtocols = [];
-        const partRequirements = [];
-        const partTranscripts = [];
+      const partRequirements = [];
+      const totalSteps = uploadedParts.length * 2 + 4;
 
-        // Шаги 1..N: анализ каждого куска — протокол + требования прямо из видео
-        for (let i = 0; i < uploadedParts.length; i++) {
-          const part = uploadedParts[i];
-          const pct = 10 + (i / uploadedParts.length) * 50;
-          showStatus('protocol-status', 'info',
-            `Шаг ${i+1}/${uploadedParts.length+4} — анализирую ${part.label}...`);
-          showAP(`Анализ части ${i+1} из ${uploadedParts.length}`, pct,
-            'Протокол + требования прямо из видео');
+      for (let i = 0; i < uploadedParts.length; i++) {
+        const part = uploadedParts[i];
+        const step1 = i * 2 + 1;
+        const step2 = i * 2 + 2;
+        const pctBase = 10 + (i / uploadedParts.length) * 50;
 
-          const raw = await callGemini([
-            { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-            { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, part.transcriptSegment || '', true) }
-          ]);
+        // Проход 1: тезисы
+        showStatus('protocol-status', 'info',
+          `Шаг ${step1}/${totalSteps} — тезисы ${part.label}...`);
+        showAP(
+          `Шаг ${step1}/${totalSteps} · тезисы части ${i+1}`,
+          pctBase,
+          `Извлекаю содержание: As Is / To Be · ${part.label}`
+        );
+        const thesesRaw = await callGemini([
+          { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
+          { text: THESES_PROMPT(part.label, part.transcriptSegment || '', true) }
+        ]);
 
-          const marker1 = raw.indexOf('===ТРЕБОВАНИЯ===');
-          const marker2 = raw.indexOf('===ТРАНСКРИПЦИЯ===');
-          if (marker1 > -1) {
-            partProtocols.push(raw.slice(0, marker1).trim());
-            const reqAndTrans = raw.slice(marker1 + 16);
-            if (marker2 > marker1) {
-              partRequirements.push(reqAndTrans.slice(0, marker2 - marker1 - 16).trim());
-              partTranscripts.push(reqAndTrans.slice(marker2 - marker1 - 16 + 18).trim());
-            } else {
-              partRequirements.push(reqAndTrans.trim());
-              partTranscripts.push('');
-            }
-          } else {
-            partProtocols.push(raw.trim());
-            partRequirements.push('');
-            partTranscripts.push('');
-          }
+        showAP(`Пауза перед шагом ${step2}...`, pctBase + 2, 'Соблюдаем лимит API · тезисы готовы ✓');
+        await sleep(20000);
 
-          if (i < uploadedParts.length - 1) {
-            showAP(`Пауза...`, pct + 2, 'Соблюдаем лимит API');
-            await sleep(20000);
-          }
+        // Проход 2: полный протокол с готовыми тезисами
+        showStatus('protocol-status', 'info',
+          `Шаг ${step2}/${totalSteps} — протокол ${part.label}...`);
+        showAP(
+          `Шаг ${step2}/${totalSteps} · протокол части ${i+1}`,
+          pctBase + 5,
+          `Заполняю шаблон с готовыми тезисами · ${part.label}`
+        );
+        const raw = await callGemini([
+          { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
+          { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, part.transcriptSegment || '', true, thesesRaw) }
+        ]);
+
+        const marker1 = raw.indexOf('===ТРЕБОВАНИЯ===');
+        if (marker1 > -1) {
+          partProtocols.push(raw.slice(0, marker1).trim());
+          partRequirements.push(raw.slice(marker1 + 16).replace(/===ТРАНСКРИПЦИЯ===[^]*/, '').trim());
+        } else {
+          partProtocols.push(raw.trim());
+          partRequirements.push('');
         }
 
-        const totalParts = uploadedParts.length;
+        if (i < uploadedParts.length - 1) {
+          showAP(`Пауза перед частью ${i + 2}...`, pctBase + 7, 'Соблюдаем лимит API');
+          await sleep(20000);
+        }
+      }
 
-        // Шаг N+1: объединить протоколы
-        showStatus('protocol-status', 'info',
-          `Шаг ${totalParts+1}/${totalParts+4} — объединяю протоколы...`);
-        showAP('Объединение протоколов...', 65, '');
-        await sleep(20000);
-        protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
+      const totalParts = uploadedParts.length;
 
-        // Шаг N+2: объединить реестры требований
-        showStatus('protocol-status', 'info',
-          `Шаг ${totalParts+2}/${totalParts+4} — объединяю реестры требований...`);
-        showAP('Объединение реестров требований...', 76, 'Убираем дубли, сохраняем нюансы');
-        await sleep(20000);
-        currentRequirementsText = await callGemini([{
-          text: MERGE_REQUIREMENTS_PROMPT(partRequirements, title)
-        }]);
+      // Объединение протоколов
+      showStatus('protocol-status', 'info',
+        `Шаг ${totalParts*2+1}/${totalSteps} — объединяю протоколы...`);
+      showAP('Объединение протоколов...', 65, '');
+      await sleep(20000);
+      protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
 
-        // Шаг N+3: финальная проверка — сверяем реестр с итоговым протоколом
-        showStatus('protocol-status', 'info',
-          `Шаг ${totalParts+3}/${totalParts+4} — финальная проверка требований...`);
-        showAP('Сверяю реестр с протоколом...', 88,
-          'Проверяем не потерялось ли ничего при объединении');
-        await sleep(20000);
-        currentRequirementsText = await callGemini([{
-          text: FINAL_CHECK_REQUIREMENTS_PROMPT(protocolText, currentRequirementsText, title)
-        }]);
+      // Объединение требований
+      showStatus('protocol-status', 'info',
+        `Шаг ${totalParts*2+2}/${totalSteps} — объединяю реестры требований...`);
+      showAP('Объединение реестров требований...', 76, 'Убираем дубли, сохраняем нюансы');
+      await sleep(20000);
+      currentRequirementsText = await callGemini([{
+        text: MERGE_REQUIREMENTS_PROMPT(partRequirements, title)
+      }]);
 
-        // Транскрипция — просто склеиваем части (без AI, бесплатно)
-        currentTranscriptText = partTranscripts
-          .filter(t => t && t.length > 0)
-          .join('\n\n--- Продолжение ---\n\n');
+      // Финальная проверка
+      showStatus('protocol-status', 'info',
+        `Шаг ${totalParts*2+3}/${totalSteps} — финальная проверка требований...`);
+      showAP('Сверяю реестр с протоколом...', 88,
+        'Проверяем не потерялось ли ничего при объединении');
+      await sleep(20000);
+      currentRequirementsText = await callGemini([{
+        text: FINAL_CHECK_REQUIREMENTS_PROMPT(protocolText, currentRequirementsText, title)
+      }]);
+
     } else if (uploadedFile) {
-      // Single file
-      showStatus('protocol-status', 'info', 'Gemini анализирует запись...');
-      showAP('Gemini смотрит запись...', 40, 'Видит экран и слышит речь · ~1–2 минуты');
+      // ── Режим: одиночный файл (2 прохода) ──
+      showStatus('protocol-status', 'info', 'Шаг 1 из 2 — извлекаю тезисы...');
+      showAP('Шаг 1 из 2 — тезисы', 25,
+        'Gemini анализирует видео и транскрипцию · только содержание');
+      const thesesRaw = await callGemini([
+        { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
+        { text: THESES_PROMPT(null, currentTranscriptText || '', true) }
+      ]);
+
+      showAP('Пауза...', 45, 'Тезисы готовы ✓ · соблюдаем лимит API');
+      await sleep(20000);
+
+      showStatus('protocol-status', 'info', 'Шаг 2 из 2 — составляю протокол...');
+      showAP('Шаг 2 из 2 — протокол', 55,
+        'Заполняю шаблон · тезисы уже готовы');
       const raw = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '', true) }
+        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '', true, thesesRaw) }
       ]);
       const blocks = parseGeminiBlocks(raw);
       protocolText = blocks.protocolText;
       if (blocks.requirementsText) currentRequirementsText = blocks.requirementsText;
-      if (blocks.transcriptText && !currentTranscriptText) currentTranscriptText = blocks.transcriptText;
       showAP('Протокол готов', 85, '');
     }
 
