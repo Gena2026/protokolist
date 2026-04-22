@@ -1180,17 +1180,32 @@ function hideAP() { document.getElementById('analysis-progress').style.display =
 // ── PROMPTS ───────────────────────────────────────────
 const today = () => new Date().toLocaleDateString('ru-RU');
 
-function PROTOCOL_PROMPT(title, partInfo, projectName, teamText, meetingDate, transcriptSegment) {
+function PROTOCOL_PROMPT(title, partInfo, projectName, teamText, meetingDate, transcriptSegment, hasVideo) {
   const dateStr = meetingDate || today();
   return `Ты — профессиональный IT-аналитик. Составь протокол интервью СТРОГО по шаблону ниже.
 ${partInfo ? `ВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент.` : ''}
+
+${hasVideo
+  ? `ИСТОЧНИКИ АНАЛИЗА — используй оба в связке:
+1. ВИДЕО — главный источник для экранного контекста.
+   Смотри что отображается на экране: названия документов, полей, кнопок, статусов, вкладок.
+   Используй таймкоды транскрипции для синхронизации: когда встречается [ЧЧ:ММ:СС] — посмотри что на экране в этот момент.
+   Заменяй расплывчатые указатели («вот это», «тут», «вот эта штука», «вот эта херня») на конкретные названия из интерфейса.
+2. ТРАНСКРИПЦИЯ WHISPER — главный источник для речи.
+   Точные слова участников, намерения и договорённости.
+   Разговорный стиль и жаргон — переформулируй профессионально.
+Итог: видео даёт контекст экрана, транскрипция даёт смысл слов — совмести оба.`
+  : `ИСТОЧНИК АНАЛИЗА — транскрипция Whisper.
+Разговорный стиль, жаргон и ненормативная лексика — норма для живых рабочих встреч.
+Твоя задача: извлечь технический смысл и переформулировать профессионально.
+Даже фраза «надо убрать эту херню, чтобы без этого давало» содержит конкретное требование — найди и зафиксируй его.`}
 
 ДАННЫЕ ДЛЯ ШАПКИ:
 Проект: ${projectName || '[не указан]'}
 Тема: ${title || '[определи из контекста]'}
 Дата: ${dateStr}
 Команда проекта — используй ТОЛЬКО этих людей для заполнения таблиц:
-${teamText || '[список участников не задан — определи из видео по именам]'}
+${teamText || '[список участников не задан — определи из записи по именам]'}
 
 СПИСОК ФУНКЦИОНАЛЬНЫХ ОБЛАСТЕЙ (выбери одну или несколько из списка):
 Закупки, Продажи, Планирование, Бюджетирование, Склады, Доставка, МСФО, Бухгалтерия, Финансы, Казначейство, CRM и маркетинг, НСИ, Производство, Ремонт
@@ -1220,9 +1235,6 @@ ${teamText || '[список участников не задан — опред
 [Пронумерованный список вопросов которые обсуждались. Формат: 1. Вопрос? 2. Вопрос?]
 
 ТЕЗИСЫ ИНТЕРВЬЮ:
-⚠️ КРИТИЧНО — ПРОЧТИ ПЕРЕД НАПИСАНИЕМ:
-Транскрипция может содержать разговорную речь, жаргон, обрывистые фразы и ненормативную лексику — это нормально для живых рабочих встреч. Твоя задача: извлечь технический смысл и переформулировать профессиональным языком. Даже одна фраза «нам надо убрать эту херню, чтобы без этого давало» содержит конкретное требование.
-
 ОБЯЗАТЕЛЬНЫЕ ПРАВИЛА ДЛЯ ТЕЗИСОВ:
 — СТРОГО ЗАПРЕЩЕНО использовать маркированные списки (•, -, *). Только связные абзацы.
 — Структурируй по темам беседы. Каждая отдельная тема — отдельный подзаголовок без двоеточия (например: «Дублирование заданий на перевозку», «Связи между документами», «Обязательные поля», «Интеграции» и т.д.).
@@ -1299,15 +1311,11 @@ ${teamText || '[список участников не задан — опред
 
 ━━━ КОНЕЦ БЛОКА 2 ━━━
 
-===ТРАНСКРИПЦИЯ===
-
-━━━ БЛОК 3: ТРАНСКРИПЦИЯ ━━━
-
 ${transcriptSegment
-  ? 'Готовая транскрипция от Whisper (используй её для анализа выше):\n' + transcriptSegment
-  : 'Транскрипция недоступна — напиши самостоятельно слово в слово все реплики.\nФормат каждой реплики: [ЧЧ:ММ:СС] Текст реплики'}
-
-━━━ КОНЕЦ БЛОКА 3 ━━━`;
+  ? `[ТРАНСКРИПЦИЯ WHISPER — используй для анализа выше]\n${transcriptSegment}\n[КОНЕЦ ТРАНСКРИПЦИИ]`
+  : hasVideo
+    ? '[Транскрипция недоступна — используй только видео]'
+    : '[Транскрипция не предоставлена]'}`;
 }
 
 
@@ -1487,7 +1495,7 @@ async function generateProtocol() {
       showStatus('protocol-status', 'info', 'Составляю протокол...');
       showAP('Анализ текста...', 30, '');
       const raw = await callGemini([{
-        text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, '') + '\n\nТЕКСТ ВСТРЕЧИ:\n' + manualText
+        text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, manualText, false)
       }]);
       const blocks = parseGeminiBlocks(raw);
       protocolText = blocks.protocolText;
@@ -1512,7 +1520,7 @@ async function generateProtocol() {
 
           const raw = await callGemini([
             { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-            { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, part.transcriptSegment || '') }
+            { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, part.transcriptSegment || '', true) }
           ]);
 
           const marker1 = raw.indexOf('===ТРЕБОВАНИЯ===');
@@ -1577,7 +1585,7 @@ async function generateProtocol() {
       showAP('Gemini смотрит запись...', 40, 'Видит экран и слышит речь · ~1–2 минуты');
       const raw = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '') }
+        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '', true) }
       ]);
       const blocks = parseGeminiBlocks(raw);
       protocolText = blocks.protocolText;
@@ -2488,7 +2496,7 @@ async function reprocessSession(id) {
         showStatus('library-status', 'info', `Gemini анализирует ${part.label}...`);
         const raw = await callGemini([
           { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-          { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, '') }
+          { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, '', true) }
         ]);
         const marker1 = raw.indexOf('===ТРЕБОВАНИЯ===');
         if (marker1 > -1) {
@@ -2510,7 +2518,7 @@ async function reprocessSession(id) {
       showStatus('library-status', 'info', 'Gemini анализирует запись...');
       protocolText = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, '') }
+        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, '', true) }
       ]);
     }
 
