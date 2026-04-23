@@ -2961,6 +2961,9 @@ async function reprocessSession(id) {
   const projectName = typeof getProjectName === 'function' ? (getProjectName() || '') : '';
   const teamText = typeof getProjectTeamText === 'function' ? (getProjectTeamText() || '') : '';
   const meetingDate = (document.getElementById('meeting-date')?.value?.trim()) || today();
+  // Используем сохранённую транскрипцию если она есть — это позволяет мержить тезисы
+  // на том же материале, без ре-транскрипции через Whisper.
+  const savedTranscript = session.transcript || '';
 
   showStatus('library-status', 'info', `Запускаю анализ: «${title}»...`);
   document.getElementById('library-result-card').style.display = 'none';
@@ -2973,31 +2976,109 @@ async function reprocessSession(id) {
     let protocolText = '';
 
     if (uploadedParts.length > 0) {
+      // ── Multi-part: тот же pipeline что и в generateProtocol ──
       const partProtocols = [];
       const partRequirements = [];
+      const partTheses = [];
+
+      // Раскладываем сохранённую транскрипцию по чанкам по CHUNK_SEC сек
+      const transcriptSegments = uploadedParts.map((p, i) =>
+        savedTranscript
+          ? getTranscriptSegment(savedTranscript, i * CHUNK_SEC, (i+1) * CHUNK_SEC)
+          : ''
+      );
+
       for (let i = 0; i < uploadedParts.length; i++) {
         const part = uploadedParts[i];
-        showStatus('library-status', 'info', `Gemini анализирует ${part.label}...`);
+        const ts = transcriptSegments[i];
+
+        // Проход 1: тезисы
+        showStatus('library-status', 'info',
+          `Часть ${i+1}/${uploadedParts.length} · тезисы (${part.label})...`);
+        const thesesRaw = await callGemini([
+          { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
+          { text: THESES_PROMPT(part.label, ts, true) }
+        ]);
+        partTheses.push(thesesRaw || '');
+        await sleep(20000);
+
+        // Проход 2: протокол с готовыми тезисами
+        showStatus('library-status', 'info',
+          `Часть ${i+1}/${uploadedParts.length} · протокол (${part.label})...`);
         const raw = await callGemini([
           { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-          { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, '', true) }
+          { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, ts, true, thesesRaw) }
         ]);
         const { protocolText: pText, requirementsText: rText } = parseGeminiBlocks(raw);
         partProtocols.push(pText || raw.trim());
         partRequirements.push(rText);
         if (i < uploadedParts.length - 1) await sleep(20000);
       }
-      showStatus('library-status', 'info', 'Объединяю части...');
+
+      // Merge главного протокола (без тезисов и участников)
+      showStatus('library-status', 'info', 'Объединяю протоколы...');
       await sleep(20000);
       protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
+
+      // Merge тезисов отдельным запросом
+      showStatus('library-status', 'info', 'Объединяю тезисы...');
+      await sleep(20000);
+      const mergedTheses = await callGemini([{
+        text: MERGE_THESES_PROMPT(partTheses.filter(t => t && t.trim()), title)
+      }]);
+
+      // Merge участников отдельным запросом
+      showStatus('library-status', 'info', 'Объединяю участников...');
+      await sleep(20000);
+      const mergedParticipants = await callGemini([{
+        text: MERGE_PARTICIPANTS_PROMPT(partProtocols, title, teamText)
+      }]);
+
+      // Штампуем в итоговый протокол
+      const nextAfterTheses = [
+        'ИНФОРМАЦИОННЫЕ МАТЕРИАЛЫ', 'ОТКРЫТЫЕ ВОПРОСЫ', 'СЛЕДУЮЩИЕ ШАГИ',
+        'ПРОТОКОЛ СОСТАВЛЕН', 'ЛИСТ СОГЛАСОВАНИЯ', 'СПИСОК ПРИЛОЖЕНИЙ'
+      ];
+      const nextAfterParticipants = [
+        'ГЛОССАРИЙ', 'ВОПРОСЫ ДЛЯ ОБСУЖДЕНИЯ', 'ТЕЗИСЫ ИНТЕРВЬЮ', ...nextAfterTheses
+      ];
+      if (mergedTheses && mergedTheses.trim()) {
+        protocolText = replaceSectionInProtocol(
+          protocolText, 'ТЕЗИСЫ ИНТЕРВЬЮ', mergedTheses, nextAfterTheses
+        );
+      }
+      if (mergedParticipants && mergedParticipants.trim()) {
+        protocolText = replaceSectionInProtocol(
+          protocolText, 'УЧАСТНИКИ', mergedParticipants, nextAfterParticipants
+        );
+      }
+
+      // Merge требований
       showStatus('library-status', 'info', 'Объединяю реестры требований...');
       await sleep(20000);
-      currentRequirementsText = await callGemini([{ text: MERGE_REQUIREMENTS_PROMPT(partRequirements, title) }]);
+      currentRequirementsText = await callGemini([{
+        text: MERGE_REQUIREMENTS_PROMPT(partRequirements, title)
+      }]);
+
+      // Финальная проверка требований
+      showStatus('library-status', 'info', 'Финальная проверка требований...');
+      await sleep(20000);
+      currentRequirementsText = await callGemini([{
+        text: FINAL_CHECK_REQUIREMENTS_PROMPT(protocolText, currentRequirementsText, title)
+      }]);
+
     } else {
-      showStatus('library-status', 'info', 'Gemini анализирует запись...');
+      // ── Single file: 2 прохода как в generateProtocol ──
+      showStatus('library-status', 'info', 'Gemini анализирует запись · Шаг 1 — тезисы...');
+      const thesesRaw = await callGemini([
+        { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
+        { text: THESES_PROMPT(null, savedTranscript, true) }
+      ]);
+      await sleep(20000);
+      showStatus('library-status', 'info', 'Gemini анализирует запись · Шаг 2 — протокол...');
       const rawSingle = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, '', true) }
+        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, savedTranscript, true, thesesRaw) }
       ]);
       const blocks = parseGeminiBlocks(rawSingle);
       protocolText = blocks.protocolText || rawSingle;
@@ -3005,6 +3086,9 @@ async function reprocessSession(id) {
     }
 
     currentProtocolText = protocolText;
+    // Сохраняем транскрипцию для кнопки «Скачать транскрипцию.txt» в результате
+    currentTranscriptText = savedTranscript;
+
     if (!currentRequirementsText) {
       showStatus('library-status', 'info', 'Извлекаю требования...');
       await sleep(20000);
