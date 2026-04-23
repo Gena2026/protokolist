@@ -96,12 +96,48 @@ textarea{resize:vertical;line-height:1.6}
 .progress-bar{height:8px;border-radius:99px;background:linear-gradient(90deg,#3b82f6,#8b5cf6);transition:width .3s;width:0%}
 .progress-note{font-size:11px;color:#94a3b8;margin-top:5px}
 
+/* ACTION STEPS — единая панель шагов */
+.actions{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.action-step{background:#fafafa;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;transition:.25s}
+.action-step.step-done{background:#f0fdf4;border-color:#bbf7d0}
+.action-step.step-next{background:#eff6ff;border-color:#bfdbfe;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
+.action-step.step-disabled{opacity:.55}
+.action-step-header{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.action-step-num{width:24px;height:24px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.action-step.step-done .action-step-num{background:#10b981;color:#fff}
+.action-step.step-next .action-step-num{background:#3b82f6;color:#fff}
+.action-step-title{font-size:14px;font-weight:600;color:#1e293b}
+.action-step-status{margin-left:auto;font-size:12px;color:#64748b}
+.action-step.step-done .action-step-status{color:#059669;font-weight:600}
+.action-step-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.action-step-hint{font-size:12px;color:#64748b;margin-top:7px;line-height:1.45}
+.action-step.step-next .action-step-hint{color:#1d4ed8;font-weight:500}
+
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinner{width:16px;height:16px;border:2px solid rgba(59,130,246,.3);border-top-color:#3b82f6;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;margin-top:1px}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .pulsing{animation:pulse 1.5s ease-in-out infinite}
 
 .preview{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:18px;font-size:13px;line-height:1.75;white-space:pre-wrap;max-height:420px;overflow-y:auto;font-family:inherit;color:#334155}
+
+/* ACTION STEPS (main protocol page) */
+.actions{display:flex;flex-direction:column;gap:12px;margin-top:20px}
+.action-step{background:#fafafa;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;transition:.2s}
+.action-step.step-done{background:#f0fdf4;border-color:#bbf7d0}
+.action-step.step-next{background:#eff6ff;border-color:#bfdbfe;box-shadow:0 2px 8px rgba(59,130,246,.08)}
+.action-step.step-disabled{opacity:.55}
+.action-step-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.action-step-num{width:22px;height:22px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.action-step.step-done .action-step-num{background:#10b981;color:#fff}
+.action-step.step-next .action-step-num{background:#3b82f6;color:#fff}
+.action-step-title{font-size:14px;font-weight:600;color:#1e293b}
+.action-step-status{margin-left:auto;font-size:12px;color:#64748b}
+.action-step.step-done .action-step-status{color:#059669;font-weight:600}
+.action-step-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.action-step-hint{font-size:12px;color:#64748b;margin-top:8px;line-height:1.4}
+.action-step.step-next .action-step-hint{color:#1d4ed8}
+.cleanup-status-line{font-size:12px;color:#475569;margin-top:8px;line-height:1.4}
+
 .protocol-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #e2e8f0;border-radius:9px;margin-bottom:8px;transition:.2s;cursor:pointer}
 .protocol-item:hover{border-color:#bfdbfe;background:#f8faff}
 .protocol-item input[type=checkbox]{width:16px;height:16px;cursor:pointer;flex-shrink:0;accent-color:#3b82f6}
@@ -198,23 +234,6 @@ textarea{resize:vertical;line-height:1.6}
           <div class="upload-icon" id="upload-done-icon">✅</div>
           <div class="upload-title" id="upload-done-title">Файл готов к обработке</div>
           <div class="upload-sub" id="upload-done-sub"></div>
-          <!-- Step indicators -->
-          <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;align-items:flex-start">
-            <div id="step1-badge" class="upload-ready-badge" style="background:#dcfce7;color:#166534;border:1px solid #bbf7d0">✅ Шаг 1: Видео загружено на Google</div>
-            <div id="step2-badge" style="display:none">
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <span class="upload-ready-badge" style="background:#dcfce7;color:#166534;border:1px solid #bbf7d0">✅ Шаг 2: Транскрипция готова</span>
-                <button class="btn btn-secondary" style="font-size:12px;padding:5px 12px" onclick="event.stopPropagation();downloadTranscript()">📄 Скачать</button>
-                <button class="btn btn-secondary" id="btn-cleanup" style="font-size:12px;padding:5px 12px" onclick="event.stopPropagation();retryGeminiCleanup()" title="Повторить постобработку Gemini">✨ Улучшить</button>
-              </div>
-              <div id="cleanup-status" style="font-size:12px;color:#475569;margin-top:4px"></div>
-            </div>
-            <div id="whisper-done-badge" style="display:none;margin-top:2px">
-              <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="event.stopPropagation();downloadTranscript()">
-                📄 Скачать транскрипцию Whisper
-              </button>
-            </div>
-          </div>
         </div>
         <div id="upload-error-area" style="display:none">
           <div class="upload-icon">❌</div>
@@ -240,11 +259,49 @@ textarea{resize:vertical;line-height:1.6}
       <div class="progress-note" id="ap-note"></div>
     </div>
 
-    <div class="btn-row" style="flex-wrap:wrap;gap:8px">
-      <button class="btn btn-secondary" id="btn-transcribe" onclick="startTranscription()" disabled
-        title="Сначала загрузи файл">🎙️ Транскрибировать</button>
-      <button class="btn btn-primary" id="btn-generate" onclick="generateProtocol()">✨ Создать протокол</button>
-      <button class="btn btn-secondary" id="btn-download-transcript-main" disabled title="Транскрипция появится после обработки Whisper" onclick="downloadTranscript()">📄 Скачать транскрипцию</button>
+    <!-- ЕДИНАЯ ПАНЕЛЬ ДЕЙСТВИЙ — Шаг 1/2/3 -->
+    <div class="actions" id="action-panel">
+      <!-- Шаг 1: Загрузка -->
+      <div class="action-step step-disabled" id="step-1">
+        <div class="action-step-header">
+          <span class="action-step-num">1</span>
+          <span class="action-step-title">Загрузка файла</span>
+          <span class="action-step-status" id="step-1-status">ожидание файла</span>
+        </div>
+        <div class="action-step-hint" id="step-1-hint">Файл автоматически режется на части по 14 минут и загружается на серверы Google. Живёт 48 часов.</div>
+      </div>
+
+      <!-- Шаг 2: Транскрипция -->
+      <div class="action-step step-disabled" id="step-2">
+        <div class="action-step-header">
+          <span class="action-step-num">2</span>
+          <span class="action-step-title">Транскрипция</span>
+          <span class="action-step-status" id="step-2-status"></span>
+        </div>
+        <div class="action-step-body">
+          <button class="btn btn-primary" id="btn-transcribe" onclick="startTranscription()" disabled
+            title="Сначала загрузи файл">🎙️ Транскрибировать</button>
+          <button class="btn btn-secondary" id="btn-download-transcript-main" disabled
+            onclick="downloadTranscript()" title="Скачай .txt после обработки">📄 Скачать</button>
+          <button class="btn btn-secondary" id="btn-cleanup" disabled
+            onclick="retryGeminiCleanup()" title="Повторить постобработку Gemini">✨ Улучшить</button>
+        </div>
+        <div class="action-step-hint" id="step-2-hint">Whisper расшифрует аудио, Gemini почистит пунктуацию и добавит экранный контекст.</div>
+        <div class="cleanup-status-line" id="cleanup-status"></div>
+      </div>
+
+      <!-- Шаг 3: Протокол -->
+      <div class="action-step step-disabled" id="step-3">
+        <div class="action-step-header">
+          <span class="action-step-num">3</span>
+          <span class="action-step-title">Протокол</span>
+          <span class="action-step-status" id="step-3-status"></span>
+        </div>
+        <div class="action-step-body">
+          <button class="btn btn-primary" id="btn-generate" onclick="generateProtocol()">✨ Создать протокол</button>
+        </div>
+        <div class="action-step-hint" id="step-3-hint">Двухпроходная генерация: сначала тезисы, потом шаблон с таблицами и реестром требований.</div>
+      </div>
     </div>
     <div id="protocol-status"></div>
   </div>
@@ -455,6 +512,41 @@ let audioOnlyMode = false;    // if true: extract audio, upload as audio-only to
 // ── SETTINGS ─────────────────────────────────────────
 const getKey = () => localStorage.getItem('gemini_key') || '';
 const getGroqKey = () => localStorage.getItem('groq_key') || '';
+
+// ── SAFE STORAGE WRITE ──────────────────────────────
+// localStorage ~5 МБ на домен. Длинные whisper-сырцы могут переполнить.
+// При QuotaExceededError чистим самые старые whisper_raw_* / whisper_progress_*
+// и пробуем ещё раз.
+function safeSetItem(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e) {
+    if (!/quota|storage/i.test(e.name + ' ' + e.message)) {
+      console.warn('safeSetItem error:', e);
+      return false;
+    }
+    // Собираем все старые whisper-ключи (кроме текущего)
+    const oldKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k !== key && (k.startsWith('whisper_raw_') || k.startsWith('whisper_progress_'))) {
+        oldKeys.push(k);
+      }
+    }
+    // Пытаемся освободить место: удаляем 1, 2, 3... ключей пока не получится
+    for (let n = 1; n <= oldKeys.length; n++) {
+      try {
+        localStorage.removeItem(oldKeys[n - 1]);
+        localStorage.setItem(key, value);
+        console.info(`safeSetItem: освободили ${n} старых whisper-кеш(а), запись удалась`);
+        return true;
+      } catch (retryErr) { /* продолжаем чистку */ }
+    }
+    console.error('safeSetItem: переполнение localStorage, очистить не удалось. Ключ:', key);
+    return false;
+  }
+}
 function openSettings() {
   document.getElementById('gemini-key').value = getKey();
   document.getElementById('groq-key').value = localStorage.getItem('groq_key') || '';
@@ -523,17 +615,35 @@ function setUIP(stage, pct, note) {
   document.getElementById('uip-note').textContent = note || '';
 }
 
+// ── ACTION PANEL (Step 1/2/3) ─────────────────────────
+// state: 'disabled' | 'active' | 'done' | 'next' (next = подсвечен, нужно нажать)
+function setStepState(stepNum, state, statusText) {
+  const step = document.getElementById('step-' + stepNum);
+  if (!step) return;
+  step.classList.remove('step-disabled', 'step-done', 'step-next');
+  if (state === 'disabled') step.classList.add('step-disabled');
+  if (state === 'done')     step.classList.add('step-done');
+  if (state === 'next')     step.classList.add('step-next');
+  // state === 'active' = дефолтное состояние (ни один класс)
+  const statusEl = document.getElementById('step-' + stepNum + '-status');
+  if (statusEl && statusText !== undefined) statusEl.textContent = statusText;
+}
+
+function setStepHint(stepNum, html) {
+  // step-2-hint / step-3-hint — рядовой подсказочный текст под кнопками
+  const hint = document.getElementById('step-' + stepNum + '-hint');
+  if (hint) hint.innerHTML = html;
+}
+
 function showWhisperBadge() {
-  // Button inside upload-done-area (visible after upload completes)
-  const badge = document.getElementById('whisper-done-badge');
-  if (badge) badge.style.display = 'block';
-  // Enable the always-visible button next to "Создать протокол"
+  // Шаг 2 готов → активируем кнопки скачивания + "Улучшить", подсвечиваем Шаг 3
+  setStepState(2, 'done', '✓ готово');
+  setStepState(3, 'next');
+  setStepHint(3, '✅ Транскрипция готова — теперь нажми «Создать протокол»');
   const mainBtn = document.getElementById('btn-download-transcript-main');
-  if (mainBtn) {
-    mainBtn.disabled = false;
-    mainBtn.title = 'Скачать транскрипцию Whisper';
-  }
-  // Update the upload done sub-text
+  if (mainBtn) { mainBtn.disabled = false; mainBtn.title = 'Скачать транскрипцию'; }
+  const cleanupBtn = document.getElementById('btn-cleanup');
+  if (cleanupBtn) { cleanupBtn.disabled = false; }
   const sub = document.getElementById('upload-done-sub');
   if (sub && sub.textContent && !sub.textContent.includes('Whisper')) {
     sub.textContent = sub.textContent + ' · Whisper ✅';
@@ -596,13 +706,15 @@ async function startFileUpload(file) {
   currentRawFile = file;
   currentFileKey = makeFileKey(file);
 
-  // Reset step badges
-  const s2 = document.getElementById('step2-badge');
-  if (s2) s2.style.display = 'none';
-  const wBadge = document.getElementById('whisper-done-badge');
-  if (wBadge) wBadge.style.display = 'none';
+  // Сброс панели шагов — начинаем с «Шаг 1 в процессе»
+  setStepState(1, 'active', 'загрузка...');
+  setStepState(2, 'disabled', '');
+  setStepState(3, 'disabled', '');
+  setStepHint(3, 'Двухпроходная генерация: сначала тезисы, потом шаблон с таблицами и реестром требований.');
   const mainBtn = document.getElementById('btn-download-transcript-main');
   if (mainBtn) { mainBtn.disabled = true; }
+  const cleanupBtn = document.getElementById('btn-cleanup');
+  if (cleanupBtn) { cleanupBtn.disabled = true; }
   const tBtn = document.getElementById('btn-transcribe');
   if (tBtn) { tBtn.disabled = true; tBtn.title = 'Дождись загрузки видео'; }
   clearStatus('protocol-status');
@@ -731,14 +843,22 @@ async function startFileUpload(file) {
     }
 
     // ── Enable Transcribe button after upload done ──
+    setStepState(1, 'done', '✓ загружено');
     if (tBtn && getGroqKey()) {
       tBtn.disabled = false;
       tBtn.title = 'Запустить транскрипцию Whisper';
+      setStepState(2, 'next', '');
+      setStepHint(2, '✅ Файл готов — теперь нажми «Транскрибировать»');
+    } else if (tBtn && !getGroqKey()) {
+      tBtn.title = 'Добавь Groq API-ключ в ⚙️ настройках';
+      setStepState(2, 'active', 'нужен Groq-ключ');
+      setStepHint(2, '⚠️ Добавь Groq API-ключ в ⚙️ настройках вверху справа');
     }
 
   } catch (e) {
     uploadState = 'error';
     setUploadUI('error', { msg: e.message });
+    setStepState(1, 'active', '❌ ошибка');
   }
 }
 
@@ -822,6 +942,8 @@ async function startTranscription() {
 
   uploadState = 'transcribing';
   clearStatus('protocol-status');
+  setStepState(2, 'active', 'в процессе...');
+  setStepHint(2, 'Whisper расшифровывает аудио. Между чанками ~65 сек паузы — это лимит бесплатного Groq.');
 
   try {
     // ── Step A: Whisper raw transcription ──
@@ -833,7 +955,7 @@ async function startTranscription() {
       // ── Step B: Gemini cleanup ──
       if (getKey()) {
         if (tBtn) tBtn.textContent = '✨ Постобработка Gemini...';
-        showProgressUI('Постобработка транскрипции...', 'Gemini', 95, 'Восстановление предложений и пунктуации');
+        showAP('Постобработка транскрипции... · Gemini', 95, 'Восстановление предложений и пунктуации');
         const cleanupStatus = document.getElementById('cleanup-status');
         try {
           finalTranscript = await cleanTranscriptWithGemini(whisperRaw);
@@ -844,11 +966,11 @@ async function startTranscription() {
           if (cleanupStatus) cleanupStatus.innerHTML =
             `⚠️ Постобработка не удалась (${e.message.slice(0,60)}). Нажми «✨ Улучшить» чтобы повторить.`;
         }
-        hideProgressUI();
+        hideAP();
       }
 
       // Save raw Whisper separately so cleanup can be retried without re-running Whisper
-      try { localStorage.setItem('whisper_raw_' + currentFileKey, whisperRaw); } catch(e) {}
+      try { safeSetItem('whisper_raw_' + currentFileKey, whisperRaw); } catch(e) {}
       currentTranscriptText = finalTranscript;
       saveTranscriptToSession(currentFileKey, finalTranscript);
 
@@ -860,8 +982,9 @@ async function startTranscription() {
         }));
       }
 
-      // ── Step C: Video enrichment ──
-      if (getKey() && (uploadedParts.length > 0 || uploadedFile)) {
+      // ── Step C: Video enrichment (пропускаем для audio-only) ──
+      const canEnrich = getKey() && !audioOnlyMode && (uploadedParts.length > 0 || uploadedFile);
+      if (canEnrich) {
         if (tBtn) tBtn.textContent = '🎬 Добавляю экранный контекст...';
         const cleanupStatus = document.getElementById('cleanup-status');
         try {
@@ -876,18 +999,18 @@ async function startTranscription() {
           if (cleanupStatus) cleanupStatus.innerHTML =
             `⚠️ Добавление контекста не удалось (${e.message.slice(0,60)}). Нажми «✨ Улучшить» чтобы повторить.`;
         }
-        hideProgressUI();
+        hideAP();
       }
 
       uploadState = 'transcribed';
       showWhisperBadge();
-      const s2 = document.getElementById('step2-badge');
-      if (s2) s2.style.display = 'block';
       const mainBtn = document.getElementById('btn-download-transcript-main');
       if (mainBtn) { mainBtn.disabled = false; }
     }
   } catch(e) {
     uploadState = 'ready';
+    setStepState(2, 'next', '❌ ошибка — можно повторить');
+    setStepHint(2, `⚠️ Ошибка транскрипции: ${e.message.slice(0,80)}. Попробуй ещё раз.`);
     const statusEl = document.getElementById('protocol-status');
     if (statusEl) statusEl.innerHTML = `<div style="color:#dc2626;margin-top:8px">❌ Транскрипция: ${e.message}</div>`;
   }
@@ -949,9 +1072,8 @@ async function enrichTranscriptWithVideo() {
     for (let i = 0; i < uploadedParts.length; i++) {
       const part = uploadedParts[i];
       const pct = 10 + Math.round((i / uploadedParts.length) * 75);
-      showProgressUI(
-        `Шаг 2 из 2 — добавляю экранный контекст`,
-        `часть ${i + 1} из ${uploadedParts.length}`,
+      showAP(
+        `Шаг 2 из 2 — добавляю экранный контекст · часть ${i + 1} из ${uploadedParts.length}`,
         pct,
         `Gemini смотрит видео и расшифровывает что на экране · ${part.label}`
       );
@@ -969,9 +1091,8 @@ async function enrichTranscriptWithVideo() {
       }
 
       if (i < uploadedParts.length - 1) {
-        showProgressUI(
-          `Шаг 2 из 2 — добавляю экранный контекст`,
-          `пауза перед частью ${i + 2}`,
+        showAP(
+          `Шаг 2 из 2 — добавляю экранный контекст · пауза перед частью ${i + 2}`,
           pct + 3,
           `✓ Часть ${i + 1} готова · ждём лимит API`
         );
@@ -990,9 +1111,8 @@ async function enrichTranscriptWithVideo() {
     return enrichedSegments.join('\n\n');
 
   } else {
-    showProgressUI(
-      'Шаг 2 из 2 — добавляю экранный контекст',
-      'полное видео',
+    showAP(
+      'Шаг 2 из 2 — добавляю экранный контекст · полное видео',
       50,
       'Gemini синхронизирует таймкоды транскрипции с тем что на экране'
     );
@@ -1024,16 +1144,16 @@ async function retryGeminiCleanup() {
 
   const btn = document.getElementById('btn-cleanup');
   const statusEl = document.getElementById('cleanup-status');
-  const hasVideo = uploadedParts.length > 0 || !!uploadedFile;
+  // Видео есть ТОЛЬКО если загружено и НЕ audio-only режим.
+  const hasVideo = !audioOnlyMode && (uploadedParts.length > 0 || !!uploadedFile);
   const totalSteps = hasVideo ? 2 : 1;
 
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Улучшаю...'; }
 
   try {
     // ── Шаг 1: Whisper cleanup ──
-    showProgressUI(
-      `Шаг 1 из ${totalSteps} — улучшаю текст транскрипции`,
-      'Gemini',
+    showAP(
+      `Шаг 1 из ${totalSteps} — улучшаю текст транскрипции · Gemini`,
       hasVideo ? 20 : 50,
       'Восстановление предложений, пунктуации и терминов'
     );
@@ -1056,7 +1176,7 @@ async function retryGeminiCleanup() {
         currentTranscriptText = enriched;
         saveTranscriptToSession(currentFileKey, enriched);
       }
-      showProgressUI('Готово', '', 100, '');
+      showAP('Готово', 100, '');
       if (statusEl) statusEl.textContent = '✨ Готово: текст улучшен + экранный контекст добавлен';
     } else {
       if (statusEl) statusEl.textContent = '✨ Транскрипция улучшена';
@@ -1067,27 +1187,8 @@ async function retryGeminiCleanup() {
       `⚠️ Ошибка: ${e.message.slice(0,80)}. <a href="#" onclick="retryGeminiCleanup();return false">Повторить</a>`;
   }
 
-  hideProgressUI();
+  hideAP();
   if (btn) { btn.disabled = false; btn.textContent = '✨ Улучшить'; }
-}
-
-// ── PROGRESS UI HELPERS (for transcription step) ──────
-function showProgressUI(title, stage, pct, note) {
-  const apWrap = document.getElementById('analysis-progress');
-  const apStage = document.getElementById('ap-stage');
-  const apPct = document.getElementById('ap-pct');
-  const apBar = document.getElementById('ap-bar');
-  const apNote = document.getElementById('ap-note');
-  if (apWrap) apWrap.style.display = 'block';
-  if (apStage) apStage.textContent = title + (stage ? ' · ' + stage : '');
-  if (apPct) apPct.textContent = Math.round(pct) + '%';
-  if (apBar) apBar.style.width = Math.round(pct) + '%';
-  if (apNote) apNote.textContent = note || '';
-}
-
-function hideProgressUI() {
-  const apWrap = document.getElementById('analysis-progress');
-  if (apWrap) apWrap.style.display = 'none';
 }
 
 // ── WAIT FOR FILE ACTIVE ──────────────────────────────
@@ -1242,21 +1343,45 @@ async function uploadFileToGemini(file, onProgress) {
 }
 
 // ── GEMINI GENERATE ───────────────────────────────────
+// Таймаут для одного HTTP-запроса. Если ответ не пришёл — AbortError,
+// который в свою очередь ретраим (как обычную ошибку сети).
+const GEMINI_TIMEOUT_MS = 5 * 60 * 1000; // 5 минут на запрос
+
 async function callGemini(parts, _attempt = 0) {
   const key = getKey();
   if (!key) throw new Error('Не указан Gemini API Key');
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
-      })
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+
+  let res;
+  try {
+    res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+        }),
+        signal: controller.signal
+      }
+    );
+  } catch (fetchErr) {
+    clearTimeout(timeoutId);
+    // AbortError или сетевая ошибка — ретраим как временную
+    const isAbort = fetchErr.name === 'AbortError';
+    const reason = isAbort
+      ? `Запрос к Gemini завис (> ${Math.round(GEMINI_TIMEOUT_MS/60000)} мин)`
+      : `Сетевая ошибка: ${fetchErr.message}`;
+    if (_attempt < 3) {
+      await countdownWait([30, 60, 120][_attempt], _attempt + 1, reason);
+      return callGemini(parts, _attempt + 1);
     }
-  );
+    throw new Error(reason + ' — несколько попыток подряд неудачны');
+  }
+  clearTimeout(timeoutId);
 
   if (res.ok) {
     const d = await res.json();
@@ -1502,22 +1627,24 @@ ${parts.map((p, i) => `=== ФРАГМЕНТ ${i + 1} ===\n${p}`).join('\n\n')}`;
 }
 
 function MERGE_REQUIREMENTS_PROMPT(reqParts, title) {
-  return `Объедини реестры требований из фрагментов встречи «${title || 'без названия'}» в единый сводный реестр.
+  return `Объедини блоки «Зафиксированные требования» из фрагментов встречи «${title || 'без названия'}» в единый список.
 
-Правила:
-— Устрани дублирующиеся требования (похожие по смыслу → объединяй в одно)
-— Присвой каждому уникальный ID: REQ-001, REQ-002...
-— Сохрани источник (из какого фрагмента)
-— Сохрани все нюансы формулировок — ничего не теряй
+ФОРМАТ ВЫВОДА — СТРОГО 4 КОЛОНКИ (как в исходных фрагментах):
+| Содержание требования | ФИО владельца требования | Должность | Вид требования |
 
-СВОДНЫЙ РЕЕСТР ТРЕБОВАНИЙ
-Встреча: ${title || 'без названия'} · Дата: ${today()}
+Не добавляй колонки ID, Приоритет, Статус, Источник — это блок для протокола, а не сводный реестр.
 
-Формат: ID | Описание | Тип | Приоритет | Источник | Статус
+ПРАВИЛА ОБЪЕДИНЕНИЯ:
+— Устрани дубликаты: похожие по смыслу требования объедини в одну строку, сохраняя самую полную формулировку.
+— Ничего не теряй: если одно и то же требование описано в разных фрагментах по-разному — возьми наиболее подробную версию.
+— ФИО и Должность — из исходных строк (обычно это представители заказчика).
+— Вид требования всегда: Пользовательское требование.
+— Каждое требование — отдельной строкой таблицы.
 
-Итог: Всего: N | Функциональных: N | Нефункциональных: N | Высокий: N | Средний: N | Низкий: N
+Верни ТОЛЬКО таблицу со строкой-заголовком, без пояснений и без нумерации.
+Если во всех фрагментах требований не было — напиши одной строкой: Требований не зафиксировано.
 
-${reqParts.map((r, i) => `=== РЕЕСТР ФРАГМЕНТА ${i + 1} ===\n${r}`).join('\n\n')}`;
+${reqParts.map((r, i) => `=== ФРАГМЕНТ ${i + 1} ===\n${r}`).join('\n\n')}`;
 }
 
 function FINAL_CHECK_REQUIREMENTS_PROMPT(protocol, mergedReqs, title) {
@@ -1633,7 +1760,13 @@ async function generateProtocol() {
   const title = document.getElementById('meeting-title').value.trim();
   const projectName = typeof getProjectName === 'function' ? (getProjectName() || '') : '';
   const teamText = typeof getProjectTeamText === 'function' ? (getProjectTeamText() || '') : '';
-  const meetingDate = (document.getElementById('meeting-date')?.value?.trim()) || today();
+  const meetingDateRaw = document.getElementById('meeting-date')?.value?.trim() || '';
+  // Если введена и НЕ валидна — не запускаем генерацию. Если пусто — берём сегодня.
+  if (meetingDateRaw && !isValidDateStr(meetingDateRaw)) {
+    showStatus('protocol-status', 'error', 'Проверь дату встречи: формат ДД.ММ.ГГГГ и реальный календарь');
+    return;
+  }
+  const meetingDate = meetingDateRaw || today();
 
   // Validation
   if (!manualText && uploadState === 'uploading') {
@@ -1653,6 +1786,8 @@ async function generateProtocol() {
   btn.disabled = true;
   clearStatus('protocol-status');
   hideAP();
+  setStepState(3, 'active', 'в процессе...');
+  setStepHint(3, 'Gemini анализирует встречу и собирает протокол. Это занимает несколько минут.');
   // Don't reset currentTranscriptText here — Whisper may have already populated it in background
   currentRequirementsText = '';
 
@@ -1718,14 +1853,9 @@ async function generateProtocol() {
           { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, part.transcriptSegment || '', true, thesesRaw) }
         ]);
 
-        const marker1 = raw.indexOf('===ТРЕБОВАНИЯ===');
-        if (marker1 > -1) {
-          partProtocols.push(raw.slice(0, marker1).trim());
-          partRequirements.push(raw.slice(marker1 + 16).replace(/===ТРАНСКРИПЦИЯ===[^]*/, '').trim());
-        } else {
-          partProtocols.push(raw.trim());
-          partRequirements.push('');
-        }
+        const { protocolText: pText, requirementsText: rText } = parseGeminiBlocks(raw);
+        partProtocols.push(pText || raw.trim());
+        partRequirements.push(rText);
 
         if (i < uploadedParts.length - 1) {
           showAP(`Пауза перед частью ${i + 2}...`, pctBase + 7, 'Соблюдаем лимит API');
@@ -1763,12 +1893,18 @@ async function generateProtocol() {
 
     } else if (uploadedFile) {
       // ── Режим: одиночный файл (2 прохода) ──
+      // Для audio-only режима визуального контекста нет — промпт не должен
+      // просить Gemini «смотреть на экран», иначе он галлюцинирует.
+      const hasVisual = !audioOnlyMode;
+      const sourceNote = hasVisual
+        ? 'Gemini анализирует видео и транскрипцию · только содержание'
+        : 'Gemini анализирует аудио и транскрипцию · только содержание';
+
       showStatus('protocol-status', 'info', 'Шаг 1 из 2 — извлекаю тезисы...');
-      showAP('Шаг 1 из 2 — тезисы', 25,
-        'Gemini анализирует видео и транскрипцию · только содержание');
+      showAP('Шаг 1 из 2 — тезисы', 25, sourceNote);
       const thesesRaw = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: THESES_PROMPT(null, currentTranscriptText || '', true) }
+        { text: THESES_PROMPT(null, currentTranscriptText || '', hasVisual) }
       ]);
 
       showAP('Пауза...', 45, 'Тезисы готовы ✓ · соблюдаем лимит API');
@@ -1779,7 +1915,7 @@ async function generateProtocol() {
         'Заполняю шаблон · тезисы уже готовы');
       const raw = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '', true, thesesRaw) }
+        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '', hasVisual, thesesRaw) }
       ]);
       const blocks = parseGeminiBlocks(raw);
       protocolText = blocks.protocolText;
@@ -1800,6 +1936,8 @@ async function generateProtocol() {
     }
 
     hideAP();
+    setStepState(3, 'done', '✓ готово');
+    setStepHint(3, 'Скачай .docx ниже или сохрани в список. Можно править прямо в превью.');
     document.getElementById('protocol-preview').textContent = currentProtocolText;
     document.getElementById('protocol-result-card').style.display = 'block';
     document.getElementById('protocol-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1807,6 +1945,7 @@ async function generateProtocol() {
 
   } catch (e) {
     hideAP();
+    setStepState(3, 'next', '❌ ошибка — можно повторить');
     showStatus('protocol-status', 'error', e.message);
   } finally {
     btn.disabled = false;
@@ -1896,7 +2035,7 @@ function deleteProtocol(id) {
   renderList('report');
 }
 function selectAll(prefix) { document.querySelectorAll(`input[id^="${prefix}-"]`).forEach(c => c.checked = true); }
-const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const escHtml = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 // ── GENERATE REPORT ───────────────────────────────────
 async function generateReport() {
@@ -1977,7 +2116,16 @@ async function downloadDocx(type) {
   }
 
   if (type === 'protocol') {
-    await downloadProtocolDocx(text, file);
+    // ── FIX: requirements хранятся отдельно в currentRequirementsText.
+    // MERGE_PROMPT и двухпроходная генерация намеренно НЕ включают блок
+    // «Зафиксированные требования» в тело протокола, поэтому при рендеринге
+    // DOCX таблица оставалась пустой. Склеиваем с маркером, который
+    // распознаёт парсер секций (см. sectionMarkers в downloadProtocolDocx).
+    let mergedText = text;
+    if (currentRequirementsText && !/ЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ/i.test(text)) {
+      mergedText = text.trimEnd() + '\n\nЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ:\n' + currentRequirementsText.trim() + '\n';
+    }
+    await downloadProtocolDocx(mergedText, file);
   } else {
     await downloadSimpleDocx(text, file);
   }
@@ -2506,7 +2654,7 @@ function saveTranscriptToSession(fileKey, transcriptText) {
   const s = sessions.find(s => s.fileKey === fileKey);
   if (!s) return;
   s.transcript = transcriptText;
-  localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+  safeSetItem('upload_sessions', JSON.stringify(sessions));
 }
 
 
@@ -2691,14 +2839,9 @@ async function reprocessSession(id) {
           { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
           { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, '', true) }
         ]);
-        const marker1 = raw.indexOf('===ТРЕБОВАНИЯ===');
-        if (marker1 > -1) {
-          partProtocols.push(raw.slice(0, marker1).trim());
-          partRequirements.push(raw.slice(marker1 + 16).replace(/===ТРАНСКРИПЦИЯ===[^]*/, '').trim());
-        } else {
-          partProtocols.push(raw.trim());
-          partRequirements.push('');
-        }
+        const { protocolText: pText, requirementsText: rText } = parseGeminiBlocks(raw);
+        partProtocols.push(pText || raw.trim());
+        partRequirements.push(rText);
         if (i < uploadedParts.length - 1) await sleep(20000);
       }
       showStatus('library-status', 'info', 'Объединяю части...');
@@ -2709,10 +2852,13 @@ async function reprocessSession(id) {
       currentRequirementsText = await callGemini([{ text: MERGE_REQUIREMENTS_PROMPT(partRequirements, title) }]);
     } else {
       showStatus('library-status', 'info', 'Gemini анализирует запись...');
-      protocolText = await callGemini([
+      const rawSingle = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
         { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, '', true) }
       ]);
+      const blocks = parseGeminiBlocks(rawSingle);
+      protocolText = blocks.protocolText || rawSingle;
+      if (blocks.requirementsText) currentRequirementsText = blocks.requirementsText;
     }
 
     currentProtocolText = protocolText;
@@ -2753,6 +2899,25 @@ function formatDateInput(el) {
   if (v.length > 2) v = v.slice(0,2) + '.' + v.slice(2);
   if (v.length > 5) v = v.slice(0,5) + '.' + v.slice(5);
   el.value = v.slice(0,10);
+  // Визуальная подсказка при полной дате
+  if (el.value.length === 10) {
+    const valid = isValidDateStr(el.value);
+    el.style.borderColor = valid ? '' : '#ef4444';
+    el.title = valid ? '' : 'Некорректная дата — проверь день и месяц';
+  } else {
+    el.style.borderColor = '';
+    el.title = '';
+  }
+}
+
+// Проверка «ДД.ММ.ГГГГ» на реальность календаря (не просто регексп).
+function isValidDateStr(s) {
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(s);
+  if (!m) return false;
+  const d = +m[1], mo = +m[2], y = +m[3];
+  if (y < 1990 || y > 2100) return false;
+  const dt = new Date(y, mo - 1, d);
+  return dt.getDate() === d && dt.getMonth() === mo - 1 && dt.getFullYear() === y;
 }
 
 function addPosition() {
@@ -3021,7 +3186,7 @@ async function transcribeWithWhisper(file) {
 
     // Save this chunk to localStorage immediately (allows resume after refresh)
     savedChunks[i] = chunkText;
-    try { localStorage.setItem(progressKey, JSON.stringify(savedChunks)); } catch(e) {}
+    try { safeSetItem(progressKey, JSON.stringify(savedChunks)); } catch(e) {}
     fullTranscript += chunkText;
   }
 
@@ -3087,6 +3252,11 @@ setTimeout(() => {
     groqStatusEl.textContent = getGroqKey() ? '🎙️ Whisper готов' : '⚠️ Groq не настроен';
     groqStatusEl.style.color = getGroqKey() ? '#10b981' : '#f59e0b';
   }
+  // Стартовое состояние панели шагов
+  setStepState(1, 'next', 'жду файл');
+  setStepHint(1, 'Загрузи видео или аудио в область выше. MP4, MKV, WEBM, MOV, MP3, WAV и т.п. До 2 ГБ.');
+  setStepState(2, 'disabled', '');
+  setStepState(3, 'disabled', '');
 }, 100);
 </script>
 </body>
