@@ -117,6 +117,15 @@ textarea{resize:vertical;line-height:1.6}
 .step-card label:first-of-type{margin-top:14px}
 .cleanup-status-line{font-size:12px;color:#475569;margin-top:8px;line-height:1.4}
 
+/* TRANSCRIPT UPLOAD (альтернативный вход в Шаге 1) */
+.transcript-upload-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.transcript-hint{font-size:12px;color:#94a3b8;flex:1;min-width:160px}
+.transcript-loaded{display:flex;align-items:center;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:9px;padding:10px 14px;margin-top:10px}
+.transcript-loaded-icon{color:#10b981;font-weight:700;font-size:14px;flex-shrink:0}
+.transcript-loaded-text{font-size:13px;color:#166534;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.transcript-loaded-clear{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:5px;transition:.15s;line-height:1}
+.transcript-loaded-clear:hover{color:#ef4444;background:#fef2f2}
+
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinner{width:16px;height:16px;border:2px solid rgba(59,130,246,.3);border-top-color:#3b82f6;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;margin-top:1px}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
@@ -136,6 +145,15 @@ textarea{resize:vertical;line-height:1.6}
 .empty-state-icon{font-size:36px;margin-bottom:10px}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:100;align-items:center;justify-content:center;padding:20px}
 .modal-overlay.open{display:flex}
+
+/* DROPZONE OVERLAY — full-window drag&drop */
+.dropzone-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(59,130,246,.18);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:32px;animation:dz-fade .12s ease-out}
+.dropzone-overlay.active{display:flex}
+.dropzone-inner{background:#fff;border:3px dashed #3b82f6;border-radius:20px;padding:42px 56px;text-align:center;box-shadow:0 30px 80px rgba(15,23,42,.28);pointer-events:none;max-width:92%}
+.dropzone-icon{font-size:62px;margin-bottom:12px;line-height:1}
+.dropzone-title{font-size:22px;font-weight:700;color:#1e293b;margin-bottom:6px}
+.dropzone-sub{font-size:13px;color:#64748b}
+@keyframes dz-fade{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
 .modal{background:#fff;border-radius:16px;padding:28px;width:100%;max-width:460px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
 .modal-title{font-size:17px;font-weight:700;margin-bottom:6px;color:#1e293b}
 .modal-sub{font-size:13px;color:#64748b;margin-bottom:20px}
@@ -223,9 +241,24 @@ textarea{resize:vertical;line-height:1.6}
     </div>
     <input type="file" id="audio-file" accept="audio/*,video/*" style="display:none" onchange="handleFileSelect(this)">
 
-    <div class="or-divider"><span>или вставить готовый текст</span></div>
+    <div class="or-divider"><span>или загрузить готовую транскрипцию</span></div>
 
-    <textarea id="manual-transcript" rows="3" placeholder="Вставь готовый текст встречи — файл загружать не нужно..."></textarea>
+    <div class="transcript-upload-row">
+      <button type="button" class="btn btn-secondary" id="btn-load-transcript" onclick="document.getElementById('transcript-file').click()">
+        📄 Загрузить .txt / .docx
+      </button>
+      <span class="transcript-hint">Если транскрипция уже сделана — пропусти Шаги 1–2 и сразу к протоколу</span>
+    </div>
+    <input type="file" id="transcript-file" accept=".txt,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="handleTranscriptFile(this)">
+
+    <div id="transcript-loaded" class="transcript-loaded" style="display:none">
+      <span class="transcript-loaded-icon">✓</span>
+      <span id="transcript-loaded-text" class="transcript-loaded-text"></span>
+      <button type="button" class="transcript-loaded-clear" onclick="clearLoadedTranscript()" title="Удалить и загрузить другую">✕</button>
+    </div>
+
+    <!-- Скрытый textarea — для совместимости с generateProtocol, который читает .value -->
+    <textarea id="manual-transcript" style="display:none"></textarea>
 
     <div class="step-card-hint" id="step-1-hint">Файл автоматически режется на части по 14 минут и загружается на серверы Google. Живёт 48 часов.</div>
   </div>
@@ -262,7 +295,12 @@ textarea{resize:vertical;line-height:1.6}
     <div class="step-card-header">
       <span class="step-card-num">3</span>
       <h2 class="step-card-title">Протокол</h2>
-      <span class="step-card-status" id="step-3-status"></span>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+        <span class="step-card-status" id="step-3-status"></span>
+        <button class="btn btn-secondary" onclick="resetForNewMeeting()"
+          style="padding:5px 11px;font-size:12px"
+          title="Очистить форму и начать новую встречу">🆕 Новая встреча</button>
+      </div>
     </div>
 
     <label>Название встречи</label>
@@ -455,6 +493,16 @@ textarea{resize:vertical;line-height:1.6}
 </div><!-- /main -->
 
 
+<!-- ======= GLOBAL DROPZONE OVERLAY ======= -->
+<div class="dropzone-overlay" id="dropzone-overlay">
+  <div class="dropzone-inner">
+    <div class="dropzone-icon">📥</div>
+    <div class="dropzone-title">Брось файл сюда</div>
+    <div class="dropzone-sub">Видео или аудио · до 2 ГБ</div>
+  </div>
+</div>
+
+
 <!-- ======= SETTINGS ======= -->
 <div class="modal-overlay" id="settings-modal" onclick="if(event.target===this)closeSettings()">
   <div class="modal">
@@ -495,6 +543,7 @@ let uploadedParts = [];       // [{ uri, mimeType, label }] for long videos
 let currentFileKey = null;    // fileKey of current upload session (for transcript saving)
 let currentRawFile = null;    // original File object — needed for separate transcription step
 let audioOnlyMode = false;    // if true: extract audio, upload as audio-only to Gemini
+let currentMediaInfo = { durationSec: 0, numChunks: 0 };  // обновляется в startFileUpload — длительность и кол-во чанков для UI
 
 // ── SETTINGS ─────────────────────────────────────────
 const getKey = () => localStorage.getItem('gemini_key') || '';
@@ -637,6 +686,83 @@ function showWhisperBadge() {
   }
 }
 
+// ── RESET для «🆕 Новая встреча» ─────────────────────
+// Возвращает страницу «Протокол встречи» в чистое стартовое состояние.
+// Сохранённые в Библиотеке файлы и протоколы — НЕ ТРОГАЕТ.
+function resetForNewMeeting() {
+  if (uploadState === 'uploading') {
+    alert('Подожди — идёт загрузка файла. Сначала дождись завершения или обнови страницу.');
+    return;
+  }
+  // Confirm только если есть что терять
+  const $ = id => document.getElementById(id);
+  const hasProgress =
+    !!currentTranscriptText ||
+    !!currentProtocolText ||
+    !!uploadedFile ||
+    (uploadedParts && uploadedParts.length > 0) ||
+    ($('meeting-title')?.value || '').trim() ||
+    ($('manual-transcript')?.value || '').trim();
+  if (hasProgress &&
+      !confirm('Очистить форму и начать новую встречу?\n\nЗагруженный файл и транскрипция остаются в Библиотеке файлов.')) {
+    return;
+  }
+
+  // Reset state vars
+  currentProtocolText = '';
+  currentRequirementsText = '';
+  currentTranscriptText = '';
+  uploadedFile = null;
+  uploadedParts = [];
+  currentFileKey = null;
+  currentRawFile = null;
+  audioOnlyMode = false;
+  currentMediaInfo = { durationSec: 0, numChunks: 0 };
+  uploadState = 'idle';
+
+  // Form fields
+  if ($('meeting-title'))     $('meeting-title').value = '';
+  if ($('meeting-date'))      $('meeting-date').value  = '';
+  if ($('meeting-project'))   $('meeting-project').value = '';
+  if ($('manual-transcript')) $('manual-transcript').value = '';
+  if ($('audio-only-flag'))   $('audio-only-flag').checked = false;
+
+  // Upload-area UI
+  setUploadUI('idle');
+
+  // Скрыть превью результата
+  const resCard = $('protocol-result-card');
+  if (resCard) resCard.style.display = 'none';
+  if ($('protocol-preview')) $('protocol-preview').textContent = '';
+
+  // Step states + дефолтные подсказки
+  setStepState(1, 'next', 'жду файл');
+  setStepHint(1, 'Загрузи видео или аудио в область выше. MP4, MKV, WEBM, MOV, MP3, WAV и т.п. До 2 ГБ.');
+  setStepState(2, 'disabled', '');
+  setStepHint(2, 'Whisper расшифрует аудио, Gemini почистит пунктуацию и добавит экранный контекст.');
+  setStepState(3, 'disabled', '');
+  setStepHint(3, 'Двухпроходная генерация: сначала тезисы, потом шаблон с таблицами и реестром требований.');
+
+  // Кнопки Шага 2 — disabled
+  const tBtn = $('btn-transcribe');
+  if (tBtn) { tBtn.disabled = true; tBtn.title = 'Сначала загрузи файл'; }
+  const dBtn = $('btn-download-transcript-main');
+  if (dBtn) { dBtn.disabled = true; dBtn.title = 'Скачай .txt после обработки'; }
+  const cBtn = $('btn-cleanup');
+  if (cBtn) cBtn.disabled = true;
+
+  // Status panes / прогресс
+  if ($('cleanup-status'))    $('cleanup-status').textContent = '';
+  if ($('protocol-status'))   $('protocol-status').innerHTML = '';
+  if ($('analysis-progress')) $('analysis-progress').style.display = 'none';
+
+  // Чип «транскрипция загружена вручную» — спрятать
+  if ($('transcript-loaded')) $('transcript-loaded').style.display = 'none';
+
+  // Прокрутка к Шагу 1
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 // ── UPLOAD AREA CLICK ─────────────────────────────────
 function onUploadAreaClick() {
   // Allow re-select only if not currently uploading
@@ -644,16 +770,59 @@ function onUploadAreaClick() {
   document.getElementById('audio-file').click();
 }
 
-// ── DRAG & DROP ───────────────────────────────────────
-const ua = document.getElementById('upload-area');
-ua.addEventListener('dragover', e => { e.preventDefault(); if (uploadState !== 'uploading') ua.classList.add('dragover'); });
-ua.addEventListener('dragleave', () => ua.classList.remove('dragover'));
-ua.addEventListener('drop', e => {
-  e.preventDefault(); ua.classList.remove('dragover');
-  if (uploadState === 'uploading') return;
-  const f = e.dataTransfer.files[0];
-  if (f) startFileUpload(f);
-});
+// ── DRAG & DROP — полнооконный оверлей ──────────────
+(function setupGlobalDropzone() {
+  const overlay = document.getElementById('dropzone-overlay');
+  if (!overlay) return;
+  let depth = 0;
+
+  // Пользователь тащит ИМЕННО файл с ОС, не текст/ссылку из браузера
+  function isFileDrag(e) {
+    const t = e.dataTransfer && e.dataTransfer.types;
+    if (!t) return false;
+    // DOMStringList не имеет .includes в старых браузерах — спред делает массив
+    return Array.prototype.slice.call(t).indexOf('Files') !== -1;
+  }
+
+  function hideOverlay() {
+    depth = 0;
+    overlay.classList.remove('active');
+  }
+
+  window.addEventListener('dragenter', e => {
+    if (!isFileDrag(e)) return;
+    if (uploadState === 'uploading') return;
+    e.preventDefault();
+    depth++;
+    overlay.classList.add('active');
+  });
+
+  // Без preventDefault на dragover браузер откроет файл вместо drop
+  window.addEventListener('dragover', e => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  });
+
+  window.addEventListener('dragleave', e => {
+    if (!isFileDrag(e)) return;
+    depth = Math.max(0, depth - 1);
+    if (depth === 0) overlay.classList.remove('active');
+  });
+
+  window.addEventListener('drop', e => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    hideOverlay();
+    if (uploadState === 'uploading') return;
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) startFileUpload(f);
+  });
+
+  // На случай если drag прервался (Esc / окно потеряло фокус)
+  window.addEventListener('blur', hideOverlay);
+  window.addEventListener('mouseleave', hideOverlay);
+})();
 
 // ── FILE SELECT ───────────────────────────────────────
 function handleFileSelect(input) {
@@ -661,6 +830,116 @@ function handleFileSelect(input) {
   if (!f) return;
   startFileUpload(f);
   input.value = ''; // reset so same file can be re-selected
+}
+
+// ── ЗАГРУЗКА ГОТОВОЙ ТРАНСКРИПЦИИ (.txt / .docx) ─────
+let _mammothLoading = null;
+function loadMammoth() {
+  if (window.mammoth) return Promise.resolve(window.mammoth);
+  if (_mammothLoading) return _mammothLoading;
+  _mammothLoading = new Promise((resolve, reject) => {
+    const tryUrl = (url, onFail) => {
+      const s = document.createElement('script');
+      s.src = url;
+      s.onload = () => window.mammoth ? resolve(window.mammoth) : onFail(new Error('mammoth не появился в window'));
+      s.onerror = () => onFail(new Error('сеть/CDN недоступен'));
+      document.head.appendChild(s);
+    };
+    tryUrl('https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js', (err1) => {
+      tryUrl('https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js', (err2) => {
+        reject(new Error('Не удалось загрузить парсер DOCX (' + (err2.message || err1.message) + '). Проверь интернет или сохрани файл как .txt'));
+      });
+    });
+  });
+  return _mammothLoading;
+}
+
+async function parseDocxToText(file) {
+  const m = await loadMammoth();
+  const buf = await file.arrayBuffer();
+  const result = await m.extractRawText({ arrayBuffer: buf });
+  return result && result.value ? result.value : '';
+}
+
+async function handleTranscriptFile(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  input.value = ''; // позволяет повторно выбрать тот же файл
+
+  const ext = (f.name.split('.').pop() || '').toLowerCase();
+  const btn = document.getElementById('btn-load-transcript');
+  const origBtnText = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Читаю файл...'; }
+
+  let text = '';
+  try {
+    if (ext === 'txt' || f.type === 'text/plain') {
+      text = await f.text();
+    } else if (ext === 'docx') {
+      if (btn) btn.textContent = '⏳ Парсинг .docx...';
+      text = await parseDocxToText(f);
+    } else {
+      alert('Поддерживаются только .txt и .docx файлы.\nТвой файл: .' + ext);
+      return;
+    }
+  } catch (e) {
+    alert('Не удалось прочитать файл: ' + (e.message || e));
+    return;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = origBtnText || '📄 Загрузить .txt / .docx'; }
+  }
+
+  text = (text || '').trim();
+  if (!text) {
+    alert('Файл пустой или не содержит текста.');
+    return;
+  }
+  applyManualTranscript(text, f.name);
+}
+
+// Применить распарсенный текст: заполняет скрытый textarea + двигает шаги
+function applyManualTranscript(text, fileName) {
+  const $ = id => document.getElementById(id);
+  const ta = $('manual-transcript');
+  if (ta) ta.value = text;            // generateProtocol читает отсюда — сохраняем контракт
+  currentTranscriptText = text;       // для других потребителей (resetForNewMeeting и т.п.)
+
+  const loaded = $('transcript-loaded');
+  const loadedText = $('transcript-loaded-text');
+  if (loaded && loadedText) {
+    loaded.style.display = 'flex';
+    loadedText.textContent = `${fileName} — ${text.length.toLocaleString('ru-RU')} символов`;
+  }
+
+  // Шаги 1, 2 — пройдены вручную; Шаг 3 — следующий
+  setStepState(1, 'done', '✓ загружено вручную');
+  setStepHint(1, 'Транскрипция загружена из файла. Если хочешь — можно загрузить и видео для контекста, но необязательно.');
+  setStepState(2, 'done', '✓ пропущено');
+  setStepHint(2, 'Транскрипция уже есть — Whisper не нужен');
+  setStepState(3, 'next', '');
+  setStepHint(3, '✅ Транскрипция готова — заполни «Название», «Дату», «Проект» и нажми «Создать протокол»');
+
+  // Скроллим к Шагу 3
+  const step3 = $('step-3');
+  if (step3) step3.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function clearLoadedTranscript() {
+  const ta = document.getElementById('manual-transcript');
+  if (ta) ta.value = '';
+  currentTranscriptText = '';
+  const loaded = document.getElementById('transcript-loaded');
+  if (loaded) loaded.style.display = 'none';
+
+  // Если файл не загружался — возвращаемся в стартовое состояние
+  if (uploadState === 'idle' && !uploadedFile && (!uploadedParts || uploadedParts.length === 0)) {
+    setStepState(1, 'next', 'жду файл');
+    setStepHint(1, 'Загрузи видео или аудио в область выше. MP4, MKV, WEBM, MOV, MP3, WAV и т.п. До 2 ГБ.');
+    setStepState(2, 'disabled', '');
+    setStepHint(2, 'Whisper расшифрует аудио, Gemini почистит пунктуацию и добавит экранный контекст.');
+    setStepState(3, 'disabled', '');
+    setStepHint(3, 'Двухпроходная генерация: сначала тезисы, потом шаблон с таблицами и реестром требований.');
+  }
 }
 
 async function startFileUpload(file) {
@@ -710,7 +989,10 @@ async function startFileUpload(file) {
 
   try {
     const duration = await getVideoDuration(file).catch(() => 0);
-    const durationStr = duration > 0 ? ` · ${Math.round(duration / 60)} мин` : '';
+
+    // numChunks для multi-part пути; для audio-only и коротких — 1
+    const numChunks = (duration > CHUNK_SEC && !audioOnlyMode) ? Math.ceil(duration / CHUNK_SEC) : 1;
+    currentMediaInfo = { durationSec: duration || 0, numChunks };
 
     if (audioOnlyMode) {
       // ── AUDIO-ONLY MODE: extract audio → upload single file ──
@@ -743,8 +1025,10 @@ async function startFileUpload(file) {
       const meetingTitle = document.getElementById('meeting-title').value.trim() || file.name;
       saveSingleFileURI(file, result.uri, result.mimeType, meetingTitle);
       setUploadUI('ready', {
-        title: `🔊 ${file.name}${durationStr}`,
-        sub: `Аудио-режим · ${(audioFile.size/1024/1024).toFixed(1)} МБ · готово`
+        title: `🔊 ${file.name}`,
+        sub: duration > 0
+          ? `⏱ ${fmtDuration(duration)} · аудио ${(audioFile.size/1024/1024).toFixed(1)} МБ · готово`
+          : `Аудио-режим · ${(audioFile.size/1024/1024).toFixed(1)} МБ · готово`
       });
 
     } else {
@@ -795,8 +1079,10 @@ async function startFileUpload(file) {
 
         uploadState = 'ready';
         setUploadUI('ready', {
-          title: `${file.name}${durationStr}`,
-          sub: `${numParts} частей загружено · готово`
+          title: file.name,
+          sub: duration > 0
+            ? `⏱ ${fmtDuration(duration)} · ${numParts} ${pluralizeRu(numParts, 'часть', 'части', 'частей')} по ${CHUNK_MINUTES} мин · готово`
+            : `${numParts} частей загружено · готово`
         });
 
       } else {
@@ -824,22 +1110,31 @@ async function startFileUpload(file) {
         saveSingleFileURI(file, result.uri, result.mimeType, meetingTitle);
         setUploadUI('ready', {
           title: file.name,
-          sub: `${mb} МБ${durationStr} · готово`
+          sub: duration > 0
+            ? `⏱ ${fmtDuration(duration)} · ${mb} МБ · готово`
+            : `${mb} МБ · готово`
         });
       }
     }
 
     // ── Enable Transcribe button after upload done ──
     setStepState(1, 'done', '✓ загружено');
+    // ETA для Whisper-транскрипции: "✅ Файл готов · ⏱ ~9 мин (6 чанков, пауза 65 с)"
+    const etaSec = estimateTranscriptionEta(currentMediaInfo.numChunks, audioOnlyMode);
+    const etaSuffix = etaSec > 0
+      ? ` · ⏱ займёт ${fmtEtaShort(etaSec)}` + (currentMediaInfo.numChunks > 1
+          ? ` (${currentMediaInfo.numChunks} ${pluralizeRu(currentMediaInfo.numChunks,'чанк','чанка','чанков')}, пауза 65 с между ними)`
+          : '')
+      : '';
     if (tBtn && getGroqKey()) {
       tBtn.disabled = false;
       tBtn.title = 'Запустить транскрипцию Whisper';
       setStepState(2, 'next', '');
-      setStepHint(2, '✅ Файл готов — теперь нажми «Транскрибировать»');
+      setStepHint(2, '✅ Файл готов — теперь нажми «Транскрибировать»' + etaSuffix);
     } else if (tBtn && !getGroqKey()) {
       tBtn.title = 'Добавь Groq API-ключ в ⚙️ настройках';
       setStepState(2, 'active', 'нужен Groq-ключ');
-      setStepHint(2, '⚠️ Добавь Groq API-ключ в ⚙️ настройках вверху справа');
+      setStepHint(2, '⚠️ Добавь Groq API-ключ в ⚙️ настройках вверху справа' + etaSuffix);
     }
 
   } catch (e) {
@@ -1208,6 +1503,45 @@ function getVideoDuration(file) {
     v.onerror = () => reject(new Error('Не удалось определить длину'));
     v.src = URL.createObjectURL(file);
   });
+}
+
+// ── DURATION / ETA HELPERS ────────────────────────────
+// 78 sec → "78 сек", 78*60 → "1ч 18мин", 14*60 → "14 мин"
+function fmtDuration(sec) {
+  const total = Math.max(0, Math.round(sec || 0));
+  if (total < 60) return `${total} сек`;
+  const h = Math.floor(total / 3600);
+  const m = Math.round((total % 3600) / 60);
+  if (h && m) return `${h}ч ${m}мин`;
+  if (h) return `${h}ч`;
+  return `${m} мин`;
+}
+
+// pluralizeRu(1, 'часть','части','частей') → 'часть'
+function pluralizeRu(n, one, few, many) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 19) return many;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
+}
+
+// Грубая оценка времени транскрипции (Step A + B + C):
+//   Whisper ≈ 30 сек/чанк, пауза 65 сек между чанками,
+//   cleanup B ≈ 30 сек, video enrichment C ≈ 25 сек/чанк (skipped if audio-only)
+function estimateTranscriptionEta(numChunks, isAudioOnly) {
+  if (!numChunks || numChunks < 1) return 0;
+  const whisper = numChunks * 30;
+  const pauses  = Math.max(0, numChunks - 1) * 65;
+  const cleanup = 30;
+  const enrich  = isAudioOnly ? 0 : numChunks * 25;
+  return whisper + pauses + cleanup + enrich;
+}
+
+// "~9 мин" — округление до минут, минимум "~1 мин"
+function fmtEtaShort(sec) {
+  const m = Math.round((sec || 0) / 60);
+  return `~${Math.max(1, m)} мин`;
 }
 
 // ── FFMPEG (локальные файлы — без кросс-доменных проблем) ──────────
