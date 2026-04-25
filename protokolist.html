@@ -760,7 +760,7 @@ function resetForNewMeeting() {
 // ── ОТКРЫТЬ СОХРАНЁННУЮ СЕССИЮ В ГЛАВНОЙ СТРАНИЦЕ ────
 // Восстанавливает state из session, обновляет UI всех 3-х Шагов
 // и переключает на вкладку «Протокол встречи».
-function loadSessionToMainPage(sessionId) {
+async function loadSessionToMainPage(sessionId) {
   const session = getUploadSessions().find(s => s.id === sessionId);
   if (!session) {
     alert('Сессия не найдена. Возможно, она была удалена.');
@@ -842,24 +842,42 @@ function loadSessionToMainPage(sessionId) {
   // ── 4. Двигаем Шаги ──
   setStepState(1, 'done', '✓ восстановлено');
   setStepHint(1, hoursLeft < 12
-    ? `⚠️ Файлы истекают через ${hoursLeft}ч. Если хочешь сохранить транскрипцию — запусти Шаг 2 сейчас.`
+    ? `⚠️ Файлы истекают через ${hoursLeft}ч. Чтобы успеть — переходи к Шагу 3.`
     : `Файлы лежат на серверах Google · ${hoursLeft}ч до истечения`);
 
   const tBtn = $('btn-transcribe');
   const dBtn = $('btn-download-transcript-main');
   const cBtn = $('btn-cleanup');
 
+  // Проверяем IDB-кэш аудио для этой сессии. Если есть — Whisper можно запустить
+  // прямо сейчас, локальный File-объект восстановится из Blob внутри startTranscription.
+  let cachedAudio = null;
+  try {
+    cachedAudio = await getAudioBlob(currentFileKey);
+  } catch (e) { /* IDB недоступен — без проблем */ }
+  const hasCachedAudio = !!(cachedAudio && cachedAudio.blob);
+  const cachedSizeMb = hasCachedAudio ? (cachedAudio.blob.size / 1024 / 1024).toFixed(1) : 0;
+
   if (currentTranscriptText) {
-    // Транскрипция уже была сделана — Шаг 2 = done
+    // Транскрипция уже была сделана раньше — её можно скачивать и улучшать
     setStepState(2, 'done', `✓ есть · ${currentTranscriptText.length.toLocaleString('ru-RU')} симв.`);
-    setStepHint(2, 'Транскрипция была сохранена в прошлый раз. Можно скачать или повторить очистку Gemini.');
-    if (tBtn) { tBtn.disabled = false; tBtn.title = 'Запустить транскрипцию заново (перезапишет существующую)'; }
+    setStepHint(2, 'Транскрипция была сохранена в прошлый раз — можно скачать .txt или улучшить через Gemini.' +
+                   (hasCachedAudio ? ` Также можно запустить Whisper заново — аудио лежит в кэше браузера (${cachedSizeMb} МБ).` : ''));
+    if (tBtn) {
+      if (hasCachedAudio) {
+        tBtn.disabled = false;
+        tBtn.title = `Перезапустить Whisper · аудио в кэше (${cachedSizeMb} МБ)`;
+      } else {
+        tBtn.disabled = true;
+        tBtn.title = 'Whisper нужен локальный файл — а кэш для этой сессии пуст. Перетащи файл в Шаг 1 ещё раз.';
+      }
+    }
     if (dBtn) { dBtn.disabled = false; dBtn.title = 'Скачать .txt'; }
     if (cBtn) { cBtn.disabled = false; }
     setStepState(3, 'next', '');
     setStepHint(3, '✅ Всё готово — заполни «Проект» (если нужно) и нажми «Создать протокол»');
-  } else {
-    // Транскрипции нет — Шаг 2 = next или нужен ключ
+  } else if (hasCachedAudio) {
+    // Транскрипции нет, но есть кэшированное аудио — Whisper готов к запуску
     const etaSec = estimateTranscriptionEta(session.numParts, false);
     const etaSuffix = ` · ⏱ займёт ${fmtEtaShort(etaSec)}` +
       (session.numParts > 1
@@ -867,17 +885,28 @@ function loadSessionToMainPage(sessionId) {
         : '');
     if (getGroqKey()) {
       setStepState(2, 'next', '');
-      setStepHint(2, '✅ Файл готов — нажми «Транскрибировать»' + etaSuffix);
-      if (tBtn) { tBtn.disabled = false; tBtn.title = 'Запустить транскрипцию Whisper'; }
+      setStepHint(2, `✅ Аудио в кэше браузера (${cachedSizeMb} МБ) — нажми «Транскрибировать»` + etaSuffix);
+      if (tBtn) { tBtn.disabled = false; tBtn.title = 'Запустить Whisper из кэша'; }
     } else {
       setStepState(2, 'active', 'нужен Groq-ключ');
-      setStepHint(2, '⚠️ Добавь Groq API-ключ в ⚙️ настройках вверху справа' + etaSuffix);
+      setStepHint(2, `⚠️ Аудио в кэше есть, но не настроен Groq API-ключ — добавь в ⚙️ настройках вверху справа.` + etaSuffix);
       if (tBtn) { tBtn.disabled = true; tBtn.title = 'Добавь Groq API-ключ'; }
     }
-    if (dBtn) { dBtn.disabled = true; }
-    if (cBtn) { cBtn.disabled = true; }
+    if (dBtn) { dBtn.disabled = true; dBtn.title = 'Транскрипции пока нет — сначала запусти Whisper'; }
+    if (cBtn) { cBtn.disabled = true; cBtn.title = 'Транскрипции пока нет'; }
     setStepState(3, 'next', '');
-    setStepHint(3, 'Можно сразу создавать протокол по видео, или сначала сделать транскрипцию (выше) — будет точнее');
+    setStepHint(3, 'Можно сразу делать протокол по видео, или сначала сделать Whisper-транскрипцию (выше) — будет точнее');
+  } else {
+    // Ни транскрипции, ни кэша аудио — Шаг 2 невозможен. Шаг 3 — единственный путь.
+    if (tBtn) { tBtn.disabled = true; tBtn.title = 'Whisper нужен локальный файл, а кэш для этой сессии пуст. Перетащи файл в Шаг 1 ещё раз.'; }
+    setStepState(2, 'disabled', 'недоступно из библиотеки');
+    setStepHint(2, '⊝ Сохранённого аудио для этой сессии нет (вероятно, загружена в старой версии). ' +
+                   'Можно сразу делать протокол — Gemini справится без отдельной транскрипции, ' +
+                   'или перетащи тот же файл в Шаг 1 ещё раз — приложение опознает его и пропустит загрузку.');
+    if (dBtn) { dBtn.disabled = true; dBtn.title = 'Транскрипции для этой сессии нет'; }
+    if (cBtn) { cBtn.disabled = true; cBtn.title = 'Транскрипции для этой сессии нет'; }
+    setStepState(3, 'next', '');
+    setStepHint(3, '✅ Файлы на серверах Google готовы — заполни «Проект» (если нужно) и жми «Создать протокол»');
   }
 
   // ── 5. Переключаем вкладку на «Протокол встречи» ──
@@ -1158,6 +1187,8 @@ async function startFileUpload(file) {
       uploadState = 'ready';
       const meetingTitle = document.getElementById('meeting-title').value.trim() || file.name;
       saveSingleFileURI(file, result.uri, result.mimeType, meetingTitle, duration);
+      // Сохраняем извлечённое аудио в IDB — переиспользуем audioFile, без повторного ffmpeg
+      await cacheAudioForWhisper(file, makeFileKey(file), audioFile);
       setUploadUI('ready', {
         title: `🔊 ${file.name}`,
         sub: duration > 0
@@ -1249,6 +1280,24 @@ async function startFileUpload(file) {
             : `${mb} МБ · готово`
         });
       }
+
+      // ── Финальный этап Шага 1: извлечение аудио из видео в IDB ──
+      // Применяется к обоим видео-путям (multi-part и short). Audio-only путь
+      // делает свою копию выше, до выхода из своего if-блока.
+      // Прогресс показывается через setUIP внутри cacheAudioForWhisper.
+      setUploadUI('uploading', {
+        title: 'Извлекаю аудио для Whisper...',
+        stage: 'ffmpeg', pct: 95,
+        note: 'Это займёт ~30-60 сек, не закрывай вкладку'
+      });
+      await cacheAudioForWhisper(file, fileKey, null);
+      // Возвращаем плашку «готово» (она была перезаписана прогрессом извлечения)
+      setUploadUI('ready', {
+        title: file.name,
+        sub: duration > 0
+          ? `⏱ ${fmtDuration(duration)} · ${numParts > 1 ? `${numParts} ${pluralizeRu(numParts, 'часть', 'части', 'частей')} по ${CHUNK_MINUTES} мин` : `${mb} МБ`} · готово`
+          : `${numParts > 1 ? `${numParts} частей загружено` : `${mb} МБ`} · готово`
+      });
     }
 
     // ── Enable Transcribe button after upload done ──
@@ -1344,8 +1393,34 @@ async function extractAudioWithFFmpeg(file) {
 
 // ── STEP 2: TRANSCRIBE (manual trigger) ──────────────
 async function startTranscription() {
-  if (!currentRawFile) {
-    alert('Сначала загрузи видеофайл (Шаг 1)');
+  // ── Step A: убедиться что у нас есть локальный аудио-File ──
+  // Источники, в порядке приоритета:
+  //   1. currentRawFile (свежезагруженное видео — есть прямо в памяти)
+  //   2. IndexedDB по currentFileKey (открыли из Библиотеки — поднимаем сохранённое аудио)
+  //   3. Никак — alert с инструкцией
+  let fileForWhisper = currentRawFile;
+  if (!fileForWhisper && currentFileKey) {
+    try {
+      const cached = await getAudioBlob(currentFileKey);
+      if (cached && cached.blob) {
+        // Восстанавливаем File из сохранённого Blob — для transcribeWithWhisper это эквивалентно
+        fileForWhisper = new File([cached.blob], cached.fileName || 'audio.mp3', { type: cached.blob.type || 'audio/mpeg' });
+      }
+    } catch (e) {
+      console.warn('[whisper] не удалось достать аудио из IDB:', e);
+    }
+  }
+
+  if (!fileForWhisper) {
+    if (uploadedFile || (uploadedParts && uploadedParts.length > 0)) {
+      alert('Whisper-транскрипция требует локальный аудио-файл, а сохранённого аудио для этой сессии в кэше браузера нет.\n\n' +
+            'Это может произойти если сессия загружена в старой версии приложения, либо кэш был очищен.\n\n' +
+            'Чтобы сделать транскрипцию — перетащи тот же файл в Шаг 1 ещё раз. ' +
+            'Приложение опознает его и пропустит повторную загрузку.\n\n' +
+            'Либо сразу переходи к Шагу 3 — Gemini сделает протокол по видео без отдельной транскрипции.');
+    } else {
+      alert('Сначала загрузи видеофайл (Шаг 1)');
+    }
     return;
   }
   if (!getGroqKey()) {
@@ -1363,7 +1438,7 @@ async function startTranscription() {
 
   try {
     // ── Step A: Whisper raw transcription ──
-    const whisperRaw = await transcribeWithWhisper(currentRawFile);
+    const whisperRaw = await transcribeWithWhisper(fileForWhisper);
 
     if (whisperRaw) {
       let finalTranscript = whisperRaw;
@@ -1705,6 +1780,133 @@ async function loadFFmpeg() {
   });
   ffmpegInstance = ff;
   return ff;
+}
+
+// ── AUDIO CACHE (IndexedDB) ─────────────────────────
+// Сохраняем извлечённое mp3 на локальном диске юзера, в IDB браузера.
+// Это позволяет Whisper-транскрипции работать после F5 / открытия из Библиотеки —
+// без повторной загрузки 2 ГБ видео. Размер mp3 16kHz mono ~3-5 МБ за час.
+//
+// Object store: audio_blobs
+//   key   = fileKey (тот же что в session, makeFileKey(file))
+//   value = { blob: Blob, fileName: string, savedAt: timestamp, sizeBytes: number }
+
+const AUDIO_DB_NAME = 'protokolist_audio_cache';
+const AUDIO_DB_VERSION = 1;
+const AUDIO_STORE = 'audio_blobs';
+
+let _audioDbPromise = null;
+function openAudioDB() {
+  if (_audioDbPromise) return _audioDbPromise;
+  _audioDbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(AUDIO_DB_NAME, AUDIO_DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(AUDIO_STORE)) {
+        db.createObjectStore(AUDIO_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IndexedDB не открылась'));
+  });
+  return _audioDbPromise;
+}
+
+async function saveAudioBlob(fileKey, blob, fileName) {
+  if (!fileKey || !blob) return false;
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(AUDIO_STORE, 'readwrite');
+      const store = tx.objectStore(AUDIO_STORE);
+      const record = { blob, fileName, savedAt: Date.now(), sizeBytes: blob.size };
+      const req = store.put(record, fileKey);
+      req.onsuccess = () => resolve(true);
+      req.onerror  = () => reject(req.error);
+    });
+  } catch (e) {
+    console.warn('[audio-cache] saveAudioBlob failed:', e);
+    return false;
+  }
+}
+
+async function getAudioBlob(fileKey) {
+  if (!fileKey) return null;
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(AUDIO_STORE, 'readonly');
+      const req = tx.objectStore(AUDIO_STORE).get(fileKey);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror  = () => resolve(null);
+    });
+  } catch (e) {
+    console.warn('[audio-cache] getAudioBlob failed:', e);
+    return null;
+  }
+}
+
+async function deleteAudioBlob(fileKey) {
+  if (!fileKey) return;
+  try {
+    const db = await openAudioDB();
+    await new Promise((resolve) => {
+      const tx = db.transaction(AUDIO_STORE, 'readwrite');
+      const req = tx.objectStore(AUDIO_STORE).delete(fileKey);
+      req.onsuccess = () => resolve();
+      req.onerror  = () => resolve();
+    });
+  } catch (e) {
+    console.warn('[audio-cache] deleteAudioBlob failed:', e);
+  }
+}
+
+// Удалить из IDB всё, что больше не упомянуто ни в одной upload-сессии.
+// Вызывается при рендере Библиотеки (там и так чистятся истёкшие сессии).
+async function cleanupOrphanAudioBlobs() {
+  try {
+    const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+    const liveKeys = new Set(sessions.map(s => s.fileKey).filter(Boolean));
+    const db = await openAudioDB();
+    const allKeys = await new Promise((resolve) => {
+      const tx = db.transaction(AUDIO_STORE, 'readonly');
+      const req = tx.objectStore(AUDIO_STORE).getAllKeys();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror  = () => resolve([]);
+    });
+    for (const k of allKeys) {
+      if (!liveKeys.has(k)) await deleteAudioBlob(k);
+    }
+  } catch (e) {
+    console.warn('[audio-cache] cleanupOrphanAudioBlobs failed:', e);
+  }
+}
+
+// Извлечь аудио (или взять уже-извлечённое) и положить в IDB как часть Шага 1.
+// `existingAudioFile` — если в audio-only режиме у нас уже есть mp3-File — переиспользуем без ffmpeg.
+async function cacheAudioForWhisper(originalFile, fileKey, existingAudioFile) {
+  let audioBlob = null, displayName = '';
+  try {
+    if (existingAudioFile) {
+      // Audio-only режим: используем уже извлечённый mp3
+      audioBlob = existingAudioFile;
+      displayName = existingAudioFile.name || (originalFile.name.replace(/\.[^.]+$/,'') + '.mp3');
+      setUIP('Сохраняю аудио для Whisper...', 96, `${(audioBlob.size/1024/1024).toFixed(1)} МБ → IndexedDB`);
+    } else {
+      // Видео режим: извлекаем mp3 через ffmpeg.wasm
+      setUIP('Извлекаю аудио для Whisper...', 95, 'ffmpeg -vn → mp3 (~5 МБ за час)');
+      const audioFile = await extractAudioWithFFmpeg(originalFile);
+      audioBlob = audioFile;
+      displayName = audioFile.name;
+      setUIP('Сохраняю аудио для Whisper...', 98, `${(audioBlob.size/1024/1024).toFixed(1)} МБ → IndexedDB`);
+    }
+    const ok = await saveAudioBlob(fileKey, audioBlob, displayName);
+    if (!ok) console.warn('[audio-cache] не удалось сохранить — не блокируем Шаг 1');
+  } catch (e) {
+    // Если ffmpeg упал или IDB-квота переполнена — логируем, но Шаг 1 НЕ ломаем.
+    // Whisper всё ещё доступен прямо сейчас через currentRawFile, и Шаг 3 работает в любом случае.
+    console.warn('[audio-cache] cacheAudioForWhisper failed:', e);
+  }
 }
 
 async function splitVideoIntoChunks(file) {
@@ -3271,6 +3473,9 @@ function renderLibrary() {
   let sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
   localStorage.setItem('upload_sessions', JSON.stringify(sessions));
 
+  // Параллельно чистим аудио-кэш от записей, у которых больше нет сессий (истекшие, удалённые)
+  cleanupOrphanAudioBlobs();
+
   const el = document.getElementById('library-list');
   if (!sessions.length) {
     el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div>Нет активных файлов.<br>Загрузи видео на вкладке «Протокол встречи».</div>';
@@ -3292,6 +3497,8 @@ function renderLibrary() {
     const transcriptBadge = hasTranscript
       ? `<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;white-space:nowrap" title="Сохранена транскрипция (${s.transcript.length.toLocaleString('ru-RU')} символов)">📝 транскрипция</span>`
       : '';
+    // Слот для бейджа «🎵 аудио в кэше» — заполняется async ниже, после рендера
+    const audioBadgeSlot = `<span class="audio-badge-slot" data-fkey="${escHtml(s.fileKey || '')}"></span>`;
     const statusBadge = isPartial
       ? `<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;white-space:nowrap">⚠️ ${doneCount}/${s.numParts}</span>`
       : `<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;white-space:nowrap">✅ Готово</span>`;
@@ -3308,6 +3515,7 @@ function renderLibrary() {
           </div>
           ${statusBadge}
           ${transcriptBadge}
+          ${audioBadgeSlot}
           <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${badgeBg};color:${badgeTx};border:1px solid ${badgeBd};white-space:nowrap">⏱ ${hoursLeft}ч</span>
           <button class="protocol-del" onclick="event.stopPropagation();deleteSession(${s.id})" title="Удалить">×</button>
         </div>
@@ -3321,6 +3529,23 @@ function renderLibrary() {
         }
       </div>`;
   }).join('');
+
+  // Прогрессивное дополнение: для каждой строки проверяем IDB на наличие аудио
+  // и подставляем бейдж «🎵 аудио в кэше» с размером файла.
+  setTimeout(async () => {
+    const slots = document.querySelectorAll('#library-list .audio-badge-slot[data-fkey]');
+    for (const slot of slots) {
+      const fkey = slot.getAttribute('data-fkey');
+      if (!fkey) continue;
+      try {
+        const cached = await getAudioBlob(fkey);
+        if (cached && cached.blob) {
+          const mb = (cached.blob.size / 1024 / 1024).toFixed(1);
+          slot.outerHTML = `<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;white-space:nowrap" title="Аудио лежит в кэше браузера (${mb} МБ) — Whisper можно запустить даже после F5">🎵 аудио ${mb} МБ</span>`;
+        }
+      } catch (e) { /* IDB недоступен — оставляем слот пустым */ }
+    }
+  }, 0);
 }
 
 async function deleteSession(id) {
@@ -3337,6 +3562,9 @@ async function deleteSession(id) {
   if (session.fileUri) {
     await deleteGoogleFile(session.fileUri).catch(() => {});
   }
+
+  // Чистим аудио-кэш для этого fileKey
+  if (session.fileKey) await deleteAudioBlob(session.fileKey);
 
   const sessions = getUploadSessions().filter(s => s.id !== id);
   localStorage.setItem('upload_sessions', JSON.stringify(sessions));
@@ -3370,6 +3598,7 @@ async function clearLibrary() {
       }
     }
     if (s.fileUri) await deleteGoogleFile(s.fileUri).catch(() => {});
+    if (s.fileKey) await deleteAudioBlob(s.fileKey);
   }
 
   localStorage.setItem('upload_sessions', JSON.stringify([]));
