@@ -272,7 +272,12 @@ textarea{resize:vertical;line-height:1.6}
     <div class="step-card-header">
       <span class="step-card-num">2</span>
       <h2 class="step-card-title">Транскрипция</h2>
-      <span class="step-card-status" id="step-2-status"></span>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+        <span class="step-card-status" id="step-2-status"></span>
+        <button class="protocol-del" id="btn-reset-transcript" onclick="resetTranscriptForRerun()"
+          title="Удалить транскрипцию и вернуть Шаг 2 к исходному состоянию"
+          style="display:none">×</button>
+      </div>
     </div>
     <div class="step-card-body">
       <button class="btn btn-primary" id="btn-transcribe" onclick="startTranscription()" disabled
@@ -299,12 +304,7 @@ textarea{resize:vertical;line-height:1.6}
     <div class="step-card-header">
       <span class="step-card-num">3</span>
       <h2 class="step-card-title">Протокол</h2>
-      <div style="margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end">
-        <span class="step-card-status" id="step-3-status"></span>
-        <button class="btn btn-secondary" onclick="resetForNewMeeting()"
-          style="padding:5px 11px;font-size:12px"
-          title="Очистить форму и начать новую встречу">🆕 Новая встреча</button>
-      </div>
+      <span class="step-card-status" id="step-3-status"></span>
     </div>
 
     <label>Название встречи</label>
@@ -680,81 +680,64 @@ function showWhisperBadge() {
   }
 }
 
-// ── RESET для «🆕 Новая встреча» ─────────────────────
-// Возвращает страницу «Протокол встречи» в чистое стартовое состояние.
-// Сохранённые в Библиотеке файлы и протоколы — НЕ ТРОГАЕТ.
-function resetForNewMeeting() {
-  if (uploadState === 'uploading') {
-    alert('Подожди — идёт загрузка файла. Сначала дождись завершения или обнови страницу.');
-    return;
-  }
-  // Confirm только если есть что терять
-  const $ = id => document.getElementById(id);
-  const hasProgress =
-    !!currentTranscriptText ||
-    !!currentProtocolText ||
-    !!uploadedFile ||
-    (uploadedParts && uploadedParts.length > 0) ||
-    ($('meeting-title')?.value || '').trim() ||
-    ($('manual-transcript')?.value || '').trim();
-  if (hasProgress &&
-      !confirm('Очистить форму и начать новую встречу?\n\nЗагруженный файл и транскрипция остаются в Библиотеке файлов.')) {
-    return;
-  }
+// ── RESET TRANSCRIPT (крестик в шапке Шага 2) ────────
+// Удаляет существующую транскрипцию, чтобы можно было запустить Whisper заново.
+// Шаг 1 не трогаем (файл остаётся), Шаг 3 переводим обратно в next-состояние.
+async function resetTranscriptForRerun() {
+  if (!currentTranscriptText) return; // нечего сбрасывать
 
-  // Reset state vars
-  currentProtocolText = '';
-  currentRequirementsText = '';
+  // Без confirm — действие обратимое (можно сразу нажать Транскрибировать снова)
+
+  // Очищаем state
   currentTranscriptText = '';
-  uploadedFile = null;
-  uploadedParts = [];
-  currentFileKey = null;
-  currentRawFile = null;
-  audioOnlyMode = false;
-  currentMediaInfo = { durationSec: 0, numChunks: 0 };
-  uploadState = 'idle';
 
-  // Form fields
-  if ($('meeting-title'))     $('meeting-title').value = '';
-  if ($('meeting-date'))      $('meeting-date').value  = '';
-  if ($('meeting-project'))   $('meeting-project').value = '';
+  // Удаляем сохранённую транскрипцию из upload session — иначе F5 её восстановит
+  if (currentFileKey) {
+    try {
+      const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+      const ix = sessions.findIndex(s => s.fileKey === currentFileKey);
+      if (ix >= 0 && sessions[ix].transcript) {
+        delete sessions[ix].transcript;
+        localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+      }
+    } catch (e) { console.warn('reset transcript: session cleanup failed', e); }
+  }
+
+  // Чистим UI
+  const $ = id => document.getElementById(id);
   if ($('manual-transcript')) $('manual-transcript').value = '';
-  if ($('audio-only-flag'))   $('audio-only-flag').checked = false;
-
-  // Upload-area UI
-  setUploadUI('idle');
-
-  // Скрыть превью результата
-  const resCard = $('protocol-result-card');
-  if (resCard) resCard.style.display = 'none';
-  if ($('protocol-preview')) $('protocol-preview').textContent = '';
-
-  // Step states + дефолтные подсказки
-  setStepState(1, 'next', 'жду файл');
-  setStepHint(1, 'Загрузи видео или аудио в область выше. MP4, MKV, WEBM, MOV, MP3, WAV и т.п. До 2 ГБ.');
-  setStepState(2, 'disabled', '');
-  setStepHint(2, 'Whisper расшифрует аудио, Gemini почистит пунктуацию и добавит экранный контекст.');
-  setStepState(3, 'disabled', '');
-  setStepHint(3, 'Двухпроходная генерация: сначала тезисы, потом шаблон с таблицами и реестром требований.');
-
-  // Кнопки Шага 2 — disabled
-  const tBtn = $('btn-transcribe');
-  if (tBtn) { tBtn.disabled = true; tBtn.title = 'Сначала загрузи файл'; }
-  const dBtn = $('btn-download-transcript-main');
-  if (dBtn) { dBtn.disabled = true; dBtn.title = 'Скачай .txt после обработки'; }
-  const cBtn = $('btn-cleanup');
-  if (cBtn) cBtn.disabled = true;
-
-  // Status panes / прогресс
-  if ($('cleanup-status'))    $('cleanup-status').textContent = '';
-  if ($('protocol-status'))   $('protocol-status').innerHTML = '';
-  if ($('analysis-progress')) $('analysis-progress').style.display = 'none';
-
-  // Чип «транскрипция загружена вручную» — спрятать
   if ($('transcript-loaded')) $('transcript-loaded').style.display = 'none';
+  if ($('cleanup-status'))    $('cleanup-status').textContent = '';
+  if ($('btn-reset-transcript')) $('btn-reset-transcript').style.display = 'none';
 
-  // Прокрутка к Шагу 1
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // Определяем доступность Whisper: либо File в памяти, либо аудио в IDB
+  let canRerun = !!currentRawFile;
+  if (!canRerun && currentFileKey) {
+    try {
+      const cached = await getAudioBlob(currentFileKey);
+      canRerun = !!(cached && cached.blob);
+    } catch (e) { /* fall through */ }
+  }
+
+  const tBtn = $('btn-transcribe');
+  const dBtn = $('btn-download-transcript-main');
+  const cBtn = $('btn-cleanup');
+
+  if (canRerun && getGroqKey()) {
+    setStepState(2, 'next', '');
+    setStepHint(2, '✅ Транскрипция удалена — нажми «Транскрибировать» чтобы создать заново');
+    if (tBtn) { tBtn.disabled = false; tBtn.textContent = '🎙️ Транскрибировать'; tBtn.title = 'Запустить Whisper'; }
+  } else if (canRerun && !getGroqKey()) {
+    setStepState(2, 'active', 'нужен Groq-ключ');
+    setStepHint(2, '⚠️ Добавь Groq API-ключ в ⚙️ настройках');
+    if (tBtn) { tBtn.disabled = true; tBtn.textContent = '🎙️ Транскрибировать'; }
+  } else {
+    setStepState(2, 'disabled', '');
+    setStepHint(2, '⊝ Whisper не запустится: нет ни локального файла, ни сохранённого аудио. Перетащи файл в Шаг 1 заново.');
+    if (tBtn) { tBtn.disabled = true; tBtn.textContent = '🎙️ Транскрибировать'; }
+  }
+  if (dBtn) { dBtn.disabled = true; dBtn.title = 'Сделай транскрипцию сначала'; }
+  if (cBtn) { cBtn.disabled = true; cBtn.title = 'Сделай транскрипцию сначала'; }
 }
 
 // ── ОТКРЫТЬ СОХРАНЁННУЮ СЕССИЮ В ГЛАВНОЙ СТРАНИЦЕ ────
@@ -1065,7 +1048,7 @@ function applyManualTranscript(text, fileName) {
   const $ = id => document.getElementById(id);
   const ta = $('manual-transcript');
   if (ta) ta.value = text;            // generateProtocol читает отсюда — сохраняем контракт
-  currentTranscriptText = text;       // для других потребителей (resetForNewMeeting и т.п.)
+  currentTranscriptText = text;       // для других потребителей (cleanup, downloadTranscript и т.п.)
 
   const loaded = $('transcript-loaded');
   const loadedText = $('transcript-loaded-text');
@@ -1435,6 +1418,7 @@ async function startTranscription() {
   clearStatus('protocol-status');
   setStepState(2, 'active', 'в процессе...');
   setStepHint(2, 'Whisper расшифровывает аудио. Между чанками ~65 сек паузы — это лимит бесплатного Groq.');
+  moveProgressTo(2);  // прогресс-бар внутрь Шага 2 — это его операция
 
   try {
     // ── Step A: Whisper raw transcription ──
@@ -1497,6 +1481,13 @@ async function startTranscription() {
       showWhisperBadge();
       const mainBtn = document.getElementById('btn-download-transcript-main');
       if (mainBtn) { mainBtn.disabled = false; }
+
+      // Шаг 2 готов: фиксируем done, скрываем кнопку Транскрибировать (но оставляем доступной отмену через крестик).
+      setStepState(2, 'done', '✓ готово');
+      setStepHint(2, '✨ Транскрипция готова: можно скачать .txt, улучшить через Gemini, или сразу делать протокол.');
+      if (tBtn) { tBtn.disabled = true; tBtn.title = 'Транскрипция уже сделана — нажми × справа в шапке Шага 2 чтобы отменить и запустить заново'; }
+      const resetX = document.getElementById('btn-reset-transcript');
+      if (resetX) resetX.style.display = '';
     }
   } catch(e) {
     uploadState = 'ready';
@@ -1506,7 +1497,13 @@ async function startTranscription() {
     if (statusEl) statusEl.innerHTML = `<div style="color:#dc2626;margin-top:8px">❌ Транскрипция: ${e.message}</div>`;
   }
 
-  if (tBtn) { tBtn.disabled = false; tBtn.textContent = '🎙️ Транскрибировать'; }
+  // На успешном пути кнопка остаётся disabled (см. блок выше). На ошибке — разблокируем для повтора.
+  if (tBtn && uploadState !== 'transcribed') {
+    tBtn.disabled = false;
+    tBtn.textContent = '🎙️ Транскрибировать';
+  } else if (tBtn) {
+    tBtn.textContent = '🎙️ Транскрибировать';
+  }
 }
 
 // ── GEMINI TRANSCRIPT CLEANUP ─────────────────────────
@@ -1640,6 +1637,7 @@ async function retryGeminiCleanup() {
   const totalSteps = hasVideo ? 2 : 1;
 
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Улучшаю...'; }
+  moveProgressTo(2);  // прогресс-бар внутрь Шага 2 — это его операция
 
   try {
     // ── Шаг 1: Whisper cleanup ──
@@ -2092,6 +2090,21 @@ function showAP(stage, pct, note) {
 }
 function hideAP() { document.getElementById('analysis-progress').style.display = 'none'; }
 
+// Раньше каждое промежуточное «Шаг N — ...» дублировалось в плашке #protocol-status под Шагом 3
+// И ОДНОВРЕМЕННО в прогресс-баре. Теперь только в баре — текстовая плашка молча игнорит info-сообщения.
+// Чтобы не выкорчёвывать 12 call-сайтов, осталась стаб-функция с тем же интерфейсом.
+const _silentInfo = (...args) => {};
+
+// Перемещает один и тот же прогресс-бар внутрь активного шага.
+// Вызывается перед запуском долгой операции:
+//   moveProgressTo(2) — для startTranscription / retryGeminiCleanup
+//   moveProgressTo(3) — для generateProtocol
+function moveProgressTo(stepNum) {
+  const ap = document.getElementById('analysis-progress');
+  const target = document.getElementById('step-' + stepNum);
+  if (ap && target && ap.parentElement !== target) target.appendChild(ap);
+}
+
 // ── PROMPTS ───────────────────────────────────────────
 const today = () => new Date().toLocaleDateString('ru-RU');
 
@@ -2541,6 +2554,7 @@ async function generateProtocol() {
   hideAP();
   setStepState(3, 'active', 'в процессе...');
   setStepHint(3, 'Gemini анализирует встречу и собирает протокол. Это занимает несколько минут.');
+  moveProgressTo(3);  // прогресс-бар внутрь Шага 3 — это его операция
   // Don't reset currentTranscriptText here — Whisper may have already populated it in background
   currentRequirementsText = '';
 
@@ -2549,13 +2563,13 @@ async function generateProtocol() {
 
     if (manualText) {
       // ── Режим: ручная транскрипция (2 прохода) ──
-      showStatus('protocol-status', 'info', 'Шаг 1 из 2 — извлекаю тезисы...');
+      _silentInfo( 'Шаг 1 из 2 — извлекаю тезисы...');
       showAP('Шаг 1 из 2 — тезисы', 20, 'Фокусированный анализ содержания без отвлечения на шаблон');
       const thesesRaw = await callGemini([{
         text: THESES_PROMPT(null, manualText, false)
       }]);
 
-      showStatus('protocol-status', 'info', 'Шаг 2 из 2 — составляю протокол...');
+      _silentInfo( 'Шаг 2 из 2 — составляю протокол...');
       showAP('Шаг 2 из 2 — протокол', 60, 'Заполняю шаблон с готовыми тезисами');
       const raw = await callGemini([{
         text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, manualText, false, thesesRaw)
@@ -2579,7 +2593,7 @@ async function generateProtocol() {
         const pctBase = 10 + (i / uploadedParts.length) * 50;
 
         // Проход 1: тезисы
-        showStatus('protocol-status', 'info',
+        _silentInfo(
           `Шаг ${step1}/${totalSteps} — тезисы ${part.label}...`);
         showAP(
           `Шаг ${step1}/${totalSteps} · тезисы части ${i+1}`,
@@ -2596,7 +2610,7 @@ async function generateProtocol() {
         await sleep(20000);
 
         // Проход 2: полный протокол с готовыми тезисами
-        showStatus('protocol-status', 'info',
+        _silentInfo(
           `Шаг ${step2}/${totalSteps} — протокол ${part.label}...`);
         showAP(
           `Шаг ${step2}/${totalSteps} · протокол части ${i+1}`,
@@ -2623,7 +2637,7 @@ async function generateProtocol() {
 
       // Объединение протоколов (без тезисов и участников — их штампуем отдельно)
       stepNum++;
-      showStatus('protocol-status', 'info',
+      _silentInfo(
         `Шаг ${stepNum}/${totalSteps} — объединяю протоколы...`);
       showAP('Объединение протоколов...', 62, 'Шапка, глоссарий, вопросы, таблицы — без тезисов');
       await sleep(20000);
@@ -2631,7 +2645,7 @@ async function generateProtocol() {
 
       // Объединение тезисов ОТДЕЛЬНЫМ запросом — merge главного протокола их не касается
       stepNum++;
-      showStatus('protocol-status', 'info',
+      _silentInfo(
         `Шаг ${stepNum}/${totalSteps} — объединяю тезисы...`);
       showAP('Объединение тезисов...', 70,
         'Консолидирую As Is / To Be по темам, ничего не теряя');
@@ -2642,7 +2656,7 @@ async function generateProtocol() {
 
       // Объединение участников из всех protocolParts
       stepNum++;
-      showStatus('protocol-status', 'info',
+      _silentInfo(
         `Шаг ${stepNum}/${totalSteps} — объединяю участников...`);
       showAP('Объединение участников...', 75, 'Собираю уникальных людей');
       await sleep(20000);
@@ -2672,7 +2686,7 @@ async function generateProtocol() {
 
       // Объединение требований
       stepNum++;
-      showStatus('protocol-status', 'info',
+      _silentInfo(
         `Шаг ${stepNum}/${totalSteps} — объединяю реестры требований...`);
       showAP('Объединение реестров требований...', 82, 'Убираем дубли, сохраняем нюансы');
       await sleep(20000);
@@ -2682,7 +2696,7 @@ async function generateProtocol() {
 
       // Финальная проверка
       stepNum++;
-      showStatus('protocol-status', 'info',
+      _silentInfo(
         `Шаг ${stepNum}/${totalSteps} — финальная проверка требований...`);
       showAP('Сверяю реестр с протоколом...', 90,
         'Проверяем не потерялось ли ничего при объединении');
@@ -2700,7 +2714,7 @@ async function generateProtocol() {
         ? 'Gemini анализирует видео и транскрипцию · только содержание'
         : 'Gemini анализирует аудио и транскрипцию · только содержание';
 
-      showStatus('protocol-status', 'info', 'Шаг 1 из 2 — извлекаю тезисы...');
+      _silentInfo( 'Шаг 1 из 2 — извлекаю тезисы...');
       showAP('Шаг 1 из 2 — тезисы', 25, sourceNote);
       const thesesRaw = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
@@ -2710,7 +2724,7 @@ async function generateProtocol() {
       showAP('Пауза...', 45, 'Тезисы готовы ✓ · соблюдаем лимит API');
       await sleep(20000);
 
-      showStatus('protocol-status', 'info', 'Шаг 2 из 2 — составляю протокол...');
+      _silentInfo( 'Шаг 2 из 2 — составляю протокол...');
       showAP('Шаг 2 из 2 — протокол', 55,
         'Заполняю шаблон · тезисы уже готовы');
       const raw = await callGemini([
@@ -2727,7 +2741,7 @@ async function generateProtocol() {
 
     if (!currentRequirementsText) {
       // Single file or text path — requirements not yet extracted (no markers found in response)
-      showStatus('protocol-status', 'info', 'Извлекаю требования (2-й запрос)...');
+      _silentInfo( 'Извлекаю требования (2-й запрос)...');
       showAP('Извлечение требований...', 92, 'Последний запрос');
       currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
       showAP('Готово', 99, '');
