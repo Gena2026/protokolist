@@ -96,22 +96,26 @@ textarea{resize:vertical;line-height:1.6}
 .progress-bar{height:8px;border-radius:99px;background:linear-gradient(90deg,#3b82f6,#8b5cf6);transition:width .3s;width:0%}
 .progress-note{font-size:11px;color:#94a3b8;margin-top:5px}
 
-/* ACTION STEPS — единая панель шагов */
-.actions{display:flex;flex-direction:column;gap:10px;margin-top:18px}
-.action-step{background:#fafafa;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;transition:.25s}
-.action-step.step-done{background:#f0fdf4;border-color:#bbf7d0}
-.action-step.step-next{background:#eff6ff;border-color:#bfdbfe;box-shadow:0 0 0 3px rgba(59,130,246,.08)}
-.action-step.step-disabled{opacity:.55}
-.action-step-header{display:flex;align-items:center;gap:10px;margin-bottom:9px}
-.action-step-num{width:24px;height:24px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.action-step.step-done .action-step-num{background:#10b981;color:#fff}
-.action-step.step-next .action-step-num{background:#3b82f6;color:#fff}
-.action-step-title{font-size:14px;font-weight:600;color:#1e293b}
-.action-step-status{margin-left:auto;font-size:12px;color:#64748b}
-.action-step.step-done .action-step-status{color:#059669;font-weight:600}
-.action-step-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.action-step-hint{font-size:12px;color:#64748b;margin-top:7px;line-height:1.45}
-.action-step.step-next .action-step-hint{color:#1d4ed8;font-weight:500}
+/* STEP CARDS — главная страница «Протокол встречи» */
+.step-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:22px 24px;margin-bottom:14px;transition:background .25s,border-color .25s,box-shadow .25s,opacity .25s}
+.step-card.step-done{background:#f7fffa;border-color:#bbf7d0}
+.step-card.step-next{border-color:#bfdbfe;box-shadow:0 4px 16px rgba(59,130,246,.10)}
+.step-card.step-disabled{opacity:.6}
+.step-card-header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.step-card-num{width:30px;height:30px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.25s}
+.step-card.step-done .step-card-num{background:#10b981;color:#fff}
+.step-card.step-next .step-card-num{background:#3b82f6;color:#fff}
+.step-card-title{font-size:16px;font-weight:600;color:#1e293b;margin:0}
+.step-card-status{margin-left:auto;font-size:12px;color:#64748b;font-weight:500}
+.step-card.step-done .step-card-status{color:#059669;font-weight:600}
+.step-card.step-next .step-card-status{color:#1d4ed8;font-weight:600}
+.step-card-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.step-card-hint{font-size:12px;color:#64748b;margin-top:12px;line-height:1.5}
+.step-card.step-next .step-card-hint{color:#1d4ed8;font-weight:500}
+.step-fields-row{display:grid;grid-template-columns:200px 1fr;gap:14px;margin-top:14px}
+@media (max-width:560px){.step-fields-row{grid-template-columns:1fr}}
+.step-card label:first-of-type{margin-top:14px}
+.cleanup-status-line{font-size:12px;color:#475569;margin-top:8px;line-height:1.4}
 
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinner{width:16px;height:16px;border:2px solid rgba(59,130,246,.3);border-top-color:#3b82f6;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;margin-top:1px}
@@ -119,24 +123,6 @@ textarea{resize:vertical;line-height:1.6}
 .pulsing{animation:pulse 1.5s ease-in-out infinite}
 
 .preview{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:18px;font-size:13px;line-height:1.75;white-space:pre-wrap;max-height:420px;overflow-y:auto;font-family:inherit;color:#334155}
-
-/* ACTION STEPS (main protocol page) */
-.actions{display:flex;flex-direction:column;gap:12px;margin-top:20px}
-.action-step{background:#fafafa;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;transition:.2s}
-.action-step.step-done{background:#f0fdf4;border-color:#bbf7d0}
-.action-step.step-next{background:#eff6ff;border-color:#bfdbfe;box-shadow:0 2px 8px rgba(59,130,246,.08)}
-.action-step.step-disabled{opacity:.55}
-.action-step-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.action-step-num{width:22px;height:22px;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.action-step.step-done .action-step-num{background:#10b981;color:#fff}
-.action-step.step-next .action-step-num{background:#3b82f6;color:#fff}
-.action-step-title{font-size:14px;font-weight:600;color:#1e293b}
-.action-step-status{margin-left:auto;font-size:12px;color:#64748b}
-.action-step.step-done .action-step-status{color:#059669;font-weight:600}
-.action-step-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.action-step-hint{font-size:12px;color:#64748b;margin-top:8px;line-height:1.4}
-.action-step.step-next .action-step-hint{color:#1d4ed8}
-.cleanup-status-line{font-size:12px;color:#475569;margin-top:8px;line-height:1.4}
 
 .protocol-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #e2e8f0;border-radius:9px;margin-bottom:8px;transition:.2s;cursor:pointer}
 .protocol-item:hover{border-color:#bfdbfe;background:#f8faff}
@@ -184,72 +170,83 @@ textarea{resize:vertical;line-height:1.6}
 
 <!-- ======= PROTOCOL ======= -->
 <div class="page active" id="page-protocol">
-  <div class="card">
-    <div class="card-title"><div class="card-title-icon icon-blue">🎙️</div>Запись встречи</div>
 
-    <label>Проект</label>
-    <select id="meeting-project" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 13px;font-size:14px;font-family:inherit;outline:none;background:#fafafa;color:#1e293b;cursor:pointer">
-      <option value="">— Выбери проект —</option>
-    </select>
-
-    <label>Название встречи</label>
-    <input type="text" id="meeting-title" placeholder="Например: Обследование отдела планирования">
-
-    <label>Дата проведения встречи</label>
-    <input type="text" id="meeting-date" placeholder="ДД.ММ.ГГГГ" maxlength="10"
-      oninput="formatDateInput(this)"
-      style="width:220px">
-
-    <div style="margin-top:16px">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-        <label style="margin:0;font-weight:600">Видео или аудио файл</label>
-        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:400;color:#475569;border:1px solid #e2e8f0;border-radius:8px;padding:5px 12px;background:#f8fafc">
-          <input type="checkbox" id="audio-only-flag" onchange="audioOnlyMode=this.checked" style="width:15px;height:15px;cursor:pointer">
-          🔊 Только аудио <span style="color:#94a3b8;font-size:11px">(нет показа экрана)</span>
-        </label>
-      </div>
-      <div class="upload-area" id="upload-area" onclick="onUploadAreaClick()">
-        <div id="upload-idle">
-          <div class="upload-icon">🎬</div>
-          <div class="upload-title">Нажми или перетащи файл</div>
-          <div class="upload-sub">MP4, MKV, WEBM, MOV, AVI, MP3, WAV, M4A</div>
-          <div class="upload-tags">
-            <span class="upload-tag tag-green">✅ До 2 ГБ</span>
-            <span class="upload-tag tag-blue">🔪 Длинные записи разбиваются автоматически</span>
-          </div>
-        </div>
-        <div id="upload-progress-area" style="display:none">
-          <div class="upload-icon pulsing" id="upload-icon-anim">⬆️</div>
-          <div class="upload-title" id="upload-stage-text">Загрузка...</div>
-          <div class="upload-inline-progress">
-            <div class="uip-label">
-              <span id="uip-stage"></span>
-              <span id="uip-pct">0%</span>
-            </div>
-            <div class="uip-bar-bg"><div class="uip-bar" id="uip-bar"></div></div>
-            <div class="uip-note" id="uip-note"></div>
-          </div>
-        </div>
-        <div id="upload-done-area" style="display:none">
-          <div class="upload-icon" id="upload-done-icon">✅</div>
-          <div class="upload-title" id="upload-done-title">Файл готов к обработке</div>
-          <div class="upload-sub" id="upload-done-sub"></div>
-        </div>
-        <div id="upload-error-area" style="display:none">
-          <div class="upload-icon">❌</div>
-          <div class="upload-title">Ошибка загрузки</div>
-          <div class="upload-error-badge" id="upload-error-text"></div>
-          <div class="upload-sub" style="margin-top:8px">Нажми чтобы выбрать файл снова</div>
-        </div>
-      </div>
-      <input type="file" id="audio-file" accept="audio/*,video/*" style="display:none" onchange="handleFileSelect(this)">
+  <!-- ШАГ 1: ЗАГРУЗКА -->
+  <div class="step-card step-disabled" id="step-1">
+    <div class="step-card-header">
+      <span class="step-card-num">1</span>
+      <h2 class="step-card-title">Загрузка</h2>
+      <span class="step-card-status" id="step-1-status">ожидание файла</span>
     </div>
 
-    <div class="or-divider"><span>или вставить текст</span></div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+      <label style="margin:0;font-weight:600;text-transform:none;letter-spacing:0;font-size:13px">Видео или аудио файл</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;font-weight:400;color:#475569;border:1px solid #e2e8f0;border-radius:8px;padding:5px 12px;background:#f8fafc;margin:0;text-transform:none;letter-spacing:0">
+        <input type="checkbox" id="audio-only-flag" onchange="audioOnlyMode=this.checked" style="width:15px;height:15px;cursor:pointer">
+        🔊 Только аудио <span style="color:#94a3b8;font-size:11px">(нет показа экрана)</span>
+      </label>
+    </div>
 
-    <label>Готовая транскрипция</label>
-    <textarea id="manual-transcript" rows="4" placeholder="Вставь готовый текст встречи — файл загружать не нужно..."></textarea>
+    <div class="upload-area" id="upload-area" onclick="onUploadAreaClick()">
+      <div id="upload-idle">
+        <div class="upload-icon">🎬</div>
+        <div class="upload-title">Нажми или перетащи файл</div>
+        <div class="upload-sub">MP4, MKV, WEBM, MOV, AVI, MP3, WAV, M4A</div>
+        <div class="upload-tags">
+          <span class="upload-tag tag-green">✅ До 2 ГБ</span>
+          <span class="upload-tag tag-blue">🔪 Длинные записи разбиваются автоматически</span>
+        </div>
+      </div>
+      <div id="upload-progress-area" style="display:none">
+        <div class="upload-icon pulsing" id="upload-icon-anim">⬆️</div>
+        <div class="upload-title" id="upload-stage-text">Загрузка...</div>
+        <div class="upload-inline-progress">
+          <div class="uip-label">
+            <span id="uip-stage"></span>
+            <span id="uip-pct">0%</span>
+          </div>
+          <div class="uip-bar-bg"><div class="uip-bar" id="uip-bar"></div></div>
+          <div class="uip-note" id="uip-note"></div>
+        </div>
+      </div>
+      <div id="upload-done-area" style="display:none">
+        <div class="upload-icon" id="upload-done-icon">✅</div>
+        <div class="upload-title" id="upload-done-title">Файл готов к обработке</div>
+        <div class="upload-sub" id="upload-done-sub"></div>
+      </div>
+      <div id="upload-error-area" style="display:none">
+        <div class="upload-icon">❌</div>
+        <div class="upload-title">Ошибка загрузки</div>
+        <div class="upload-error-badge" id="upload-error-text"></div>
+        <div class="upload-sub" style="margin-top:8px">Нажми чтобы выбрать файл снова</div>
+      </div>
+    </div>
+    <input type="file" id="audio-file" accept="audio/*,video/*" style="display:none" onchange="handleFileSelect(this)">
 
+    <div class="or-divider"><span>или вставить готовый текст</span></div>
+
+    <textarea id="manual-transcript" rows="3" placeholder="Вставь готовый текст встречи — файл загружать не нужно..."></textarea>
+
+    <div class="step-card-hint" id="step-1-hint">Файл автоматически режется на части по 14 минут и загружается на серверы Google. Живёт 48 часов.</div>
+  </div>
+
+  <!-- ШАГ 2: ТРАНСКРИПЦИЯ -->
+  <div class="step-card step-disabled" id="step-2">
+    <div class="step-card-header">
+      <span class="step-card-num">2</span>
+      <h2 class="step-card-title">Транскрипция</h2>
+      <span class="step-card-status" id="step-2-status"></span>
+    </div>
+    <div class="step-card-body">
+      <button class="btn btn-primary" id="btn-transcribe" onclick="startTranscription()" disabled
+        title="Сначала загрузи файл">🎙️ Транскрибировать</button>
+      <button class="btn btn-secondary" id="btn-download-transcript-main" disabled
+        onclick="downloadTranscript()" title="Скачай .txt после обработки">📄 Скачать</button>
+      <button class="btn btn-secondary" id="btn-cleanup" disabled
+        onclick="retryGeminiCleanup()" title="Повторить постобработку Gemini">✨ Улучшить</button>
+    </div>
+    <div class="step-card-hint" id="step-2-hint">Whisper расшифрует аудио, Gemini почистит пунктуацию и добавит экранный контекст.</div>
+    <div class="cleanup-status-line" id="cleanup-status"></div>
     <div class="progress-wrap" id="analysis-progress">
       <div class="progress-label">
         <span id="ap-stage">Анализ...</span>
@@ -258,54 +255,42 @@ textarea{resize:vertical;line-height:1.6}
       <div class="progress-bar-bg"><div class="progress-bar" id="ap-bar"></div></div>
       <div class="progress-note" id="ap-note"></div>
     </div>
-
-    <!-- ЕДИНАЯ ПАНЕЛЬ ДЕЙСТВИЙ — Шаг 1/2/3 -->
-    <div class="actions" id="action-panel">
-      <!-- Шаг 1: Загрузка -->
-      <div class="action-step step-disabled" id="step-1">
-        <div class="action-step-header">
-          <span class="action-step-num">1</span>
-          <span class="action-step-title">Загрузка файла</span>
-          <span class="action-step-status" id="step-1-status">ожидание файла</span>
-        </div>
-        <div class="action-step-hint" id="step-1-hint">Файл автоматически режется на части по 14 минут и загружается на серверы Google. Живёт 48 часов.</div>
-      </div>
-
-      <!-- Шаг 2: Транскрипция -->
-      <div class="action-step step-disabled" id="step-2">
-        <div class="action-step-header">
-          <span class="action-step-num">2</span>
-          <span class="action-step-title">Транскрипция</span>
-          <span class="action-step-status" id="step-2-status"></span>
-        </div>
-        <div class="action-step-body">
-          <button class="btn btn-primary" id="btn-transcribe" onclick="startTranscription()" disabled
-            title="Сначала загрузи файл">🎙️ Транскрибировать</button>
-          <button class="btn btn-secondary" id="btn-download-transcript-main" disabled
-            onclick="downloadTranscript()" title="Скачай .txt после обработки">📄 Скачать</button>
-          <button class="btn btn-secondary" id="btn-cleanup" disabled
-            onclick="retryGeminiCleanup()" title="Повторить постобработку Gemini">✨ Улучшить</button>
-        </div>
-        <div class="action-step-hint" id="step-2-hint">Whisper расшифрует аудио, Gemini почистит пунктуацию и добавит экранный контекст.</div>
-        <div class="cleanup-status-line" id="cleanup-status"></div>
-      </div>
-
-      <!-- Шаг 3: Протокол -->
-      <div class="action-step step-disabled" id="step-3">
-        <div class="action-step-header">
-          <span class="action-step-num">3</span>
-          <span class="action-step-title">Протокол</span>
-          <span class="action-step-status" id="step-3-status"></span>
-        </div>
-        <div class="action-step-body">
-          <button class="btn btn-primary" id="btn-generate" onclick="generateProtocol()">✨ Создать протокол</button>
-        </div>
-        <div class="action-step-hint" id="step-3-hint">Двухпроходная генерация: сначала тезисы, потом шаблон с таблицами и реестром требований.</div>
-      </div>
-    </div>
-    <div id="protocol-status"></div>
   </div>
 
+  <!-- ШАГ 3: ПРОТОКОЛ -->
+  <div class="step-card step-disabled" id="step-3">
+    <div class="step-card-header">
+      <span class="step-card-num">3</span>
+      <h2 class="step-card-title">Протокол</h2>
+      <span class="step-card-status" id="step-3-status"></span>
+    </div>
+
+    <label>Название встречи</label>
+    <input type="text" id="meeting-title" placeholder="Например: Обследование отдела планирования">
+
+    <div class="step-fields-row">
+      <div>
+        <label>Дата встречи</label>
+        <input type="text" id="meeting-date" placeholder="ДД.ММ.ГГГГ" maxlength="10"
+          oninput="formatDateInput(this)" style="width:100%">
+      </div>
+      <div>
+        <label>Проект</label>
+        <select id="meeting-project" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 13px;font-size:14px;font-family:inherit;outline:none;background:#fafafa;color:#1e293b;cursor:pointer">
+          <option value="">— Выбери проект —</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="step-card-body" style="margin-top:16px">
+      <button class="btn btn-primary" id="btn-generate" onclick="generateProtocol()">✨ Создать протокол</button>
+    </div>
+    <div class="step-card-hint" id="step-3-hint">Двухпроходная генерация: сначала тезисы, потом шаблон с таблицами и реестром требований.</div>
+  </div>
+
+  <div id="protocol-status"></div>
+
+  <!-- РЕЗУЛЬТАТ -->
   <div class="card" id="protocol-result-card" style="display:none">
     <div class="card-title"><div class="card-title-icon icon-green">✅</div>Результат</div>
     <div class="preview" id="protocol-preview"></div>
