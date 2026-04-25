@@ -367,13 +367,15 @@ textarea{resize:vertical;line-height:1.6}
   <div class="card">
     <div class="card-title"><div class="card-title-icon icon-blue">📂</div>Файлы на серверах Google</div>
     <p style="font-size:13px;color:#64748b;margin-bottom:12px">Файлы хранятся 48 часов. Нажми на встречу чтобы переделать протокол без повторной загрузки видео.</p>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
-      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="clearLibrary()">🗑️ Очистить библиотеку</button>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="clearLibrary()" title="Удалит файлы с Google + все записи библиотеки + кэш расшифровок">🗑️ Очистить библиотеку</button>
+      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="clearWhisperCacheWithConfirm()" title="Удалит только сырые расшифровки Whisper, не трогая сессии и протоколы">🗑️ Очистить кэш Whisper</button>
       <span id="google-space-info" style="font-size:12px;color:#64748b;cursor:pointer" onclick="refreshGoogleSpace()" title="Нажми чтобы обновить">
         <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="event.stopPropagation();refreshGoogleSpace()">🔄 Место на Google</button>
       </span>
       <span id="google-space-text" style="font-size:12px;color:#64748b"></span>
     </div>
+    <div id="local-storage-info" style="font-size:12px;color:#64748b;margin-bottom:16px"></div>
     <div id="library-list"><div class="empty-state"><div class="empty-state-icon">📂</div>Нет сохранённых сессий загрузки</div></div>
     <div id="library-status"></div>
   </div>
@@ -571,7 +573,7 @@ function showTab(name, el) {
   if (name === 'protocol') updateProjectSelect();
   if (name === 'report') renderList('report');
   if (name === 'registry') renderList('registry');
-  if (name === 'library') { renderLibrary(); refreshGoogleSpace(); }
+  if (name === 'library') { renderLibrary(); refreshGoogleSpace(); updateStorageInfo(); }
   if (name === 'nsi') renderNSI();
 }
 
@@ -2870,6 +2872,7 @@ async function deleteSession(id) {
   const sessions = getUploadSessions().filter(s => s.id !== id);
   localStorage.setItem('upload_sessions', JSON.stringify(sessions));
   renderLibrary();
+  updateStorageInfo();
 }
 
 async function deleteGoogleFile(uri) {
@@ -2886,7 +2889,7 @@ async function deleteGoogleFile(uri) {
 }
 
 async function clearLibrary() {
-  if (!confirm('Удалить все файлы из приложения И с серверов Google? Действие необратимо.')) return;
+  if (!confirm('Удалить все файлы из приложения И с серверов Google, и весь кэш транскрипций?\n\nПротоколы в списке «Протокол встречи» останутся.\nДействие необратимо.')) return;
   const sessions = getUploadSessions();
   const statusEl = document.getElementById('library-status');
   if (statusEl) statusEl.innerHTML = '<div style="color:#64748b;font-size:13px">🗑️ Удаляю файлы с Google...</div>';
@@ -2901,10 +2904,78 @@ async function clearLibrary() {
   }
 
   localStorage.setItem('upload_sessions', JSON.stringify([]));
-  if (statusEl) statusEl.innerHTML = '<div style="color:#166534;font-size:13px">✅ Библиотека очищена</div>';
-  setTimeout(() => { if (statusEl) statusEl.innerHTML = ''; }, 3000);
+  // Также чистим whisper-кэш (сырые расшифровки + промежуточные чанки) —
+  // они привязаны к тем же файлам и без сессий бесполезны.
+  const cleared = clearWhisperCache();
+  if (statusEl) statusEl.innerHTML =
+    `<div style="color:#166534;font-size:13px">✅ Библиотека очищена. Удалено whisper-записей: ${cleared}</div>`;
+  setTimeout(() => { if (statusEl) statusEl.innerHTML = ''; }, 4000);
   renderLibrary();
   refreshGoogleSpace();
+  updateStorageInfo();
+}
+
+// Удаляет все whisper_raw_* и whisper_progress_* из localStorage.
+// Возвращает количество удалённых ключей.
+function clearWhisperCache() {
+  const toDelete = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith('whisper_raw_') || k.startsWith('whisper_progress_'))) {
+      toDelete.push(k);
+    }
+  }
+  for (const k of toDelete) localStorage.removeItem(k);
+  return toDelete.length;
+}
+
+// Считает сколько места занимает приложение в localStorage (байты на символ ≈ 2 в UTF-16).
+function getStorageUsage() {
+  const groups = { whisper: 0, sessions: 0, protocols: 0, other: 0, total: 0 };
+  const counts = { whisper: 0 };
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+    const v = localStorage.getItem(k) || '';
+    const size = (k.length + v.length) * 2; // UTF-16 approximation
+    groups.total += size;
+    if (k.startsWith('whisper_raw_') || k.startsWith('whisper_progress_')) {
+      groups.whisper += size; counts.whisper++;
+    } else if (k === 'upload_sessions') groups.sessions += size;
+    else if (k === 'protocols') groups.protocols += size;
+    else groups.other += size;
+  }
+  return { ...groups, whisperCount: counts.whisper };
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' Б';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' КБ';
+  return (bytes / 1024 / 1024).toFixed(2) + ' МБ';
+}
+
+// Обновляет текстовую строку "занято в браузере: 340 КБ" в библиотеке.
+function updateStorageInfo() {
+  const el = document.getElementById('local-storage-info');
+  if (!el) return;
+  const u = getStorageUsage();
+  const parts = [];
+  if (u.whisper > 0) parts.push(`${u.whisperCount} транскрип.: ${formatBytes(u.whisper)}`);
+  if (u.sessions > 0) parts.push(`сессии: ${formatBytes(u.sessions)}`);
+  if (u.protocols > 0) parts.push(`протоколы: ${formatBytes(u.protocols)}`);
+  el.textContent = parts.length
+    ? `💾 В браузере: ${formatBytes(u.total)} (${parts.join(' · ')})`
+    : '💾 В браузере: пусто';
+}
+
+// Отдельная очистка только whisper-кэша (для осторожных — не трогает протоколы и сессии).
+function clearWhisperCacheWithConfirm() {
+  const u = getStorageUsage();
+  if (u.whisper === 0) { alert('Кэш расшифровок уже пустой.'); return; }
+  if (!confirm(`Удалить сохранённые расшифровки Whisper?\n\nЗанято: ${formatBytes(u.whisper)} в ${u.whisperCount} записях.\n\nЭто сырые результаты до постобработки. Сессии и протоколы останутся.`)) return;
+  const n = clearWhisperCache();
+  alert(`Удалено записей: ${n}`);
+  updateStorageInfo();
 }
 
 async function refreshGoogleSpace() {
