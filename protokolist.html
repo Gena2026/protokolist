@@ -126,6 +126,10 @@ textarea{resize:vertical;line-height:1.6}
 .transcript-loaded-clear{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:5px;transition:.15s;line-height:1}
 .transcript-loaded-clear:hover{color:#ef4444;background:#fef2f2}
 
+/* Library row — full-row clickable */
+.library-row-clickable{transition:background .15s,border-color .15s,box-shadow .15s}
+.library-row-clickable:hover{background:#f8fafc;border-color:#bfdbfe;box-shadow:0 2px 10px rgba(59,130,246,.1)}
+
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinner{width:16px;height:16px;border:2px solid rgba(59,130,246,.3);border-top-color:#3b82f6;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;margin-top:1px}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
@@ -401,16 +405,6 @@ textarea{resize:vertical;line-height:1.6}
     <div id="local-storage-info" style="font-size:12px;color:#64748b;margin-bottom:16px"></div>
     <div id="library-list"><div class="empty-state"><div class="empty-state-icon">📂</div>Нет сохранённых сессий загрузки</div></div>
     <div id="library-status"></div>
-  </div>
-  <div class="card" id="library-result-card" style="display:none">
-    <div class="card-title"><div class="card-title-icon icon-green">✅</div>Результат</div>
-    <div class="preview" id="library-preview"></div>
-    <div class="btn-row">
-      <button class="btn btn-success" onclick="downloadDocx('protocol')">⬇️ Протокол.docx</button>
-      <button class="btn btn-success" onclick="downloadDocx('requirements')">⬇️ Требования.docx</button>
-      <button class="btn btn-secondary" onclick="downloadTranscript()">📄 Транскрипция.txt</button>
-      <button class="btn btn-secondary" onclick="saveProtocolFromLibrary()">💾 Сохранить в список</button>
-    </div>
   </div>
 </div>
 
@@ -763,6 +757,146 @@ function resetForNewMeeting() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// ── ОТКРЫТЬ СОХРАНЁННУЮ СЕССИЮ В ГЛАВНОЙ СТРАНИЦЕ ────
+// Восстанавливает state из session, обновляет UI всех 3-х Шагов
+// и переключает на вкладку «Протокол встречи».
+function loadSessionToMainPage(sessionId) {
+  const session = getUploadSessions().find(s => s.id === sessionId);
+  if (!session) {
+    alert('Сессия не найдена. Возможно, она была удалена.');
+    return;
+  }
+
+  // Не позволяем перезаписать в процессе активной загрузки/анализа
+  if (uploadState === 'uploading') {
+    alert('Подожди — идёт загрузка файла. Сначала дождись завершения или обнови страницу.');
+    return;
+  }
+
+  // Проверка истечения 48 часов
+  const now = Date.now();
+  const ageHours = (now - session.uploadedAt) / 1000 / 60 / 60;
+  if (ageHours >= 48) {
+    alert('Файлы этой сессии истекли (прошло более 48 часов). Загрузи видео заново.');
+    return;
+  }
+  // Проверка частичной загрузки
+  const doneCount = session.parts.filter(p => p !== null).length;
+  if (doneCount < session.numParts) {
+    alert(`Эта сессия загружена не полностью (${doneCount} из ${session.numParts} частей). ` +
+          `Открой вкладку «Протокол встречи» и выбери тот же файл — приложение продолжит загрузку.`);
+    return;
+  }
+
+  // ── 1. Восстанавливаем state vars ──
+  // 'полное видео' label = single-file ветка, иначе multi-part
+  if (session.parts.length === 1 && session.parts[0].label === 'полное видео') {
+    uploadedFile = { uri: session.parts[0].uri, mimeType: session.parts[0].mimeType };
+    uploadedParts = [];
+  } else {
+    uploadedFile = null;
+    uploadedParts = session.parts.map(p => ({
+      uri: p.uri, mimeType: p.mimeType, label: p.label, transcriptSegment: ''
+    }));
+  }
+  currentFileKey = session.fileKey;
+  currentRawFile = null;            // оригинальный File не сохраняется в localStorage — это OK
+  audioOnlyMode = false;            // флаг по умолчанию; настройку видео-контекста юзер задаст при следующей транскрипции
+  // Длительность в session не сохраняется — оставляем 0, helpers корректно обрабатывают
+  currentMediaInfo = { durationSec: session.durationSec || 0, numChunks: session.numParts };
+  currentTranscriptText = session.transcript || '';
+  currentProtocolText = '';
+  currentRequirementsText = '';
+  uploadState = 'ready';
+
+  // ── 2. Заполняем форму ──
+  const $ = id => document.getElementById(id);
+  if ($('meeting-title'))   $('meeting-title').value = session.title || session.fileName || '';
+  if ($('meeting-date'))    $('meeting-date').value  = session.date || '';
+  if ($('audio-only-flag')) $('audio-only-flag').checked = false;
+  if ($('manual-transcript')) $('manual-transcript').value = ''; // очищаем — этот режим только для свежих .txt/.docx
+  // meeting-project — оставляем юзеру выбрать (в session не хранится)
+
+  // Спрятать чип ручной транскрипции (на случай если был открыт раньше)
+  if ($('transcript-loaded')) $('transcript-loaded').style.display = 'none';
+  // Скрыть превью результата
+  if ($('protocol-result-card')) $('protocol-result-card').style.display = 'none';
+  if ($('protocol-preview'))     $('protocol-preview').textContent = '';
+  if ($('cleanup-status'))       $('cleanup-status').textContent = '';
+  if ($('protocol-status'))      $('protocol-status').innerHTML = '';
+  if ($('analysis-progress'))    $('analysis-progress').style.display = 'none';
+
+  // ── 3. UI Шага 1: показываем «загружено N часов назад» ──
+  const hoursLeft = Math.max(0, Math.round(48 - ageHours));
+  const partsLabel = session.numParts === 1
+    ? '1 файл'
+    : `${session.numParts} ${pluralizeRu(session.numParts, 'часть', 'части', 'частей')}`;
+  const durationLabel = session.durationSec
+    ? ` · ⏱ ${fmtDuration(session.durationSec)}`
+    : '';
+  setUploadUI('ready', {
+    title: session.fileName,
+    sub: `📂 Из библиотеки${durationLabel} · ${partsLabel} · ${hoursLeft}ч до истечения`
+  });
+
+  // ── 4. Двигаем Шаги ──
+  setStepState(1, 'done', '✓ восстановлено');
+  setStepHint(1, hoursLeft < 12
+    ? `⚠️ Файлы истекают через ${hoursLeft}ч. Если хочешь сохранить транскрипцию — запусти Шаг 2 сейчас.`
+    : `Файлы лежат на серверах Google · ${hoursLeft}ч до истечения`);
+
+  const tBtn = $('btn-transcribe');
+  const dBtn = $('btn-download-transcript-main');
+  const cBtn = $('btn-cleanup');
+
+  if (currentTranscriptText) {
+    // Транскрипция уже была сделана — Шаг 2 = done
+    setStepState(2, 'done', `✓ есть · ${currentTranscriptText.length.toLocaleString('ru-RU')} симв.`);
+    setStepHint(2, 'Транскрипция была сохранена в прошлый раз. Можно скачать или повторить очистку Gemini.');
+    if (tBtn) { tBtn.disabled = false; tBtn.title = 'Запустить транскрипцию заново (перезапишет существующую)'; }
+    if (dBtn) { dBtn.disabled = false; dBtn.title = 'Скачать .txt'; }
+    if (cBtn) { cBtn.disabled = false; }
+    setStepState(3, 'next', '');
+    setStepHint(3, '✅ Всё готово — заполни «Проект» (если нужно) и нажми «Создать протокол»');
+  } else {
+    // Транскрипции нет — Шаг 2 = next или нужен ключ
+    const etaSec = estimateTranscriptionEta(session.numParts, false);
+    const etaSuffix = ` · ⏱ займёт ${fmtEtaShort(etaSec)}` +
+      (session.numParts > 1
+        ? ` (${session.numParts} ${pluralizeRu(session.numParts,'чанк','чанка','чанков')}, пауза 65 с между ними)`
+        : '');
+    if (getGroqKey()) {
+      setStepState(2, 'next', '');
+      setStepHint(2, '✅ Файл готов — нажми «Транскрибировать»' + etaSuffix);
+      if (tBtn) { tBtn.disabled = false; tBtn.title = 'Запустить транскрипцию Whisper'; }
+    } else {
+      setStepState(2, 'active', 'нужен Groq-ключ');
+      setStepHint(2, '⚠️ Добавь Groq API-ключ в ⚙️ настройках вверху справа' + etaSuffix);
+      if (tBtn) { tBtn.disabled = true; tBtn.title = 'Добавь Groq API-ключ'; }
+    }
+    if (dBtn) { dBtn.disabled = true; }
+    if (cBtn) { cBtn.disabled = true; }
+    setStepState(3, 'next', '');
+    setStepHint(3, 'Можно сразу создавать протокол по видео, или сначала сделать транскрипцию (выше) — будет точнее');
+  }
+
+  // ── 5. Переключаем вкладку на «Протокол встречи» ──
+  // showTab требует второй аргумент (DOM элемент таба), находим его по data-page или by index
+  const protocolTab = document.querySelector('.tab[onclick*="protocol"]') ||
+                      document.querySelectorAll('.tab')[0];
+  if (protocolTab) {
+    showTab('protocol', protocolTab);
+  } else {
+    // Fallback: ручной свитч
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const pp = document.getElementById('page-protocol');
+    if (pp) pp.classList.add('active');
+  }
+
+  // Скроллим к Шагу 1, чтобы юзер видел восстановленное состояние
+  setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 100);
+}
+
 // ── UPLOAD AREA CLICK ─────────────────────────────────
 function onUploadAreaClick() {
   // Allow re-select only if not currently uploading
@@ -1023,7 +1157,7 @@ async function startFileUpload(file) {
       uploadedFile = result;
       uploadState = 'ready';
       const meetingTitle = document.getElementById('meeting-title').value.trim() || file.name;
-      saveSingleFileURI(file, result.uri, result.mimeType, meetingTitle);
+      saveSingleFileURI(file, result.uri, result.mimeType, meetingTitle, duration);
       setUploadUI('ready', {
         title: `🔊 ${file.name}`,
         sub: duration > 0
@@ -1040,7 +1174,7 @@ async function startFileUpload(file) {
         // ── LONG VIDEO: ffmpeg split → Gemini upload ──
         const existingSession = findSession(file);
         const alreadyUploaded = existingSession?.parts || [];
-        initSession(file, numParts, meetingTitle);
+        initSession(file, numParts, meetingTitle, duration);
 
         setUploadUI('uploading', {
           title: 'Шаг 1: Нарезаем видео на части...',
@@ -1107,7 +1241,7 @@ async function startFileUpload(file) {
         await waitForActive(result.uri);
         uploadedFile = result;
         uploadState = 'ready';
-        saveSingleFileURI(file, result.uri, result.mimeType, meetingTitle);
+        saveSingleFileURI(file, result.uri, result.mimeType, meetingTitle, duration);
         setUploadUI('ready', {
           title: file.name,
           sub: duration > 0
@@ -3048,17 +3182,25 @@ function makeFileKey(file) {
 }
 
 // Initialize or get existing session for this file
-function initSession(file, numParts, meetingTitle) {
+function initSession(file, numParts, meetingTitle, durationSec) {
   const key = makeFileKey(file);
   const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
   const existing = sessions.find(s => s.fileKey === key);
-  if (existing) return existing;
+  if (existing) {
+    // Если сессия уже была без durationSec — допишем теперь, когда знаем
+    if (!existing.durationSec && durationSec) {
+      existing.durationSec = durationSec;
+      localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+    }
+    return existing;
+  }
 
   const session = {
     id: Date.now(),
     fileKey: key,
     fileName: file.name,
     fileSize: file.size,
+    durationSec: durationSec || 0,
     title: meetingTitle || file.name,
     date: today(),
     uploadedAt: Date.now(),
@@ -3080,7 +3222,7 @@ function saveChunkURI(fileKey, chunkIndex, uri, mimeType, label) {
 }
 
 // Save single-file URI (short video, no splitting)
-function saveSingleFileURI(file, uri, mimeType, meetingTitle) {
+function saveSingleFileURI(file, uri, mimeType, meetingTitle, durationSec) {
   const key = makeFileKey(file);
   const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
   const session = {
@@ -3088,6 +3230,7 @@ function saveSingleFileURI(file, uri, mimeType, meetingTitle) {
     fileKey: key,
     fileName: file.name,
     fileSize: file.size,
+    durationSec: durationSec || 0,
     title: meetingTitle || file.name,
     date: today(),
     uploadedAt: Date.now(),
@@ -3144,29 +3287,36 @@ function renderLibrary() {
     const isPartial = doneCount < s.numParts;
     const partsLabel = isPartial
       ? `${doneCount} из ${s.numParts} частей загружено`
-      : s.numParts === 1 ? '1 файл' : `${s.numParts} части`;
-    const statusColor = isPartial ? '#fffbeb' : '#f0fdf4';
-    const statusTx = isPartial ? '#92400e' : '#166534';
-    const statusBd = isPartial ? '#fde68a' : '#bbf7d0';
-    const statusText = isPartial ? `⚠️ ${doneCount}/${s.numParts} частей` : '✅ Готово';
+      : s.numParts === 1 ? '1 файл' : `${s.numParts} ${pluralizeRu(s.numParts, 'часть', 'части', 'частей')}`;
+    const hasTranscript = !!s.transcript;
+    const transcriptBadge = hasTranscript
+      ? `<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;white-space:nowrap" title="Сохранена транскрипция (${s.transcript.length.toLocaleString('ru-RU')} символов)">📝 транскрипция</span>`
+      : '';
+    const statusBadge = isPartial
+      ? `<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;white-space:nowrap">⚠️ ${doneCount}/${s.numParts}</span>`
+      : `<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;white-space:nowrap">✅ Готово</span>`;
+    // Кликабельность строки — только если загрузка завершена
+    const rowClick = isPartial ? '' : `onclick="loadSessionToMainPage(${s.id})"`;
+    const rowCursor = isPartial ? 'default' : 'pointer';
+    const rowHover = isPartial ? '' : 'class="library-row-clickable"';
     return `
-      <div class="protocol-item" style="flex-direction:column;align-items:flex-start;gap:10px">
+      <div class="protocol-item" ${rowHover} ${rowClick} style="flex-direction:column;align-items:flex-start;gap:8px;cursor:${rowCursor}">
         <div style="display:flex;align-items:center;gap:10px;width:100%">
-          <div class="protocol-meta">
+          <div class="protocol-meta" style="min-width:0">
             <div class="protocol-title">${escHtml(s.fileName)}</div>
-            <div class="protocol-date">${s.date} · ${partsLabel}</div>
+            <div class="protocol-date">${s.date} · ${partsLabel}${s.durationSec ? ' · ' + fmtDuration(s.durationSec) : ''}</div>
           </div>
-          <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${statusColor};color:${statusTx};border:1px solid ${statusBd};white-space:nowrap">${statusText}</span>
+          ${statusBadge}
+          ${transcriptBadge}
           <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${badgeBg};color:${badgeTx};border:1px solid ${badgeBd};white-space:nowrap">⏱ ${hoursLeft}ч</span>
-          <button class="protocol-del" onclick="deleteSession(${s.id})" title="Удалить">×</button>
+          <button class="protocol-del" onclick="event.stopPropagation();deleteSession(${s.id})" title="Удалить">×</button>
         </div>
         ${isPartial
           ? `<div style="font-size:12px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;width:100%">
                Загрузка прервалась. Выбери тот же файл <strong>${escHtml(s.fileName)}</strong> на вкладке «Протокол встречи» — приложение само пропустит уже загруженные части.
              </div>`
-          : `<div style="display:flex;gap:8px;flex-wrap:wrap">
-               <button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="reprocessSession(${s.id})">✨ Переделать протокол</button>
-               ${s.transcript ? `<button class="btn btn-secondary" style="padding:6px 14px;font-size:12px" onclick="downloadSessionTranscript(${s.id})">📄 Скачать транскрипцию</button>` : '<span style="font-size:11px;color:#94a3b8;align-self:center">Транскрипции нет (Groq не настроен или не сработал)</span>'}
+          : `<div style="font-size:11px;color:#3b82f6;font-weight:500;display:flex;align-items:center;gap:6px">
+               <span style="opacity:.6">→</span> Нажми чтобы открыть на вкладке «Протокол встречи» и продолжить с любого шага
              </div>`
         }
       </div>`;
@@ -3324,187 +3474,6 @@ async function refreshGoogleSpace() {
   }
 }
 
-async function reprocessSession(id) {
-  const session = getUploadSessions().find(s => s.id === id);
-  if (!session) return;
-
-  // Check if files still active
-  showStatus('library-status', 'info', 'Проверяю файлы на серверах Google...');
-  const now = Date.now();
-  const age = (now - session.uploadedAt) / 1000 / 60 / 60;
-  if (age >= 48) {
-    showStatus('library-status', 'error', 'Файлы истекли (прошло более 48 часов). Загрузи видео заново.');
-    return;
-  }
-
-  // Restore state and process
-  if (session.parts.length === 1 && session.parts[0].label === 'полное видео') {
-    uploadedFile = { uri: session.parts[0].uri, mimeType: session.parts[0].mimeType };
-    uploadedParts = [];
-  } else {
-    uploadedFile = null;
-    uploadedParts = session.parts.map(p => ({ uri: p.uri, mimeType: p.mimeType, label: p.label }));
-  }
-
-  const title = session.title;
-  // Get current project context from main tab
-  const projectName = typeof getProjectName === 'function' ? (getProjectName() || '') : '';
-  const teamText = typeof getProjectTeamText === 'function' ? (getProjectTeamText() || '') : '';
-  const meetingDate = (document.getElementById('meeting-date')?.value?.trim()) || today();
-  // Используем сохранённую транскрипцию если она есть — это позволяет мержить тезисы
-  // на том же материале, без ре-транскрипции через Whisper.
-  const savedTranscript = session.transcript || '';
-
-  showStatus('library-status', 'info', `Запускаю анализ: «${title}»...`);
-  document.getElementById('library-result-card').style.display = 'none';
-  currentRequirementsText = '';
-
-  const btn = event.target;
-  btn.disabled = true;
-
-  try {
-    let protocolText = '';
-
-    if (uploadedParts.length > 0) {
-      // ── Multi-part: тот же pipeline что и в generateProtocol ──
-      const partProtocols = [];
-      const partRequirements = [];
-      const partTheses = [];
-
-      // Раскладываем сохранённую транскрипцию по чанкам по CHUNK_SEC сек
-      const transcriptSegments = uploadedParts.map((p, i) =>
-        savedTranscript
-          ? getTranscriptSegment(savedTranscript, i * CHUNK_SEC, (i+1) * CHUNK_SEC)
-          : ''
-      );
-
-      for (let i = 0; i < uploadedParts.length; i++) {
-        const part = uploadedParts[i];
-        const ts = transcriptSegments[i];
-
-        // Проход 1: тезисы
-        showStatus('library-status', 'info',
-          `Часть ${i+1}/${uploadedParts.length} · тезисы (${part.label})...`);
-        const thesesRaw = await callGemini([
-          { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-          { text: THESES_PROMPT(part.label, ts, true) }
-        ]);
-        partTheses.push(thesesRaw || '');
-        await sleep(20000);
-
-        // Проход 2: протокол с готовыми тезисами
-        showStatus('library-status', 'info',
-          `Часть ${i+1}/${uploadedParts.length} · протокол (${part.label})...`);
-        const raw = await callGemini([
-          { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-          { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, ts, true, thesesRaw) }
-        ]);
-        const { protocolText: pText, requirementsText: rText } = parseGeminiBlocks(raw);
-        partProtocols.push(pText || raw.trim());
-        partRequirements.push(rText);
-        if (i < uploadedParts.length - 1) await sleep(20000);
-      }
-
-      // Merge главного протокола (без тезисов и участников)
-      showStatus('library-status', 'info', 'Объединяю протоколы...');
-      await sleep(20000);
-      protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
-
-      // Merge тезисов отдельным запросом
-      showStatus('library-status', 'info', 'Объединяю тезисы...');
-      await sleep(20000);
-      const mergedTheses = await callGemini([{
-        text: MERGE_THESES_PROMPT(partTheses.filter(t => t && t.trim()), title)
-      }]);
-
-      // Merge участников отдельным запросом
-      showStatus('library-status', 'info', 'Объединяю участников...');
-      await sleep(20000);
-      const mergedParticipants = await callGemini([{
-        text: MERGE_PARTICIPANTS_PROMPT(partProtocols, title, teamText)
-      }]);
-
-      // Штампуем в итоговый протокол
-      const nextAfterTheses = [
-        'ИНФОРМАЦИОННЫЕ МАТЕРИАЛЫ', 'ОТКРЫТЫЕ ВОПРОСЫ', 'СЛЕДУЮЩИЕ ШАГИ',
-        'ПРОТОКОЛ СОСТАВЛЕН', 'ЛИСТ СОГЛАСОВАНИЯ', 'СПИСОК ПРИЛОЖЕНИЙ'
-      ];
-      const nextAfterParticipants = [
-        'ГЛОССАРИЙ', 'ВОПРОСЫ ДЛЯ ОБСУЖДЕНИЯ', 'ТЕЗИСЫ ИНТЕРВЬЮ', ...nextAfterTheses
-      ];
-      if (mergedTheses && mergedTheses.trim()) {
-        protocolText = replaceSectionInProtocol(
-          protocolText, 'ТЕЗИСЫ ИНТЕРВЬЮ', mergedTheses, nextAfterTheses
-        );
-      }
-      if (mergedParticipants && mergedParticipants.trim()) {
-        protocolText = replaceSectionInProtocol(
-          protocolText, 'УЧАСТНИКИ', mergedParticipants, nextAfterParticipants
-        );
-      }
-
-      // Merge требований
-      showStatus('library-status', 'info', 'Объединяю реестры требований...');
-      await sleep(20000);
-      currentRequirementsText = await callGemini([{
-        text: MERGE_REQUIREMENTS_PROMPT(partRequirements, title)
-      }]);
-
-      // Финальная проверка требований
-      showStatus('library-status', 'info', 'Финальная проверка требований...');
-      await sleep(20000);
-      currentRequirementsText = await callGemini([{
-        text: FINAL_CHECK_REQUIREMENTS_PROMPT(protocolText, currentRequirementsText, title)
-      }]);
-
-    } else {
-      // ── Single file: 2 прохода как в generateProtocol ──
-      showStatus('library-status', 'info', 'Gemini анализирует запись · Шаг 1 — тезисы...');
-      const thesesRaw = await callGemini([
-        { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: THESES_PROMPT(null, savedTranscript, true) }
-      ]);
-      await sleep(20000);
-      showStatus('library-status', 'info', 'Gemini анализирует запись · Шаг 2 — протокол...');
-      const rawSingle = await callGemini([
-        { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, savedTranscript, true, thesesRaw) }
-      ]);
-      const blocks = parseGeminiBlocks(rawSingle);
-      protocolText = blocks.protocolText || rawSingle;
-      if (blocks.requirementsText) currentRequirementsText = blocks.requirementsText;
-    }
-
-    currentProtocolText = protocolText;
-    // Сохраняем транскрипцию для кнопки «Скачать транскрипцию.txt» в результате
-    currentTranscriptText = savedTranscript;
-
-    if (!currentRequirementsText) {
-      showStatus('library-status', 'info', 'Извлекаю требования...');
-      await sleep(20000);
-      currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
-    }
-
-    document.getElementById('library-preview').textContent = currentProtocolText;
-    document.getElementById('library-result-card').style.display = 'block';
-    document.getElementById('library-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    showStatus('library-status', 'success', 'Готово!');
-
-  } catch (e) {
-    showStatus('library-status', 'error', e.message);
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-function saveProtocolFromLibrary() {
-  if (!currentProtocolText) return;
-  const title = (getUploadSessions()[0]?.title) || 'Встреча ' + today();
-  const list = JSON.parse(localStorage.getItem('protocols') || '[]');
-  list.unshift({ id: Date.now(), title, date: today(), protocol: currentProtocolText, requirements: currentRequirementsText });
-  localStorage.setItem('protocols', JSON.stringify(list));
-  showStatus('library-status', 'success', `Протокол «${title}» сохранён`);
-}
 
 
 // ── NSI — Нормативно-справочная информация ───────────────
