@@ -1903,11 +1903,124 @@ async function cacheAudioForWhisper(originalFile, fileKey, existingAudioFile) {
   }
 }
 
+// Извлекает список таймстемпов всех keyframe (I-frames) из видео.
+// Используется splitVideoIntoChunks чтобы резать ровно по keyframes (а не по
+// фиксированной 14-минутной отметке) — тогда `-c copy` гарантированно создаёт
+// валидные чанки, которые принимает Google File API.
+//
+// Реализация:
+//   ffmpeg -i input -vf "select=eq(pict_type\,I),showinfo" -an -f null -
+//   - select фильтр: оставляем только I-кадры (keyframes)
+//   - showinfo: пишет в stderr строку с pts_time:N.NNN на каждый прошедший кадр
+//   - -an: не трогаем аудио — экономим время
+//   - -f null -: вывод никуда — нам нужны только логи
+//
+// Возвращает: отсортированный массив чисел (секунды) или null если не извлеклось.
+// При null вызывающий код должен фолбэкнуться на старую логику (фиксированные интервалы).
+async function getKeyframeTimestamps(file) {
+  const ff = await loadFFmpeg();
+  const ext = (file.name.split('.').pop() || 'mp4').toLowerCase();
+  const tmpName = `kfprobe.${ext}`;
+
+  const timestamps = [];
+  // Регэксп ищет в логах ffmpeg строки вида: "n: 12 pts: 360360 pts_time:14.4144 ..."
+  // Это формат filter showinfo, документирован в ffmpeg docs.
+  const ptsRx = /pts_time:([\d.]+)/;
+
+  const onLog = ({ message }) => {
+    if (!message) return;
+    const m = ptsRx.exec(message);
+    if (m) {
+      const t = parseFloat(m[1]);
+      if (!Number.isNaN(t)) timestamps.push(t);
+    }
+  };
+
+  try {
+    setUIP('Анализ keyframes...', 4, 'Один проход по видео для поиска точек резки');
+    await ff.writeFile(tmpName, new Uint8Array(await file.arrayBuffer()));
+    ff.on('log', onLog);
+    // Команда не выводит видеофайл, только аналитику в stderr
+    await ff.exec([
+      '-i', tmpName,
+      '-vf', 'select=eq(pict_type\\,I),showinfo',
+      '-an',
+      '-f', 'null',
+      '-'
+    ]);
+  } catch (e) {
+    console.warn('[keyframes] не удалось извлечь:', e);
+    // оставляем timestamps как есть (возможно частичный) — обработка ниже
+  } finally {
+    try { ff.off('log', onLog); } catch (_) { /* старые версии без off — ок */ }
+    try { await ff.deleteFile(tmpName); } catch (_) { /* пофиг */ }
+  }
+
+  if (timestamps.length === 0) {
+    console.warn('[keyframes] список пустой — будет fallback на фиксированную нарезку');
+    return null;
+  }
+
+  // Сортируем (showinfo обычно идёт по порядку, но защитимся) и убираем дубли
+  timestamps.sort((a, b) => a - b);
+  const dedup = [];
+  for (const t of timestamps) {
+    if (dedup.length === 0 || t - dedup[dedup.length - 1] > 0.05) dedup.push(t);
+  }
+  console.log(`[keyframes] найдено ${dedup.length} keyframes, первые:`, dedup.slice(0, 5));
+  return dedup;
+}
+
 async function splitVideoIntoChunks(file) {
   const ff = await loadFFmpeg();
   const duration = await getVideoDuration(file);
-  const numParts = Math.ceil(duration / CHUNK_SEC);
 
+  // ── Шаг A: получить keyframes (через ту же ffmpeg.wasm-инстанс) ──
+  // Делаем ДО writeFile основного файла, потому что getKeyframeTimestamps
+  // тоже пишет в виртуальную FS под своим именем.
+  const keyframes = await getKeyframeTimestamps(file);
+
+  // ── Шаг B: вычисляем точки резки ──
+  // Стратегия: каждая следующая точка = ПОСЛЕДНИЙ keyframe в окне 
+  // (предыдущая_точка, предыдущая_точка + CHUNK_SEC]. Строго ≤ CHUNK_SEC,
+  // никогда не вылезаем за лимит TPM Gemini API.
+  // Если keyframes недоступны (null) — fallback на фиксированные интервалы.
+  const cutPoints = [0];
+  if (keyframes && keyframes.length > 0) {
+    let lastCut = 0;
+    while (lastCut + 1 < duration) {
+      const target = lastCut + CHUNK_SEC;
+      let chosen = null;
+      for (const kf of keyframes) {
+        // Берём только ПОСЛЕ предыдущей точки (минимум 1 сек чтобы не зациклиться)
+        // и НЕ ПОЗЖЕ цели (строгое ≤ — гарантия не превысить TPM)
+        if (kf > lastCut + 1 && kf <= target) chosen = kf;
+        if (kf > target) break;
+      }
+      if (chosen === null) {
+        // В окне 14 минут вообще нет keyframes — почти невозможный случай для VP8.
+        // Режем по жёсткой границе как fallback (с риском битого чанка для этого одного куска).
+        chosen = Math.min(target, duration);
+        console.warn(`[split] нет keyframe в окне (${lastCut.toFixed(1)}, ${target.toFixed(1)}] — режем без него на ${chosen.toFixed(1)}`);
+      }
+      // Если оставшийся хвост короче 30 сек — присоединим его к предыдущему чанку,
+      // чтобы не было чанка на 5 секунд в конце
+      if (duration - chosen < 30) chosen = duration;
+      cutPoints.push(chosen);
+      lastCut = chosen;
+      if (chosen >= duration) break;
+    }
+  } else {
+    // Fallback: фиксированные интервалы как раньше
+    const numParts = Math.ceil(duration / CHUNK_SEC);
+    for (let i = 1; i <= numParts; i++) {
+      cutPoints.push(Math.min(i * CHUNK_SEC, duration));
+    }
+  }
+  const numParts = cutPoints.length - 1;
+  console.log(`[split] точки резки (всего ${numParts} чанков):`, cutPoints.map(t => t.toFixed(2)));
+
+  // ── Шаг C: сама нарезка ──
   // Preserve original format — WEBM stays WEBM, MP4 stays MP4
   const origExt = file.name.split('.').pop().toLowerCase() || 'mp4';
   const mimeMap = {
@@ -1924,15 +2037,16 @@ async function splitVideoIntoChunks(file) {
 
   const chunks = [];
   for (let i = 0; i < numParts; i++) {
-    const start = i * CHUNK_SEC;
+    const start = cutPoints[i];
+    const chunkDuration = cutPoints[i + 1] - cutPoints[i];
     const partName = `part${i+1}.${chunkExt}`;
     const startMin = Math.round(start / 60);
-    const endMin = Math.round(Math.min(start + CHUNK_SEC, duration) / 60);
+    const endMin = Math.round(cutPoints[i + 1] / 60);
 
     setUIP(`Нарезка: часть ${i+1} из ${numParts}...`,
-      50 + (i / numParts) * 45, `${startMin}–${endMin} мин`);
+      50 + (i / numParts) * 45, `${startMin}–${endMin} мин · с keyframe`);
 
-    await ff.exec(['-i', inputName, '-ss', String(start), '-t', String(CHUNK_SEC),
+    await ff.exec(['-i', inputName, '-ss', String(start), '-t', String(chunkDuration),
       '-c', 'copy', '-avoid_negative_ts', 'make_zero', partName]);
 
     const partData = await ff.readFile(partName);
@@ -2991,10 +3105,11 @@ async function downloadProtocolDocx(text, filename) {
     children: [new TextRun({ text: txt, bold: true, size: 24, font: 'Arial', color: '2E4057' })]
   });
 
-  // Helper: subsection heading (As Is / To Be)
+  // Helper: subsection heading (As Is / To Be) — курсив + подчёркнутый, БЕЗ жирности.
+  // По фидбэку 26.04.2026: пользователь хочет визуально лёгкий заголовок, не bold.
   const subHead = (txt) => new Paragraph({
     spacing: { before: 160, after: 80 },
-    children: [new TextRun({ text: txt, italic: true, bold: true, size: 22, font: 'Arial' })]
+    children: [new TextRun({ text: txt, italic: true, bold: false, underline: {}, size: 22, font: 'Arial' })]
   });
 
   // Helper: parse markdown bold/italic into TextRun array
