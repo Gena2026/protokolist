@@ -339,10 +339,6 @@ textarea{resize:vertical;line-height:1.6}
     <div class="btn-row">
       <button class="btn btn-success" onclick="downloadDocx('protocol')">⬇️ Протокол.docx</button>
       <button class="btn btn-success" onclick="downloadDocx('requirements')">⬇️ Требования.docx</button>
-      <button class="btn btn-secondary" onclick="downloadTranscript()">📄 Транскрипция.txt</button>
-      <button class="btn btn-secondary" onclick="copyToClipboard(currentProtocolText, this)">📋 Скопировать</button>
-      <button class="btn btn-secondary" id="btn-edit-protocol" onclick="toggleEditMode(this)">✏️ Редактировать</button>
-      <button class="btn btn-secondary" onclick="saveProtocol()">💾 Сохранить в список</button>
     </div>
   </div>
 </div>
@@ -2242,8 +2238,6 @@ ${thesesText}
 [Конкретные действия договорённости о которых достигнуты. Срок считай от ${dateStr}.]
 | № | Действие | Ответственный | Срок |
 
-ПРОТОКОЛ СОСТАВЛЕН: [ФИО первого участника из команды исполнителя]
-
 ЛИСТ СОГЛАСОВАНИЯ:
 | ФИО | Должность | Дата | Подпись |
 [Заполни всеми участниками встречи. Колонки Дата и Подпись оставь пустыми.]
@@ -2268,7 +2262,7 @@ ${thesesText}
 
 | Содержание требования | ФИО владельца требования | Должность | Вид требования |
 [Вид требования всегда: Пользовательское требование]
-[ФИО и Должность — из команды заказчика. Если не ясно кто именно — ставь первого участника со стороны заказчика.]
+[ФИО владельца требования — кто КОНКРЕТНО высказал это требование/проблему/потребность по записи. Команда проекта (выше) — это СПРАВОЧНИК для сопоставления имён, упоминаемых в речи, а НЕ источник прямой подстановки. Если в записи говорящий явно не идентифицирован — оставь поля «ФИО» и «Должность» ПУСТЫМИ. НЕ ПРИДУМЫВАЙ владельца, не подставляй случайного участника.]
 
 Если требований действительно не было — написать: Требований в этом фрагменте не зафиксировано.
 
@@ -2405,7 +2399,7 @@ function REQUIREMENTS_PROMPT(protocol) {
 
 | Содержание требования | ФИО владельца требования | Должность | Вид требования |
 [Вид требования всегда: Пользовательское требование]
-[ФИО и Должность — из команды заказчика из протокола]
+[ФИО владельца требования — кто КОНКРЕТНО высказал это требование/проблему по тексту протокола. Если в тексте говорящий явно не идентифицирован — оставь поля «ФИО» и «Должность» ПУСТЫМИ. НЕ ПРИДУМЫВАЙ владельца, не подставляй случайного участника.]
 
 Если требований нет — написать: Требований не зафиксировано.
 
@@ -2751,11 +2745,13 @@ async function generateProtocol() {
 
     hideAP();
     setStepState(3, 'done', '✓ готово');
-    setStepHint(3, 'Скачай .docx ниже или сохрани в список. Можно править прямо в превью.');
+    setStepHint(3, 'Скачай .docx ниже. Протокол уже автоматически сохранён в Отчёт об обследовании и Реестр требований.');
     document.getElementById('protocol-preview').textContent = currentProtocolText;
     document.getElementById('protocol-result-card').style.display = 'block';
     document.getElementById('protocol-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    showStatus('protocol-status', 'success', 'Готово! Скачай документы или сохрани в список.');
+    // Автосохранение — раньше юзер должен был жать «Сохранить в список»; теперь делаем это сразу
+    try { saveProtocol({ silent: true }); } catch(e) { console.warn('autosave failed', e); }
+    showStatus('protocol-status', 'success', 'Готово! Протокол сохранён автоматически — ищи его в «Отчёт об обследовании» и «Реестре требований».');
 
   } catch (e) {
     hideAP();
@@ -2766,58 +2762,20 @@ async function generateProtocol() {
   }
 }
 
-// ── COPY TO CLIPBOARD ─────────────────────────────────
-async function copyToClipboard(text, btn) {
-  if (!text) { alert('Нет текста для копирования'); return; }
-  try {
-    await navigator.clipboard.writeText(text);
-    const orig = btn.textContent;
-    btn.textContent = '✅ Скопировано';
-    setTimeout(() => btn.textContent = orig, 2000);
-  } catch (e) {
-    // Fallback for older browsers
-    const ta = document.createElement('textarea');
-    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
-    document.body.appendChild(ta); ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    btn.textContent = '✅ Скопировано';
-    setTimeout(() => btn.textContent = '📋 Скопировать', 2000);
-  }
-}
-
-// ── TOGGLE EDIT MODE ──────────────────────────────────
-function toggleEditMode(btn) {
-  const preview = document.getElementById('protocol-preview');
-  const isEdit = preview.contentEditable === 'true';
-  if (isEdit) {
-    // Save edits back to state
-    currentProtocolText = preview.textContent;
-    preview.contentEditable = 'false';
-    preview.style.background = '';
-    preview.style.border = '';
-    btn.textContent = '✏️ Редактировать';
-    btn.className = 'btn btn-secondary';
-  } else {
-    preview.contentEditable = 'true';
-    preview.style.background = '#fffef0';
-    preview.style.border = '2px solid #f59e0b';
-    preview.focus();
-    btn.textContent = '💾 Сохранить правки';
-    btn.className = 'btn btn-primary';
-  }
-}
-
 // ── SAVE / LIST ───────────────────────────────────────
-function saveProtocol() {
-  if (!currentProtocolText) { alert('Сначала создай протокол'); return; }
+// ── SAVE / LIST ───────────────────────────────────────
+function saveProtocol(opts = {}) {
+  if (!currentProtocolText) {
+    if (!opts.silent) alert('Сначала создай протокол');
+    return;
+  }
   const title = document.getElementById('meeting-title').value.trim() || 'Встреча ' + today();
   const proj = getProjectName();
   const displayTitle = proj ? `[${proj}] ${title}` : title;
   const list = JSON.parse(localStorage.getItem('protocols') || '[]');
   list.unshift({ id: Date.now(), title: displayTitle, date: today(), protocol: currentProtocolText, requirements: currentRequirementsText, transcript: currentTranscriptText });
   localStorage.setItem('protocols', JSON.stringify(list));
-  showStatus('protocol-status', 'success', `Протокол «${title}» сохранён`);
+  if (!opts.silent) showStatus('protocol-status', 'success', `Протокол «${title}» сохранён`);
 }
 
 const getProtocols = () => JSON.parse(localStorage.getItem('protocols') || '[]');
@@ -2828,7 +2786,7 @@ function renderList(tab) {
   const prefix = isReport ? 'rp' : 'rg';
   const list = getProtocols();
   if (!list.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div>Нет сохранённых протоколов.<br>Создай протокол и нажми «Сохранить в список».</div>`;
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div>Нет сохранённых протоколов.<br>Создай протокол на вкладке «Протокол встречи» — он добавится сюда автоматически.</div>`;
     return;
   }
   el.innerHTML = `<div style="font-size:12px;color:#64748b;margin-bottom:12px">${list.length} протокол(ов)</div>` +
@@ -3001,6 +2959,13 @@ async function downloadProtocolDocx(text, filename) {
 
   // Helper: parse markdown bold/italic into TextRun array
   const parseRuns = (txt, baseSize = 22) => {
+    // Pre-clean: Gemini иногда добавляет «висячие» одиночные звёздочки (например `RDP*`),
+    // которые не являются валидным markdown italic. Если число `*` в строке нечётное —
+    // значит есть несбалансированная одиночная звёздочка; удаляем все одиночные `*`
+    // (не входящие в `**...**`). Чётное число оставляем — это валидные italic-пары.
+    if ((txt.match(/\*/g) || []).length % 2 === 1) {
+      txt = txt.replace(/(?<!\*)\*(?!\*)/g, '');
+    }
     const runs = [];
     const rx = /\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|\*(.+?)\*/g;
     let last = 0, m;
@@ -3048,6 +3013,12 @@ async function downloadProtocolDocx(text, filename) {
     const trimmed = line.trim();
     // Skip structural markers from the prompt template
     if (!trimmed || /^━+$|^═+$|^БЛОК\s|^КОНЕЦ\s|^===/.test(trimmed)) { buffer.push(trimmed); continue; }
+    // Skip markdown table separator rows like "| --- | :--- | ---: | :---: |"
+    // (Gemini добавляет такие строки автоматически; в DOCX-таблицах они выглядят как мусорная первая строка)
+    if (trimmed.includes('|')) {
+      const tokens = trimmed.split('|').map(t => t.trim()).filter(Boolean);
+      if (tokens.length > 0 && tokens.every(t => /^:?-+:?$/.test(t))) continue;
+    }
     let matched = false;
     for (const [marker, key] of Object.entries(sectionMarkers)) {
       if (trimmed.toUpperCase().includes(marker)) {
@@ -3309,19 +3280,11 @@ async function downloadProtocolDocx(text, filename) {
     })]
   }));
 
-  const composedLine = (sections.composed || []).find(l => l.trim()) || '';
-  const composedText = composedLine || 'Протокол составлен: ____________________';
-  children.push(new Paragraph({
-    spacing: { after: 240 },
-    children: [new TextRun({ text: composedText, bold: true, size: 22, font: 'Arial' })]
-  }));
-
   // ── APPROVAL TABLE ────────────────────────────────────
+  // Раньше тут были два лишних параграфа: «ПРОТОКОЛ СОСТАВЛЕН: Одилов Бехруз»
+  // (повторял первого участника команды) и «Согласовано:» (заголовок-дубль листа согласования).
+  // По фидбэку убраны — теперь сразу заголовок секции и таблица.
   children.push(sectionHead('Лист согласования'));
-  children.push(new Paragraph({
-    spacing: { after: 120 },
-    children: [new TextRun({ text: 'Согласовано:', bold: true, size: 22, font: 'Arial' })]
-  }));
   const apprCols = [Math.round(PAGE_W*0.35), Math.round(PAGE_W*0.3), Math.round(PAGE_W*0.175), Math.round(PAGE_W*0.175)];
   const apprRows = [new TableRow({ children: [
     headerCell('ФИО', apprCols[0]),
