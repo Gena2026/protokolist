@@ -391,7 +391,7 @@ textarea{resize:vertical;line-height:1.6}
     <div class="card-title"><div class="card-title-icon icon-blue">📂</div>Файлы на серверах Google</div>
     <p style="font-size:13px;color:#64748b;margin-bottom:12px">Файлы хранятся 48 часов. Нажми на встречу чтобы переделать протокол без повторной загрузки видео.</p>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="clearLibrary()" title="Удалит файлы с Google + все записи библиотеки + кэш расшифровок">🗑️ Очистить библиотеку</button>
+      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="clearLibrary()" title="Полная очистка: ВСЕ файлы на Google (включая зомби) + Библиотека + кэш аудио + кэш Whisper. Готовые протоколы остаются.">🗑️ Полная очистка Google + браузер</button>
       <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="clearWhisperCacheWithConfirm()" title="Удалит только сырые расшифровки Whisper, не трогая сессии и протоколы">🗑️ Очистить кэш Whisper</button>
       <span id="google-space-info" style="font-size:12px;color:#64748b;cursor:pointer" onclick="refreshGoogleSpace()" title="Нажми чтобы обновить">
         <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="event.stopPropagation();refreshGoogleSpace()">🔄 Место на Google</button>
@@ -1088,6 +1088,7 @@ async function startFileUpload(file) {
   if (!getKey()) { openSettings(); return; }
 
   audioOnlyMode = document.getElementById('audio-only-flag')?.checked || false;
+  markStepStart(1);  // хронометраж Шага 1
 
   // Formats Google does NOT support at all — convert those only
   const _ext = file.name.split('.').pop().toLowerCase();
@@ -1280,7 +1281,7 @@ async function startFileUpload(file) {
     }
 
     // ── Enable Transcribe button after upload done ──
-    setStepState(1, 'done', '✓ загружено');
+    setStepState(1, 'done', '✓ загружено' + markStepDoneDuration(1));
     // ETA для Whisper-транскрипции: "✅ Файл готов · ⏱ ~9 мин (6 чанков, пауза 65 с)"
     const etaSec = estimateTranscriptionEta(currentMediaInfo.numChunks, audioOnlyMode);
     const etaSuffix = etaSec > 0
@@ -1415,6 +1416,7 @@ async function startTranscription() {
   setStepState(2, 'active', 'в процессе...');
   setStepHint(2, 'Whisper расшифровывает аудио. Между чанками ~65 сек паузы — это лимит бесплатного Groq.');
   moveProgressTo(2);  // прогресс-бар внутрь Шага 2 — это его операция
+  markStepStart(2);   // хронометраж Шага 2
 
   try {
     // ── Step A: Whisper raw transcription ──
@@ -1479,7 +1481,7 @@ async function startTranscription() {
       if (mainBtn) { mainBtn.disabled = false; }
 
       // Шаг 2 готов: фиксируем done, скрываем кнопку Транскрибировать (но оставляем доступной отмену через крестик).
-      setStepState(2, 'done', '✓ готово');
+      setStepState(2, 'done', '✓ готово' + markStepDoneDuration(2));
       setStepHint(2, '✨ Транскрипция готова: можно скачать .txt, улучшить через Gemini, или сразу делать протокол.');
       if (tBtn) { tBtn.disabled = true; tBtn.title = 'Транскрипция уже сделана — нажми × справа в шапке Шага 2 чтобы отменить и запустить заново'; }
       const resetX = document.getElementById('btn-reset-transcript');
@@ -1718,6 +1720,27 @@ function fmtDuration(sec) {
   if (h && m) return `${h}ч ${m}мин`;
   if (h) return `${h}ч`;
   return `${m} мин`;
+}
+
+// «Хронометраж» каждого Шага. Запоминаем Date.now() в start, считаем разницу в done.
+// Возвращает строку для вставки в статус: " (4 мин 32 сек)" или пустую если не запускался.
+const _stepStartTimes = {};
+function markStepStart(stepNum) { _stepStartTimes[stepNum] = Date.now(); }
+function markStepDoneDuration(stepNum) {
+  const start = _stepStartTimes[stepNum];
+  if (!start) return '';
+  const sec = Math.round((Date.now() - start) / 1000);
+  delete _stepStartTimes[stepNum];
+  // fmtDuration не подходит для коротких — он округляет «47 сек» как «47 сек», но
+  // средние «4 мин 32 сек» округляет в «5 мин» (теряется секунды). Для шагов
+  // нужна точность до секунд: для < 60 сек = «N сек», для < 1ч = «M мин K сек», от 1ч = «Hч Mмин».
+  if (sec < 60) return ` (${sec} сек)`;
+  if (sec < 3600) {
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return s ? ` (${m} мин ${s} сек)` : ` (${m} мин)`;
+  }
+  const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+  return m ? ` (${h}ч ${m}мин)` : ` (${h}ч)`;
 }
 
 // pluralizeRu(1, 'часть','части','частей') → 'часть'
@@ -2157,6 +2180,12 @@ async function callGemini(parts, _attempt = 0) {
   const msg = (e.error?.message || JSON.stringify(e)).slice(0, 300);
   const isRateLimit = res.status === 429 || msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED');
   const isOverload  = res.status === 503 || msg.includes('overloaded') || msg.includes('high demand') || msg.includes('unavailable');
+  // Файл, который мы залили на Google File API, мог быть удалён/истечь между загрузкой
+  // и нашим запросом generateContent (race condition Google API на больших файлах).
+  // Возвращаем особую ошибку — её ловит generateProtocol и просит юзера перезагрузить файл.
+  // Retry бесполезен — файл реально мёртв, нужен новый upload.
+  const isFileGone = (res.status === 403 || res.status === 404) &&
+    (msg.includes('permission to access the File') || msg.includes('not exist') || msg.includes('File ') || msg.includes('PERMISSION_DENIED'));
 
   if ((isRateLimit || isOverload) && _attempt < 6) {
     // Longer waits for overload (503), shorter for rate limit (429)
@@ -2168,6 +2197,11 @@ async function callGemini(parts, _attempt = 0) {
     return callGemini(parts, _attempt + 1);
   }
 
+  if (isFileGone) {
+    const err = new Error('Файл на Google истёк или был удалён');
+    err.fileGone = true;
+    throw err;
+  }
   throw new Error('Gemini: ' + msg);
 }
 
@@ -2697,6 +2731,7 @@ async function generateProtocol() {
   setStepState(3, 'active', 'в процессе...');
   setStepHint(3, 'Gemini анализирует встречу и собирает протокол. Это занимает несколько минут.');
   moveProgressTo(3);  // прогресс-бар внутрь Шага 3 — это его операция
+  markStepStart(3);   // хронометраж Шага 3
   // Don't reset currentTranscriptText here — Whisper may have already populated it in background
   currentRequirementsText = '';
 
@@ -2898,7 +2933,7 @@ async function generateProtocol() {
     }
 
     hideAP();
-    setStepState(3, 'done', '✓ готово');
+    setStepState(3, 'done', '✓ готово' + markStepDoneDuration(3));
     setStepHint(3, 'Скачай .docx ниже. Протокол уже автоматически сохранён в Отчёт об обследовании и Реестр требований.');
     document.getElementById('protocol-preview').textContent = currentProtocolText;
     document.getElementById('protocol-result-card').style.display = 'block';
@@ -2909,8 +2944,33 @@ async function generateProtocol() {
 
   } catch (e) {
     hideAP();
-    setStepState(3, 'next', '❌ ошибка — можно повторить');
-    showStatus('protocol-status', 'error', e.message);
+    if (e.fileGone) {
+      // Файл на Google умер — чистим dead session и просим юзера перезагрузить.
+      // Сессия с этим fileKey уже бесполезна (URI указывает в никуда), её надо удалить
+      // чтобы при следующем перетаскивании файла создалась новая, а не подтянулась старая.
+      try {
+        if (currentFileKey) {
+          const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+          const filtered = sessions.filter(s => s.fileKey !== currentFileKey);
+          localStorage.setItem('upload_sessions', JSON.stringify(filtered));
+        }
+      } catch (_) { /* пофиг */ }
+      // Сбрасываем state так, чтобы юзер мог перетащить файл и начать заново
+      uploadedFile = null;
+      uploadedParts = [];
+      currentFileKey = null;
+      uploadState = 'idle';
+      setUploadUI('error', { msg: 'Файл на Google истёк' });
+      setStepState(1, 'next', 'жду файл');
+      setStepState(3, 'disabled', '');
+      showStatus('protocol-status', 'error',
+        '❌ Файл на серверах Google истёк или был удалён (race condition Google API). ' +
+        'Перетащи тот же видеофайл в Шаг 1 заново — приложение опознает его по fileKey и ' +
+        'если в кэше браузера есть аудио, повторной длительной загрузки не потребуется.');
+    } else {
+      setStepState(3, 'next', '❌ ошибка — можно повторить');
+      showStatus('protocol-status', 'error', e.message);
+    }
   } finally {
     btn.disabled = false;
   }
@@ -3727,28 +3787,79 @@ async function deleteGoogleFile(uri) {
 }
 
 async function clearLibrary() {
-  if (!confirm('Удалить все файлы из приложения И с серверов Google, и весь кэш транскрипций?\n\nПротоколы в списке «Протокол встречи» останутся.\nДействие необратимо.')) return;
-  const sessions = getUploadSessions();
-  const statusEl = document.getElementById('library-status');
-  if (statusEl) statusEl.innerHTML = '<div style="color:#64748b;font-size:13px">🗑️ Удаляю файлы с Google...</div>';
+  if (!confirm('ПОЛНАЯ ОЧИСТКА:\n\n' +
+    '• Все файлы на серверах Google (включая зомби-хвосты от падений)\n' +
+    '• Все сессии в Библиотеке\n' +
+    '• Кэш аудио в браузере (IndexedDB)\n' +
+    '• Кэш транскрипций Whisper\n\n' +
+    'Готовые ПРОТОКОЛЫ в «Реестре требований» и «Отчёте» останутся нетронутыми.\n\n' +
+    'Действие необратимо. Продолжить?')) return;
 
-  for (const s of sessions) {
-    if (s.parts) {
-      for (const p of s.parts) {
-        if (p?.uri) await deleteGoogleFile(p.uri).catch(() => {});
+  const statusEl = document.getElementById('library-status');
+  const setStatus = (html) => { if (statusEl) statusEl.innerHTML = html; };
+  const key = getKey();
+  if (!key) { setStatus('<div style="color:#dc2626;font-size:13px">❌ Не указан Gemini API key</div>'); return; }
+
+  setStatus('<div style="color:#64748b;font-size:13px">🔍 Запрашиваю список файлов на Google...</div>');
+
+  // ── Шаг A: получаем ПОЛНЫЙ список файлов с Google ──
+  // Это не то же что upload_sessions — там могут быть «зомби» от старых падений,
+  // которые в локальной библиотеке уже не отображаются, но физически висят на Google.
+  // Постранично — Google File API возвращает максимум 100 за раз.
+  const allFiles = [];
+  let pageToken = null;
+  try {
+    do {
+      const url = `https://generativelanguage.googleapis.com/v1beta/files?key=${key}&pageSize=100` +
+        (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '');
+      const res = await fetch(url);
+      if (!res.ok) {
+        setStatus(`<div style="color:#dc2626;font-size:13px">❌ Не получилось запросить список (HTTP ${res.status}). Удаляю только то что в Библиотеке.</div>`);
+        break;
       }
-    }
-    if (s.fileUri) await deleteGoogleFile(s.fileUri).catch(() => {});
-    if (s.fileKey) await deleteAudioBlob(s.fileKey);
+      const data = await res.json();
+      if (Array.isArray(data.files)) allFiles.push(...data.files);
+      pageToken = data.nextPageToken || null;
+    } while (pageToken);
+  } catch (e) {
+    setStatus(`<div style="color:#dc2626;font-size:13px">❌ Сетевая ошибка при запросе списка: ${e.message}. Удаляю только то что в Библиотеке.</div>`);
   }
 
+  // ── Шаг B: удаляем каждый файл по его `name` ──
+  // Параллельно (Promise.all) — Google File API DELETE достаточно дёшев и ошибки нам не помешают
+  let total = allFiles.length, deleted = 0, failed = 0;
+  if (total > 0) {
+    setStatus(`<div style="color:#64748b;font-size:13px">🗑️ Удаляю ${total} файлов с Google (включая зомби-хвосты)...</div>`);
+    const deletePromises = allFiles.map(async (f) => {
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/${f.name}?key=${key}`, { method: 'DELETE' });
+        if (r.ok) deleted++;
+        else failed++;
+      } catch { failed++; }
+    });
+    await Promise.all(deletePromises);
+  } else {
+    setStatus('<div style="color:#64748b;font-size:13px">ℹ️ На серверах Google файлов не оказалось. Чищу локальный кэш...</div>');
+  }
+
+  // ── Шаг C: чистим локальное хранилище — sessions, IDB-аудио, whisper-кэш ──
+  const sessions = getUploadSessions();
+  for (const s of sessions) {
+    if (s.fileKey) await deleteAudioBlob(s.fileKey).catch(() => {});
+  }
   localStorage.setItem('upload_sessions', JSON.stringify([]));
-  // Также чистим whisper-кэш (сырые расшифровки + промежуточные чанки) —
-  // они привязаны к тем же файлам и без сессий бесполезны.
+  // На случай если в IDB остались сироты (например fileKey изменился) — добиваем
+  await cleanupOrphanAudioBlobs().catch(() => {});
   const cleared = clearWhisperCache();
-  if (statusEl) statusEl.innerHTML =
-    `<div style="color:#166534;font-size:13px">✅ Библиотека очищена. Удалено whisper-записей: ${cleared}</div>`;
-  setTimeout(() => { if (statusEl) statusEl.innerHTML = ''; }, 4000);
+
+  // ── Шаг D: финальный статус ──
+  const parts = [];
+  if (total > 0) parts.push(`Google: удалено ${deleted}${failed > 0 ? ` (ошибок ${failed})` : ''} из ${total}`);
+  if (cleared > 0) parts.push(`Whisper-кэш: ${cleared}`);
+  parts.push('Библиотека и аудио-кэш очищены');
+  setStatus(`<div style="color:#166534;font-size:13px">✅ ${parts.join(' · ')}</div>`);
+  setTimeout(() => { setStatus(''); }, 6000);
+
   renderLibrary();
   refreshGoogleSpace();
   updateStorageInfo();
