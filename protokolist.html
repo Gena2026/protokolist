@@ -480,6 +480,17 @@ textarea{resize:vertical;line-height:1.6}
     </div>
   </div>
 
+  <!-- FUNCTIONAL AREAS -->
+  <div class="card">
+    <div class="card-title"><div class="card-title-icon icon-green">📐</div>Функциональные области</div>
+    <div id="functional-areas-list" style="margin-bottom:12px"></div>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="new-area-name" placeholder="Название (напр., Планирование)" style="flex:1">
+      <input type="text" id="new-area-prefix" placeholder="Префикс" maxlength="2" style="width:120px;text-transform:uppercase;font-family:monospace;letter-spacing:.5px;text-align:center">
+      <button class="btn btn-primary" onclick="addFunctionalArea()">+ Добавить</button>
+    </div>
+  </div>
+
   <!-- PROJECT EDITOR -->
   <div class="card" id="project-editor" style="display:none">
     <div class="card-title"><div class="card-title-icon icon-green">✏️</div>
@@ -4372,8 +4383,31 @@ async function refreshGoogleSpace() {
 
 
 // ── NSI — Нормативно-справочная информация ───────────────
-const getNSI = () => JSON.parse(localStorage.getItem('nsi') || '{"positions":[],"participants":[],"projects":[]}');
+const getNSI = () => JSON.parse(localStorage.getItem('nsi') || '{"positions":[],"participants":[],"projects":[],"functionalAreas":[]}');
 const saveNSI = d => localStorage.setItem('nsi', JSON.stringify(d));
+
+// Гарантирует наличие новых полей в NSI (миграция со старых версий)
+// и заполняет 10 дефолтными функциональными областями при первом запуске.
+function ensureNSIDefaults() {
+  const nsi = getNSI();
+  let changed = false;
+  if (!Array.isArray(nsi.functionalAreas)) {
+    nsi.functionalAreas = [];
+    changed = true;
+  }
+  if (nsi.functionalAreas.length === 0) {
+    const defaults = [
+      ['Планирование','ПЛ'], ['Закупки','ЗА'], ['Доставка','ДО'],
+      ['Обслуживание и ремонты','РЕ'], ['Склад','СК'], ['Продажи','ПД'],
+      ['Бюджетирование','БД'], ['Бухгалтерия','БГ'],
+      ['Финансовая отчётность','ФС'], ['Производство','ПР']
+    ];
+    const baseTs = Date.now();
+    nsi.functionalAreas = defaults.map(([name,prefix],i) => ({id: baseTs + i, name, prefix}));
+    changed = true;
+  }
+  if (changed) saveNSI(nsi);
+}
 
 function formatDateInput(el) {
   let v = el.value.replace(/\D/g,'');
@@ -4432,6 +4466,38 @@ function addProject() {
 function deleteProject(id) {
   if (!confirm('Удалить проект?')) return;
   const nsi=getNSI(); nsi.projects=nsi.projects.filter(p=>p.id!==id); saveNSI(nsi); renderNSI(); updateProjectSelect();
+}
+
+// ── Функциональные области ──────────────────────────
+function addFunctionalArea() {
+  const nameEl = document.getElementById('new-area-name');
+  const prefEl = document.getElementById('new-area-prefix');
+  const name   = nameEl.value.trim();
+  const prefix = prefEl.value.trim().toUpperCase();
+  if (!name)   { alert('Введите название области'); return; }
+  if (!/^[А-ЯЁ]{2}$/.test(prefix)) {
+    alert('Префикс должен состоять из ровно 2 заглавных русских букв.\nПримеры: ПЛ, ЗА, ДО, СК.');
+    return;
+  }
+  const nsi = getNSI();
+  if (!Array.isArray(nsi.functionalAreas)) nsi.functionalAreas = [];
+  if (nsi.functionalAreas.find(a => a.name.toLowerCase() === name.toLowerCase())) {
+    alert('Область с таким названием уже существует'); return;
+  }
+  if (nsi.functionalAreas.find(a => a.prefix === prefix)) {
+    alert('Префикс «' + prefix + '» уже занят другой областью'); return;
+  }
+  nsi.functionalAreas.push({id: Date.now(), name, prefix});
+  saveNSI(nsi);
+  nameEl.value = ''; prefEl.value = '';
+  renderNSI();
+}
+function deleteFunctionalArea(id) {
+  if (!confirm('Удалить функциональную область?')) return;
+  const nsi = getNSI();
+  nsi.functionalAreas = (nsi.functionalAreas || []).filter(a => a.id !== id);
+  saveNSI(nsi);
+  renderNSI();
 }
 
 let editingProjectId = null;
@@ -4507,6 +4573,20 @@ function renderNSI() {
       <div style="display:flex;gap:6px;align-items:center"><span style="font-size:12px;color:#3b82f6">Редактировать →</span>
       <button class="protocol-del" onclick="event.stopPropagation();deleteProject(${proj.id})">×</button></div></div>`;
   }).join('') : '<div style="font-size:12px;color:#94a3b8">Нет проектов</div>';
+
+  const areaList = document.getElementById('functional-areas-list');
+  if (areaList) {
+    const areas = nsi.functionalAreas || [];
+    areaList.innerHTML = areas.length ? areas.map(a =>
+      `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px">
+        <div style="display:flex;align-items:center;gap:12px;flex:1">
+          <span style="display:inline-block;background:#10b981;color:#fff;padding:3px 10px;border-radius:5px;font-weight:700;font-size:12px;letter-spacing:.5px;font-family:monospace;min-width:34px;text-align:center">${escHtml(a.prefix)}</span>
+          <span>${escHtml(a.name)}</span>
+        </div>
+        <button class="protocol-del" onclick="deleteFunctionalArea(${a.id})">×</button>
+      </div>`
+    ).join('') : '<div style="font-size:12px;color:#94a3b8">Нет функциональных областей</div>';
+  }
 
   if (editingProjectId) {
     const proj = nsi.projects.find(p=>p.id===editingProjectId);
@@ -4725,6 +4805,7 @@ function encodeWAV(samples, sampleRate) {
 // ── INIT ─────────────────────────────────────────────
 if (!getKey()) setTimeout(openSettings, 500);
 setTimeout(() => {
+  ensureNSIDefaults();
   renderNSI();
   updateProjectSelect();
   // Show Groq status in header
