@@ -81,6 +81,7 @@ textarea{resize:vertical;line-height:1.6}
 .btn-secondary{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}
 .btn-secondary:hover:not(:disabled){background:#e2e8f0}
 .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.admin-btn{justify-content:flex-start;text-align:left;padding:11px 16px;font-weight:500}
 
 /* STATUS */
 .status{padding:11px 15px;border-radius:9px;font-size:13px;margin:14px 0;display:flex;align-items:flex-start;gap:8px;line-height:1.5}
@@ -186,6 +187,7 @@ textarea{resize:vertical;line-height:1.6}
   <div class="tab" onclick="showTab('registry',this)">📋 Реестр требований</div>
   <div class="tab" onclick="showTab('library',this)">📂 Библиотека файлов</div>
   <div class="tab" onclick="showTab('nsi',this)">⚙️ НСИ</div>
+  <div class="tab" onclick="showTab('admin',this)">🛠️ Администрирование</div>
 </div>
 
 <div class="main">
@@ -390,18 +392,58 @@ textarea{resize:vertical;line-height:1.6}
   <div class="card">
     <div class="card-title"><div class="card-title-icon icon-blue">📂</div>Файлы на серверах Google</div>
     <p style="font-size:13px;color:#64748b;margin-bottom:12px">Файлы хранятся 48 часов. Нажми на встречу чтобы переделать протокол без повторной загрузки видео.</p>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="clearLibrary()" title="Полная очистка: ВСЕ файлы на Google (включая зомби) + Библиотека + кэш аудио + кэш Whisper. Готовые протоколы остаются.">🗑️ Полная очистка Google + браузер</button>
-      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="clearWhisperCacheWithConfirm()" title="Удалит только сырые расшифровки Whisper, не трогая сессии и протоколы">🗑️ Очистить кэш Whisper</button>
-      <span id="google-space-info" style="font-size:12px;color:#64748b;cursor:pointer" onclick="refreshGoogleSpace()" title="Нажми чтобы обновить">
-        <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="event.stopPropagation();refreshGoogleSpace()">🔄 Место на Google</button>
-      </span>
-      <span id="google-space-text" style="font-size:12px;color:#64748b"></span>
-    </div>
-    <div id="local-storage-info" style="font-size:12px;color:#64748b;margin-bottom:16px"></div>
     <div id="library-list"><div class="empty-state"><div class="empty-state-icon">📂</div>Нет сохранённых сессий загрузки</div></div>
     <div id="library-status"></div>
   </div>
+</div>
+
+
+<!-- ======= ADMIN ======= -->
+<div class="page" id="page-admin">
+  <div class="card">
+    <div class="card-title"><div class="card-title-icon icon-blue">📊</div>Статистика хранилищ</div>
+    <div id="admin-stats" style="font-size:13px;color:#334155;line-height:1.85">
+      <div style="color:#94a3b8">Загрузка статистики...</div>
+    </div>
+    <div style="margin-top:14px">
+      <button class="btn btn-secondary" style="font-size:12px;padding:6px 14px" onclick="renderAdmin()">🔄 Обновить статистику</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><div class="card-title-icon icon-blue">🗑️</div>Точечная очистка</div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:14px">
+      Каждая кнопка чистит только свою область. Готовые протоколы и реестр НЕ трогаются «удалением видео» — для каждой сущности отдельная кнопка ниже.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-secondary admin-btn" onclick="adminDeleteAllVideos()" title="DELETE всех файлов на Google + чистка upload_sessions в браузере + аудио-кэш этих сессий + их транскрипции">
+        🎬 Удалить все видео <span style="color:#94a3b8;font-size:12px">— файлы на Google + Библиотека + связанное аудио и транскрипции</span>
+      </button>
+      <button class="btn btn-secondary admin-btn" onclick="adminDeleteAllAudioAndTranscripts()" title="Чистит IndexedDB audio_blobs + whisper_raw_*, whisper_progress_* + поля transcript в оставшихся сессиях">
+        🔊 Удалить аудио-кэш и транскрипции <span style="color:#94a3b8;font-size:12px">— IDB-аудио + Whisper-кэш + transcript внутри сессий</span>
+      </button>
+      <button class="btn btn-secondary admin-btn" onclick="adminDeleteAllProtocols()" title="Чистит localStorage.protocols (список во вкладке Реестр)">
+        📄 Удалить все готовые протоколы <span style="color:#94a3b8;font-size:12px">— список сохранённых протоколов</span>
+      </button>
+      <button class="btn btn-secondary admin-btn" onclick="adminDeleteRequirementsRegistry()" title="Очищает текущий показанный текст реестра требований (in-memory, F5 тоже его убьёт)">
+        📋 Удалить реестр требований <span style="color:#94a3b8;font-size:12px">— только сам сводный реестр (внутри протоколов остаётся)</span>
+      </button>
+      <button class="btn btn-secondary admin-btn" onclick="adminDeleteSurveyReport()" title="Очищает текущий показанный текст отчёта об обследовании (in-memory, F5 тоже его убьёт)">
+        📊 Удалить отчёт об обследовании <span style="color:#94a3b8;font-size:12px">— только текст агрегированного отчёта</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="card" style="border-color:#fecaca;background:#fffbfb">
+    <div class="card-title" style="color:#991b1b"><div class="card-title-icon" style="background:#fee2e2;color:#dc2626">⚠️</div>Полный сброс пользовательских данных</div>
+    <p style="font-size:13px;color:#7f1d1d;margin-bottom:14px">
+      Один клик = последовательно нажать все 5 кнопок выше. После — на дисках, серверах Google и в памяти браузера не остаётся <strong>ничего</strong> из созданных тобой данных.<br>
+      <strong>Не трогается:</strong> API-ключи (Gemini, Groq) и НСИ (команда, проекты — заполняешь руками).
+    </p>
+    <button class="btn" style="background:#dc2626;color:#fff;font-weight:600" onclick="adminDeleteEverything()">🔥 Удалить ВСЁ одним кликом</button>
+  </div>
+
+  <div id="admin-status" style="margin-top:14px"></div>
 </div>
 
 
@@ -599,6 +641,7 @@ function showTab(name, el) {
   if (name === 'registry') renderList('registry');
   if (name === 'library') { renderLibrary(); refreshGoogleSpace(); updateStorageInfo(); }
   if (name === 'nsi') renderNSI();
+  if (name === 'admin') renderAdmin();
 }
 
 // ── UPLOAD AREA UI ────────────────────────────────────
@@ -2358,7 +2401,11 @@ ${teamText || '[справочник пуст — работай только с
 ЗАПРЕЩЕНО: добавлять людей из справочника, которых нет в записи.]
 
 ГЛОССАРИЙ:
-[Перечисли термины и аббревиатуры из встречи. Формат каждой строки: Термин — определение.
+[Перечисли термины и аббревиатуры из встречи. ОБЯЗАТЕЛЬНО: каждый термин с НОВОЙ СТРОКИ (не через точку с запятой и не в одну строку!). Формат каждой строки: Термин — определение.
+Пример правильного формата:
+RDP — протокол удалённого рабочего стола
+УАТ — Управление автотранспортом
+СКД — система компоновки данных
 Если специальных терминов не было — написать одной строкой: Специальных терминов не использовалось.]
 
 ВОПРОСЫ ДЛЯ ОБСУЖДЕНИЯ:
@@ -2386,11 +2433,13 @@ ${thesesText}
 [2–6 абзацев — только если обсуждалось]`}
 
 ИНФОРМАЦИОННЫЕ МАТЕРИАЛЫ:
-[Если исполнитель запрашивал документы, данные, файлы — заполни таблицу. Плановую дату считай через 5–7 рабочих дней от ${dateStr}. Если ничего не запрашивалось — написать одной строкой: Информационные материалы не запрашивались.]
+[Если исполнитель запрашивал документы, данные, файлы — заполни таблицу одной строкой на каждый материал. Плановую дату считай через 5–7 рабочих дней от ${dateStr}.
+🔴 ЕСЛИ НИЧЕГО НЕ ЗАПРАШИВАЛОСЬ — выведи только заголовок таблицы и ОДНУ ПУСТУЮ строку. НЕ ПИШИ "Информационные материалы не запрашивались". НЕ ВЫДУМЫВАЙ "Наименование/Описание".]
 | Материал | ФИО ответственного | Плановая дата получения | Фактическая дата получения |
 
 ОТКРЫТЫЕ ВОПРОСЫ:
-[Вопросы которые остались без ответа или требуют уточнения. Если нет — написать: Открытых вопросов не зафиксировано.]
+[Вопросы которые остались без ответа или требуют уточнения.
+🔴 ЕСЛИ ОТКРЫТЫХ ВОПРОСОВ НЕТ — выведи только заголовок таблицы и ОДНУ ПУСТУЮ строку. НЕ ПИШИ "Открытых вопросов не зафиксировано". НЕ ВЫДУМЫВАЙ "Вопрос/Статус/№".]
 | Содержание вопроса | ФИО ответственного | Плановая дата | Фактическая дата |
 
 СЛЕДУЮЩИЕ ШАГИ:
@@ -3863,6 +3912,371 @@ async function clearLibrary() {
   renderLibrary();
   refreshGoogleSpace();
   updateStorageInfo();
+}
+
+// ────────────────────────────────────────────────────────────────────
+// ── ВКЛАДКА АДМИНИСТРИРОВАНИЕ ──────────────────────────────────────
+// ────────────────────────────────────────────────────────────────────
+
+// Считает занятое место по категориям. Возвращает объект для рендера.
+async function getStorageBreakdown() {
+  const sizeOf = (val) => val ? new Blob([val]).size : 0;
+
+  // localStorage
+  const lsSessions  = sizeOf(localStorage.getItem('upload_sessions'));
+  const lsProtocols = sizeOf(localStorage.getItem('protocols'));
+  const lsNsi       = sizeOf(localStorage.getItem('nsi'));
+  // Whisper кэш — много ключей, считаем суммарно
+  let lsWhisper = 0, lsWhisperCount = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && (k.startsWith('whisper_raw_') || k.startsWith('whisper_progress_'))) {
+      lsWhisper += sizeOf(localStorage.getItem(k));
+      lsWhisperCount++;
+    }
+  }
+  const lsTotal = lsSessions + lsProtocols + lsNsi + lsWhisper +
+    sizeOf(localStorage.getItem('gemini_key')) + sizeOf(localStorage.getItem('groq_key'));
+
+  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+  const protocols = JSON.parse(localStorage.getItem('protocols') || '[]');
+
+  // IndexedDB audio_blobs — считаем суммарный размер
+  let idbAudio = 0, idbAudioCount = 0;
+  try {
+    const db = await openAudioDB();
+    const allKeys = await new Promise((resolve) => {
+      const tx = db.transaction(AUDIO_STORE, 'readonly');
+      const req = tx.objectStore(AUDIO_STORE).getAllKeys();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+    for (const k of allKeys) {
+      const rec = await getAudioBlob(k);
+      if (rec && rec.blob) { idbAudio += rec.blob.size; idbAudioCount++; }
+    }
+  } catch (e) { /* IDB недоступен — считаем нули */ }
+
+  // Google File API — список + общий размер
+  const key = getKey();
+  let googleFiles = [], googleSize = 0, googleErr = null;
+  if (key) {
+    try {
+      let pageToken = null;
+      do {
+        const url = `https://generativelanguage.googleapis.com/v1beta/files?key=${key}&pageSize=100` +
+          (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '');
+        const res = await fetch(url);
+        if (!res.ok) { googleErr = `HTTP ${res.status}`; break; }
+        const data = await res.json();
+        if (Array.isArray(data.files)) {
+          googleFiles.push(...data.files);
+          for (const f of data.files) googleSize += parseInt(f.sizeBytes || 0, 10);
+        }
+        pageToken = data.nextPageToken || null;
+      } while (pageToken);
+    } catch (e) { googleErr = e.message; }
+  } else {
+    googleErr = 'не указан Gemini API key';
+  }
+
+  return {
+    googleFiles, googleSize, googleErr,
+    lsSessions, lsProtocols, lsNsi, lsWhisper, lsWhisperCount, lsTotal,
+    sessions: sessions.length, protocols: protocols.length,
+    idbAudio, idbAudioCount,
+    hasGeminiKey: !!localStorage.getItem('gemini_key'),
+    hasGroqKey: !!localStorage.getItem('groq_key'),
+    currentReportInMemory: !!currentReportText,
+    currentRegistryInMemory: !!currentRegistryText
+  };
+}
+
+function fmtBytes(b) {
+  if (!b) return '0 Б';
+  if (b < 1024) return b + ' Б';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' КБ';
+  if (b < 1024 * 1024 * 1024) return (b / 1024 / 1024).toFixed(2) + ' МБ';
+  return (b / 1024 / 1024 / 1024).toFixed(2) + ' ГБ';
+}
+
+async function renderAdmin() {
+  const el = document.getElementById('admin-stats');
+  if (!el) return;
+  el.innerHTML = '<div style="color:#94a3b8">Считаю размеры (запрашиваю Google и IDB)...</div>';
+  let s;
+  try { s = await getStorageBreakdown(); }
+  catch (e) {
+    el.innerHTML = `<div style="color:#dc2626">Не удалось собрать статистику: ${e.message}</div>`;
+    return;
+  }
+  const googleQuotaGB = 20;
+  const googleUsedGB = (s.googleSize / 1024 / 1024 / 1024).toFixed(2);
+  const googleFreePct = Math.round(100 * (1 - s.googleSize / (googleQuotaGB * 1024 * 1024 * 1024)));
+
+  el.innerHTML = `
+    <div style="margin-bottom:14px">
+      <strong>📂 На серверах Google File API</strong><br>
+      ${s.googleErr
+        ? `<span style="color:#dc2626">— ошибка: ${s.googleErr}</span>`
+        : `Файлов: <strong>${s.googleFiles.length}</strong> · занято ${googleUsedGB} ГБ из ${googleQuotaGB} ГБ (свободно ${googleFreePct}%)`}
+    </div>
+    <div style="margin-bottom:14px">
+      <strong>💾 В браузере (localStorage), всего: ${fmtBytes(s.lsTotal)}</strong><br>
+      • Сессии загрузок (Библиотека): ${fmtBytes(s.lsSessions)} <span style="color:#94a3b8">(${s.sessions} шт)</span><br>
+      • Готовые протоколы: ${fmtBytes(s.lsProtocols)} <span style="color:#94a3b8">(${s.protocols} шт)</span><br>
+      • Кэш транскрипций Whisper: ${fmtBytes(s.lsWhisper)} <span style="color:#94a3b8">(${s.lsWhisperCount} ключей)</span><br>
+      • НСИ (команда, проекты): ${fmtBytes(s.lsNsi)} <span style="color:#94a3b8">— очисткой не трогается</span><br>
+      • API-ключи: ${s.hasGeminiKey ? 'Gemini ✓' : 'Gemini ✗'}, ${s.hasGroqKey ? 'Groq ✓' : 'Groq ✗'} <span style="color:#94a3b8">— очисткой не трогаются</span>
+    </div>
+    <div style="margin-bottom:14px">
+      <strong>🎵 IndexedDB (кэш аудио для Whisper)</strong><br>
+      Файлов: <strong>${s.idbAudioCount}</strong> · занято ${fmtBytes(s.idbAudio)}
+    </div>
+    <div>
+      <strong>🧠 In-memory (живёт до F5)</strong><br>
+      Реестр требований: ${s.currentRegistryInMemory ? '✓ есть текст' : '— пусто'}<br>
+      Отчёт об обследовании: ${s.currentReportInMemory ? '✓ есть текст' : '— пусто'}
+    </div>
+  `;
+}
+
+// Хелпер: подтверждение + статус-сообщение в конце
+async function _adminAct(label, confirmText, action) {
+  if (!confirm(confirmText)) return;
+  const status = document.getElementById('admin-status');
+  if (status) status.innerHTML = `<div style="color:#64748b;font-size:13px">⏳ ${label}...</div>`;
+  let resultMsg;
+  try {
+    resultMsg = await action();
+  } catch (e) {
+    if (status) status.innerHTML = `<div style="color:#dc2626;font-size:13px">❌ Ошибка: ${e.message}</div>`;
+    return;
+  }
+  if (status) status.innerHTML = `<div style="color:#166534;font-size:13px">✅ ${resultMsg || (label + ' — готово')}</div>`;
+  setTimeout(() => { if (status) status.innerHTML = ''; }, 6000);
+  await renderAdmin();
+}
+
+// ── Кнопка 1: удалить все видео (Google + Библиотека + связанное аудио и транскрипции) ──
+async function adminDeleteAllVideos() {
+  await _adminAct('Удаляю все видео и связанные данные',
+    'УДАЛИТЬ ВСЕ ВИДЕО:\n\n' +
+    '• Все файлы на серверах Google (включая зомби)\n' +
+    '• Все сессии загрузок в Библиотеке\n' +
+    '• Аудио-кэш этих сессий в IndexedDB\n' +
+    '• Сохранённые транскрипции внутри сессий (поле transcript)\n\n' +
+    'Готовые протоколы, Реестр и Отчёт — НЕ ТРОГАЮТСЯ.\n' +
+    'Действие необратимо. Продолжить?',
+    async () => {
+      const key = getKey();
+      let googleDeleted = 0, googleFailed = 0;
+      // Сначала Google — получаем полный список и удаляем всё
+      if (key) {
+        try {
+          const allFiles = [];
+          let pageToken = null;
+          do {
+            const url = `https://generativelanguage.googleapis.com/v1beta/files?key=${key}&pageSize=100` +
+              (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '');
+            const res = await fetch(url);
+            if (!res.ok) break;
+            const data = await res.json();
+            if (Array.isArray(data.files)) allFiles.push(...data.files);
+            pageToken = data.nextPageToken || null;
+          } while (pageToken);
+          await Promise.all(allFiles.map(async f => {
+            try {
+              const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/${f.name}?key=${key}`, { method: 'DELETE' });
+              if (r.ok) googleDeleted++; else googleFailed++;
+            } catch { googleFailed++; }
+          }));
+        } catch (_) { /* пофиг — продолжаем */ }
+      }
+      // Аудио-кэш сессий + чистим upload_sessions
+      const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+      for (const s of sessions) {
+        if (s.fileKey) await deleteAudioBlob(s.fileKey).catch(() => {});
+      }
+      localStorage.setItem('upload_sessions', JSON.stringify([]));
+      // Добиваем сирот в IDB на случай если fileKey разошлись
+      await cleanupOrphanAudioBlobs().catch(() => {});
+      // Refresh UI
+      try { renderLibrary(); } catch (_) {}
+      return `Google: ${googleDeleted} удалено${googleFailed ? ` (ошибок ${googleFailed})` : ''}, сессии и аудио-кэш очищены`;
+    });
+}
+
+// ── Кнопка 2: аудио-кэш + транскрипции ──
+async function adminDeleteAllAudioAndTranscripts() {
+  await _adminAct('Удаляю аудио и транскрипции',
+    'УДАЛИТЬ АУДИО И ТРАНСКРИПЦИИ:\n\n' +
+    '• Кэш аудио в IndexedDB (mp3 для Whisper)\n' +
+    '• Whisper-кэш в localStorage (whisper_raw_*, whisper_progress_*)\n' +
+    '• Поле transcript внутри оставшихся сессий Библиотеки\n\n' +
+    'Видео-сессии и протоколы — НЕ ТРОГАЮТСЯ.\n' +
+    'Продолжить?',
+    async () => {
+      // Очищаем весь IDB store через каждый ключ
+      let idbDeleted = 0;
+      try {
+        const db = await openAudioDB();
+        const allKeys = await new Promise((resolve) => {
+          const tx = db.transaction(AUDIO_STORE, 'readonly');
+          const req = tx.objectStore(AUDIO_STORE).getAllKeys();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => resolve([]);
+        });
+        for (const k of allKeys) {
+          await deleteAudioBlob(k).catch(() => {});
+          idbDeleted++;
+        }
+      } catch (_) {}
+      // Whisper-кэш
+      const whisperCleared = clearWhisperCache();
+      // Чистим transcript в оставшихся сессиях (если кнопка 1 не нажата)
+      const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+      for (const s of sessions) { if (s.transcript) delete s.transcript; }
+      localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+      // Если текущий чат имел транскрипцию в памяти — тоже сбросим
+      currentTranscriptText = '';
+      try { renderLibrary(); } catch (_) {}
+      return `Аудио в IDB: ${idbDeleted} удалено · Whisper-кэш: ${whisperCleared} ключей · transcript в сессиях очищены`;
+    });
+}
+
+// ── Кнопка 3: все готовые протоколы ──
+async function adminDeleteAllProtocols() {
+  await _adminAct('Удаляю все готовые протоколы',
+    'УДАЛИТЬ ВСЕ ГОТОВЫЕ ПРОТОКОЛЫ:\n\n' +
+    '• Список сохранённых протоколов в localStorage\n\n' +
+    'Видео, аудио, транскрипции — НЕ ТРОГАЮТСЯ.\n' +
+    'Продолжить?',
+    async () => {
+      const before = JSON.parse(localStorage.getItem('protocols') || '[]').length;
+      localStorage.setItem('protocols', JSON.stringify([]));
+      currentProtocolText = '';
+      currentRequirementsText = '';
+      try { renderList && renderList('report'); } catch (_) {}
+      try { renderList && renderList('registry'); } catch (_) {}
+      return `Удалено протоколов: ${before}`;
+    });
+}
+
+// ── Кнопка 4: реестр требований (in-memory + DOM-превью) ──
+async function adminDeleteRequirementsRegistry() {
+  await _adminAct('Очищаю реестр требований',
+    'УДАЛИТЬ РЕЕСТР ТРЕБОВАНИЙ:\n\n' +
+    'Очистит сводный текст реестра (in-memory). Внутри отдельных протоколов раздел «Требования» останется.\n\n' +
+    'Продолжить?',
+    async () => {
+      currentRegistryText = '';
+      const prev = document.getElementById('registry-preview');
+      if (prev) prev.textContent = '';
+      return 'Реестр требований очищен';
+    });
+}
+
+// ── Кнопка 5: отчёт об обследовании ──
+async function adminDeleteSurveyReport() {
+  await _adminAct('Очищаю отчёт об обследовании',
+    'УДАЛИТЬ ОТЧЁТ ОБ ОБСЛЕДОВАНИИ:\n\n' +
+    'Очистит сводный текст отчёта (in-memory). Исходные протоколы НЕ ТРОГАЮТСЯ.\n\n' +
+    'Продолжить?',
+    async () => {
+      currentReportText = '';
+      const prev = document.getElementById('report-preview');
+      if (prev) prev.textContent = '';
+      return 'Отчёт об обследовании очищен';
+    });
+}
+
+// ── Кнопка 6: ВСЁ одним кликом ──
+async function adminDeleteEverything() {
+  if (!confirm('🔥 ПОЛНЫЙ СБРОС всех пользовательских данных:\n\n' +
+    '✗ Все видео на Google\n' +
+    '✗ Все сессии Библиотеки\n' +
+    '✗ Все аудио в IDB и Whisper-кэш\n' +
+    '✗ Все готовые протоколы\n' +
+    '✗ Реестр требований\n' +
+    '✗ Отчёт об обследовании\n\n' +
+    '✓ API-ключи останутся\n' +
+    '✓ НСИ останется\n\n' +
+    'После — никаких следов в браузере, на дисках и на серверах Google.\n' +
+    'Действие необратимо. Продолжить?')) return;
+
+  const status = document.getElementById('admin-status');
+  const setS = (html) => { if (status) status.innerHTML = html; };
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 1/5: видео и сессии...</div>');
+
+  // Шаг 1: Google + sessions + аудио сессий
+  try {
+    const key = getKey();
+    if (key) {
+      const allFiles = [];
+      let pageToken = null;
+      do {
+        const url = `https://generativelanguage.googleapis.com/v1beta/files?key=${key}&pageSize=100` +
+          (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '');
+        const res = await fetch(url);
+        if (!res.ok) break;
+        const data = await res.json();
+        if (Array.isArray(data.files)) allFiles.push(...data.files);
+        pageToken = data.nextPageToken || null;
+      } while (pageToken);
+      await Promise.all(allFiles.map(async f => {
+        try { await fetch(`https://generativelanguage.googleapis.com/v1beta/${f.name}?key=${key}`, { method: 'DELETE' }); }
+        catch (_) {}
+      }));
+    }
+    const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+    for (const s of sessions) {
+      if (s.fileKey) await deleteAudioBlob(s.fileKey).catch(() => {});
+    }
+    localStorage.setItem('upload_sessions', JSON.stringify([]));
+  } catch (_) {}
+
+  // Шаг 2: оставшийся аудио-кэш + Whisper
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 2/5: аудио-кэш и Whisper...</div>');
+  try {
+    const db = await openAudioDB();
+    const allKeys = await new Promise((resolve) => {
+      const tx = db.transaction(AUDIO_STORE, 'readonly');
+      const req = tx.objectStore(AUDIO_STORE).getAllKeys();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+    for (const k of allKeys) await deleteAudioBlob(k).catch(() => {});
+  } catch (_) {}
+  clearWhisperCache();
+  currentTranscriptText = '';
+
+  // Шаг 3: протоколы
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 3/5: протоколы...</div>');
+  localStorage.setItem('protocols', JSON.stringify([]));
+  currentProtocolText = '';
+  currentRequirementsText = '';
+
+  // Шаг 4: реестр требований
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 4/5: реестр требований...</div>');
+  currentRegistryText = '';
+  const regPrev = document.getElementById('registry-preview');
+  if (regPrev) regPrev.textContent = '';
+
+  // Шаг 5: отчёт об обследовании
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 5/5: отчёт об обследовании...</div>');
+  currentReportText = '';
+  const repPrev = document.getElementById('report-preview');
+  if (repPrev) repPrev.textContent = '';
+
+  // Refresh UI всех вкладок
+  try { renderLibrary(); } catch (_) {}
+  try { renderList && renderList('report'); } catch (_) {}
+  try { renderList && renderList('registry'); } catch (_) {}
+
+  setS('<div style="color:#166534;font-size:13px">✅ Полный сброс завершён. Браузер, диск и серверы Google очищены от пользовательских данных.</div>');
+  setTimeout(() => { setS(''); }, 8000);
+  await renderAdmin();
 }
 
 // Удаляет все whisper_raw_* и whisper_progress_* из localStorage.
