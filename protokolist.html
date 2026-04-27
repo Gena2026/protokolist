@@ -3113,23 +3113,181 @@ function saveProtocol(opts = {}) {
   const meetingDateRaw = document.getElementById('meeting-date')?.value?.trim() || '';
   const meetingDate = (meetingDateRaw && isValidDateStr(meetingDateRaw)) ? meetingDateRaw : today();
   const list = JSON.parse(localStorage.getItem('protocols') || '[]');
-  list.unshift({
+  const savedProtocol = {
     id: Date.now(),
     title: displayTitle,
     date: meetingDate,
     protocol: currentProtocolText,
     requirements: currentRequirementsText,
     transcript: currentTranscriptText,
-    // E2 новые поля:
+    // E2 поля:
     projectId,
     protocolNumber,
     functionalAreaIds
-  });
+  };
+  list.unshift(savedProtocol);
   localStorage.setItem('protocols', JSON.stringify(list));
-  if (!opts.silent) showStatus('protocol-status', 'success', `Протокол «${title}» сохранён`);
+
+  // ── E3: автопоток «Протокол → Реестр требований проекта» ──
+  // Заливаем парсенные требования в requirements_<projectId> с автокодами <префикс>-NNN.
+  // Пустой реестр (нет projectId / Gemini вернул «Требований не зафиксировано») — это НЕ ошибка.
+  let regResult = { added: 0 };
+  try {
+    if (projectId && currentRequirementsText) {
+      regResult = addRequirementsFromProtocol(savedProtocol, functionalAreaIds, currentRequirementsText) || regResult;
+    }
+  } catch (e) {
+    console.warn('[E3] не удалось добавить требования в реестр:', e);
+  }
+
+  if (!opts.silent) {
+    const tail = regResult.added ? ` · в реестр: ${regResult.added}` : '';
+    showStatus('protocol-status', 'success', `Протокол «${title}» сохранён${tail}`);
+  }
 }
 
 const getProtocols = () => JSON.parse(localStorage.getItem('protocols') || '[]');
+
+// ══════════════════════════════════════════════════════
+// E3: Реестр требований — хранение и автопоток из протокола
+// ══════════════════════════════════════════════════════
+
+// Чтение/запись реестра конкретного проекта
+function getRequirements(projectId) {
+  if (!projectId) return [];
+  return JSON.parse(localStorage.getItem('requirements_' + projectId) || '[]');
+}
+function saveRequirements(projectId, list) {
+  if (!projectId) return;
+  localStorage.setItem('requirements_' + projectId, JSON.stringify(list));
+}
+
+// Парсер markdown-таблицы требований из ответа Gemini.
+// Ожидает 5 колонок: Содержание | ФИО | Должность | Вид | Функциональная область.
+// Возвращает массив { text, ownerName, ownerPosition, kind, areaName }.
+// Стойко к: пустым строкам, заголовку с/без bold, separator-строке `|---|---|`, перевёрнутому regexp,
+// сообщению «Требований не зафиксировано».
+function parseRequirementsTable(rawText) {
+  if (!rawText) return [];
+  const text = String(rawText).trim();
+  if (/Требований\s+не\s+зафиксировано/i.test(text)) return [];
+
+  const out = [];
+  for (const lineRaw of text.split('\n')) {
+    const line = lineRaw.trim();
+    if (!line.startsWith('|')) continue;
+    // Скипаем разделитель таблицы вида |---|---|---|
+    if (/^\|[\s\-:|]+\|$/.test(line)) continue;
+    // split по | даёт пустоты на концах: |a|b|c| -> ['','a','b','c','']
+    const cells = line.split('|').slice(1, -1).map(c => c.trim());
+    if (cells.length < 4) continue; // мусор, не таблица
+    // Скипаем заголовок: ловим любую строку где первая колонка начинается со слова
+    // «Содержание» / «**Содержание...**» (это маркер заголовка нашей таблицы требований).
+    // Покрывает варианты: "Содержание требования", "Содержание", "**Содержание требования**".
+    if (/^\**\s*содержание/i.test(cells[0])) continue;
+    const text = cells[0];
+    if (!text) continue; // пустая первая колонка — мусор
+    out.push({
+      text,
+      ownerName:     cells[1] || '',
+      ownerPosition: cells[2] || '',
+      kind:          cells[3] || 'Пользовательское требование',
+      areaName:      cells[4] || ''  // 5-я колонка может отсутствовать в старых ответах — оставляем пусто
+    });
+  }
+  return out;
+}
+
+// Разрешает имя функциональной области в id из NSI.
+// 1) Точное совпадение по имени (case-insensitive, trim).
+// 2) Если не нашли — fallback на первый id из выбранных в Шаге 3.
+// Возвращает {id, name, prefix} или null если совсем безнадёга.
+function resolveAreaId(areaName, fallbackIds) {
+  const areas = getNSI().functionalAreas || [];
+  if (!areas.length) return null;
+  if (areaName) {
+    const needle = String(areaName).trim().toLowerCase();
+    const match = areas.find(a => a.name.trim().toLowerCase() === needle);
+    if (match) return match;
+  }
+  // Fallback: первая из выбранных юзером в Шаге 3
+  if (fallbackIds && fallbackIds.length) {
+    const fb = areas.find(a => a.id === fallbackIds[0]);
+    if (fb) return fb;
+  }
+  // Совсем-совсем — берём первую вообще, чтобы не потерять требование
+  return areas[0];
+}
+
+// Считает следующий номер для пары (projectId, prefix). Учитывает ВСЕ требования
+// (включая архивные) — освобождать коды нельзя, чтобы избежать переиспользования
+// номера, на который юзер мог уже сослаться где-то снаружи.
+function nextNumberForPrefix(projectId, prefix) {
+  const list = getRequirements(projectId);
+  const re = new RegExp('^' + prefix.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '-(\\d+)$');
+  const max = list.reduce((acc, r) => {
+    const m = r.code && r.code.match(re);
+    if (!m) return acc;
+    const n = parseInt(m[1], 10);
+    return (!isNaN(n) && n > acc) ? n : acc;
+  }, 0);
+  return max + 1;
+}
+
+// Форматирует номер в код: ПЛ-001, ПЛ-023, ПЛ-145, ПЛ-1234 (3-знач. паддинг, но не обрезает 4+).
+function buildCode(prefix, n) {
+  const s = String(n);
+  return prefix + '-' + (s.length < 3 ? s.padStart(3, '0') : s);
+}
+
+// Главный поток: парсим currentRequirementsText, создаём записи в реестре проекта.
+// Вызывается из saveProtocol() сразу после записи протокола в localStorage.
+function addRequirementsFromProtocol(savedProtocol, selectedAreaIds, requirementsRawText) {
+  if (!savedProtocol || !savedProtocol.projectId) return { added: 0, reason: 'no projectId' };
+  const parsed = parseRequirementsTable(requirementsRawText || '');
+  if (!parsed.length) return { added: 0, reason: 'no requirements parsed' };
+
+  // Source для колонки G: «Протокол №3 Закупки от 02.10.2025» либо без номера если нет
+  const projName = (getNSI().projects.find(p => p.id === savedProtocol.projectId) || {}).name || '';
+  const titleClean = String(savedProtocol.title || '').replace(/^\[[^\]]+\]\s*/, ''); // снимаем префикс [Проект]
+  const numPart = savedProtocol.protocolNumber ? `№${savedProtocol.protocolNumber} ` : '';
+  const datePart = savedProtocol.date ? ` от ${savedProtocol.date}` : '';
+  const source = `Протокол ${numPart}${titleClean}${datePart}`.trim();
+
+  const list = getRequirements(savedProtocol.projectId);
+  const nowIso = new Date().toISOString();
+  // Локальный счётчик per-prefix чтобы внутри одного батча не дублировать обращения к localStorage
+  const localCounters = {};
+
+  let added = 0;
+  parsed.forEach((r, i) => {
+    const area = resolveAreaId(r.areaName, selectedAreaIds);
+    if (!area) return; // защита: NSI пустой — пропускаем
+    if (!localCounters[area.prefix]) {
+      localCounters[area.prefix] = nextNumberForPrefix(savedProtocol.projectId, area.prefix);
+    }
+    const n = localCounters[area.prefix]++;
+    list.push({
+      id: 'req_' + Date.now() + '_' + i,
+      protocolId: savedProtocol.id,
+      code: buildCode(area.prefix, n),
+      text: r.text,
+      executorId: null,                 // E3: пусто; юзер назначит в E4
+      ownerName: r.ownerName,
+      ownerPosition: r.ownerPosition,
+      functionalAreaId: area.id,
+      source,
+      status: 'Новое',
+      priority: 'Обычный',
+      archived: false,
+      createdAt: nowIso,
+      updatedAt: nowIso
+    });
+    added++;
+  });
+  saveRequirements(savedProtocol.projectId, list);
+  return { added, total: list.length, projectId: savedProtocol.projectId };
+}
 
 function renderList(tab) {
   const isReport = tab === 'report';
@@ -3154,6 +3312,21 @@ function renderList(tab) {
 
 function deleteProtocol(id) {
   if (!confirm('Удалить?')) return;
+  // ── E3: каскадно удалить требования этого протокола из реестра проекта ──
+  try {
+    const protocols = getProtocols();
+    const target = protocols.find(p => p.id === id);
+    if (target && target.projectId) {
+      const before = getRequirements(target.projectId);
+      const after = before.filter(r => r.protocolId !== id);
+      if (after.length !== before.length) {
+        saveRequirements(target.projectId, after);
+        console.info(`[E3] каскад: удалено ${before.length - after.length} требований из реестра проекта ${target.projectId}`);
+      }
+    }
+  } catch (e) {
+    console.warn('[E3] каскад при удалении протокола не удался:', e);
+  }
   localStorage.setItem('protocols', JSON.stringify(getProtocols().filter(x => x.id !== id)));
   renderList('report');
 }
