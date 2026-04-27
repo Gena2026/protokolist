@@ -113,8 +113,14 @@ textarea{resize:vertical;line-height:1.6}
 .step-card-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .step-card-hint{font-size:12px;color:#64748b;margin-top:12px;line-height:1.5}
 .step-card.step-next .step-card-hint{color:#1d4ed8;font-weight:500}
-.step-fields-row{display:grid;grid-template-columns:200px 1fr;gap:14px;margin-top:14px}
+.step-fields-row{display:grid;grid-template-columns:140px 1fr 100px;gap:14px;margin-top:14px}
 @media (max-width:560px){.step-fields-row{grid-template-columns:1fr}}
+.area-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.area-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border:1px solid #e2e8f0;border-radius:999px;background:#fafafa;color:#475569;font-size:12px;font-weight:500;cursor:pointer;user-select:none;transition:.15s}
+.area-chip:hover{border-color:#cbd5e1;background:#f1f5f9}
+.area-chip-active{background:#eff6ff;border-color:#3b82f6;color:#1d4ed8}
+.area-chip-prefix{font-family:monospace;font-weight:700;font-size:11px;letter-spacing:.3px;background:#10b981;color:#fff;padding:1px 6px;border-radius:4px;min-width:22px;text-align:center}
+.area-chip-active .area-chip-prefix{background:#3b82f6}
 .step-card label:first-of-type{margin-top:14px}
 .cleanup-status-line{font-size:12px;color:#475569;margin-top:8px;line-height:1.4}
 
@@ -320,10 +326,21 @@ textarea{resize:vertical;line-height:1.6}
       </div>
       <div>
         <label>Проект</label>
-        <select id="meeting-project" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 13px;font-size:14px;font-family:inherit;outline:none;background:#fafafa;color:#1e293b;cursor:pointer">
+        <select id="meeting-project" onchange="onMeetingProjectChange()" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 13px;font-size:14px;font-family:inherit;outline:none;background:#fafafa;color:#1e293b;cursor:pointer">
           <option value="">— Выбери проект —</option>
         </select>
       </div>
+      <div>
+        <label>№ протокола</label>
+        <input type="text" id="meeting-protocol-num" placeholder="auto" inputmode="numeric"
+          oninput="this.dataset.userEdited='1';this.value=this.value.replace(/[^\d]/g,'').slice(0,4)"
+          style="width:100%;text-align:center;font-family:monospace;font-weight:600">
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <label>Функциональная область <span style="color:#94a3b8;font-weight:400">(можно выбрать несколько)</span></label>
+      <div class="area-chips" id="meeting-areas-chips"></div>
     </div>
 
     <div class="step-card-body" style="margin-top:16px">
@@ -647,7 +664,7 @@ function showTab(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('page-' + name).classList.add('active');
-  if (name === 'protocol') updateProjectSelect();
+  if (name === 'protocol') { updateProjectSelect(); renderFunctionalAreaChips(); suggestProtocolNumber(); }
   if (name === 'report') renderList('report');
   if (name === 'registry') renderList('registry');
   if (name === 'library') { renderLibrary(); refreshGoogleSpace(); updateStorageInfo(); }
@@ -2353,8 +2370,13 @@ ${transcriptSegment
   : hasVideo ? '[Транскрипция недоступна — используй только видео]' : '[Транскрипция не предоставлена]'}`;
 }
 
-function PROTOCOL_PROMPT(title, partInfo, projectName, teamText, meetingDate, transcriptSegment, hasVideo, thesesText) {
+function PROTOCOL_PROMPT(title, partInfo, projectName, teamText, meetingDate, transcriptSegment, hasVideo, thesesText, selectedAreasText, protocolNumber) {
   const dateStr = meetingDate || today();
+  const numStr = (protocolNumber !== undefined && protocolNumber !== null && String(protocolNumber).trim() !== '')
+    ? String(protocolNumber).trim() : '[порядковый номер]';
+  const areasLine = (selectedAreasText && selectedAreasText.trim())
+    ? selectedAreasText.trim()
+    : '[не указано — определи из контекста]';
   return `Ты — профессиональный IT-аналитик. Составь протокол интервью СТРОГО по шаблону ниже.
 ${partInfo ? `ВАЖНО: Это ${partInfo} одной встречи. Протоколируй только этот фрагмент.` : ''}
 
@@ -2387,17 +2409,21 @@ ${teamText || '[справочник пуст — работай только с
 — ❌ Если запись короткая и говорит только один человек — в «Участниках» должен быть только он, остальные из справочника НЕ ПОПАДАЮТ туда.
 — ✅ Заполни таблицу «Участники» строго теми, кого слышно/видно в записи. Если кто-то упоминается косвенно («передам Маше») — это не делает его участником встречи.
 
-СПИСОК ФУНКЦИОНАЛЬНЫХ ОБЛАСТЕЙ (выбери одну или несколько из списка):
-Закупки, Продажи, Планирование, Бюджетирование, Склады, Доставка, МСФО, Бухгалтерия, Финансы, Казначейство, CRM и маркетинг, НСИ, Производство, Ремонт
+СПИСОК ФУНКЦИОНАЛЬНЫХ ОБЛАСТЕЙ ВСТРЕЧИ (выбраны заранее пользователем):
+${areasLine}
+
+🔴 ВАЖНО: используй ТОЛЬКО области из списка выше. Не выдумывай свои.
+Если в списке несколько областей — каждое требование отнеси к одной из них (по содержанию).
+Если в списке одна область — все требования относятся к ней.
 
 ВЕРНИ ДВА БЛОКА, РАЗДЕЛЁННЫХ МАРКЕРОМ ===ТРЕБОВАНИЯ===
 
 ━━━ БЛОК 1: ПРОТОКОЛ ━━━
 
-Протокол интервью №[порядковый номер]
+Протокол интервью №${numStr}
 
 | Проект: | ${projectName || ''} |
-| Функциональная область | [одна или несколько из списка через запятую] |
+| Функциональная область | ${areasLine} |
 | Тема интервью | ${title || '[определи из контекста]'} |
 | Дата интервью | ${dateStr} |
 | Цель проведения интервью | [2–3 предложения: зачем проводилась встреча, что изучалось] |
@@ -2477,10 +2503,11 @@ ${thesesText}
 Не объединяй несколько требований в одну строку — каждое требование отдельной строкой таблицы.
 
 ПРИМЕР строки таблицы:
-| Необходимо установить значение «Силами поставщика» по умолчанию в поле «Доставка» заказа поставщику с целью исключения дублирования заданий на перевозку. | Иванов И.И. | Руководитель логистики | Пользовательское требование |
+| Необходимо установить значение «Силами поставщика» по умолчанию в поле «Доставка» заказа поставщику с целью исключения дублирования заданий на перевозку. | Иванов И.И. | Руководитель логистики | Пользовательское требование | Доставка |
 
-| Содержание требования | ФИО владельца требования | Должность | Вид требования |
+| Содержание требования | ФИО владельца требования | Должность | Вид требования | Функциональная область |
 [Вид требования всегда: Пользовательское требование]
+[Функциональная область — одна из заранее выбранных пользователем областей (см. список выше). Не выдумывай свои.]
 [ФИО владельца требования — кто КОНКРЕТНО высказал это требование/проблему/потребность по записи. Команда проекта (выше) — это СПРАВОЧНИК для сопоставления имён, упоминаемых в речи, а НЕ источник прямой подстановки. Если в записи говорящий явно не идентифицирован — оставь поля «ФИО» и «Должность» ПУСТЫМИ. НЕ ПРИДУМЫВАЙ владельца, не подставляй случайного участника.]
 
 Если требований действительно не было — написать: Требований в этом фрагменте не зафиксировано.
@@ -2589,8 +2616,8 @@ ${protocolParts.map((p, i) => `=== ФРАГМЕНТ ${i + 1} ===\n${p}`).join('\
 function MERGE_REQUIREMENTS_PROMPT(reqParts, title) {
   return `Объедини блоки «Зафиксированные требования» из фрагментов встречи «${title || 'без названия'}» в единый список.
 
-ФОРМАТ ВЫВОДА — СТРОГО 4 КОЛОНКИ (как в исходных фрагментах):
-| Содержание требования | ФИО владельца требования | Должность | Вид требования |
+ФОРМАТ ВЫВОДА — СТРОГО 5 КОЛОНОК (как в исходных фрагментах):
+| Содержание требования | ФИО владельца требования | Должность | Вид требования | Функциональная область |
 
 Не добавляй колонки ID, Приоритет, Статус, Источник — это блок для протокола, а не сводный реестр.
 
@@ -2599,6 +2626,7 @@ function MERGE_REQUIREMENTS_PROMPT(reqParts, title) {
 — Ничего не теряй: если одно и то же требование описано в разных фрагментах по-разному — возьми наиболее подробную версию.
 — ФИО и Должность — из исходных строк (обычно это представители заказчика).
 — Вид требования всегда: Пользовательское требование.
+— Функциональная область — из исходных строк фрагментов; не выдумывай новые.
 — Каждое требование — отдельной строкой таблицы.
 
 Верни ТОЛЬКО таблицу со строкой-заголовком, без пояснений и без нумерации.
@@ -2614,24 +2642,33 @@ function FINAL_CHECK_REQUIREMENTS_PROMPT(protocol, mergedReqs, title) {
 Найди требования которые есть в протоколе но отсутствуют или недостаточно детализированы в реестре.
 Дополни реестр найденными требованиями. Если всё в порядке — верни реестр без изменений.
 
+ФОРМАТ — СТРОГО 5 КОЛОНОК:
+| Содержание требования | ФИО владельца требования | Должность | Вид требования | Функциональная область |
+
 ИТОГОВЫЙ ПРОТОКОЛ:
 ${protocol}
 
 ТЕКУЩИЙ СВОДНЫЙ РЕЕСТР:
 ${mergedReqs}
 
-Верни ТОЛЬКО финальный реестр в том же формате. Без пояснений.`;
+Верни ТОЛЬКО финальный реестр в том же формате (5 колонок). Без пояснений.`;
 }
 
-function REQUIREMENTS_PROMPT(protocol) {
+function REQUIREMENTS_PROMPT(protocol, selectedAreasText) {
+  const areasLine = (selectedAreasText && selectedAreasText.trim())
+    ? selectedAreasText.trim() : '[не указаны — определи из контекста протокола]';
   return `Извлеки все требования заказчика из протокола и оформи в виде таблицы.
 Требование — это то что заказчик хочет видеть в новой системе.
 Каждое требование формулируй: «Необходимо реализовать [что именно] с целью [зачем].»
 Включай требования из раздела «To Be» — они тоже являются требованиями.
 
-| Содержание требования | ФИО владельца требования | Должность | Вид требования |
+ДОПУСТИМЫЕ ФУНКЦИОНАЛЬНЫЕ ОБЛАСТИ ВСТРЕЧИ: ${areasLine}
+🔴 Используй только эти области для классификации. Не выдумывай свои.
+
+| Содержание требования | ФИО владельца требования | Должность | Вид требования | Функциональная область |
 [Вид требования всегда: Пользовательское требование]
 [ФИО владельца требования — кто КОНКРЕТНО высказал это требование/проблему по тексту протокола. Если в тексте говорящий явно не идентифицирован — оставь поля «ФИО» и «Должность» ПУСТЫМИ. НЕ ПРИДУМЫВАЙ владельца, не подставляй случайного участника.]
+[Функциональная область — одна из перечисленных выше. Если несколько подходят — выбери самую релевантную.]
 
 Если требований нет — написать: Требований не зафиксировано.
 
@@ -2770,6 +2807,27 @@ async function generateProtocol() {
   }
   const meetingDate = meetingDateRaw || today();
 
+  // ── E2: проверки проекта, областей, № протокола ────────
+  const projectIdRaw = document.getElementById('meeting-project')?.value || '';
+  const projectId = parseInt(projectIdRaw);
+  if (!projectId) {
+    showStatus('protocol-status', 'error', 'Выбери проект — это обязательно. Если проектов нет, создай в НСИ → Проекты.');
+    return;
+  }
+  const selectedAreas = getSelectedAreas();
+  if (!selectedAreas.length) {
+    showStatus('protocol-status', 'error', 'Выбери хотя бы одну функциональную область внизу формы (это обязательно).');
+    return;
+  }
+  const selectedAreaIds = selectedAreas.map(a => a.id);
+  const selectedAreasText = selectedAreas.map(a => a.name).join(', ');
+  const protocolNumRaw = document.getElementById('meeting-protocol-num')?.value?.trim() || '';
+  const protocolNumber = parseInt(protocolNumRaw);
+  if (!protocolNumber || protocolNumber < 1) {
+    showStatus('protocol-status', 'error', 'Введи № протокола (целое положительное число) или выбери проект для автоподстановки.');
+    return;
+  }
+
   // Validation
   if (!manualText && uploadState === 'uploading') {
     showStatus('protocol-status', 'warn', 'Файл ещё загружается, подожди...');
@@ -2809,7 +2867,7 @@ async function generateProtocol() {
       _silentInfo( 'Шаг 2 из 2 — составляю протокол...');
       showAP('Шаг 2 из 2 — протокол', 60, 'Заполняю шаблон с готовыми тезисами');
       const raw = await callGemini([{
-        text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, manualText, false, thesesRaw)
+        text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, manualText, false, thesesRaw, selectedAreasText, protocolNumber)
       }]);
       const blocks = parseGeminiBlocks(raw);
       protocolText = blocks.protocolText;
@@ -2856,7 +2914,7 @@ async function generateProtocol() {
         );
         const raw = await callGemini([
           { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-          { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, part.transcriptSegment || '', true, thesesRaw) }
+          { text: PROTOCOL_PROMPT(title, part.label, projectName, teamText, meetingDate, part.transcriptSegment || '', true, thesesRaw, selectedAreasText, protocolNumber) }
         ]);
 
         const { protocolText: pText, requirementsText: rText } = parseGeminiBlocks(raw);
@@ -2972,7 +3030,7 @@ async function generateProtocol() {
         'Заполняю шаблон · тезисы уже готовы');
       const raw = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '', hasVisual, thesesRaw) }
+        { text: PROTOCOL_PROMPT(title, null, projectName, teamText, meetingDate, currentTranscriptText || '', hasVisual, thesesRaw, selectedAreasText, protocolNumber) }
       ]);
       const blocks = parseGeminiBlocks(raw);
       protocolText = blocks.protocolText;
@@ -2986,7 +3044,7 @@ async function generateProtocol() {
       // Single file or text path — requirements not yet extracted (no markers found in response)
       _silentInfo( 'Извлекаю требования (2-й запрос)...');
       showAP('Извлечение требований...', 92, 'Последний запрос');
-      currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText) }]);
+      currentRequirementsText = await callGemini([{ text: REQUIREMENTS_PROMPT(protocolText, selectedAreasText) }]);
       showAP('Готово', 99, '');
     } else {
       showAP('Готово', 99, '');
@@ -3046,8 +3104,27 @@ function saveProtocol(opts = {}) {
   const title = document.getElementById('meeting-title').value.trim() || 'Встреча ' + today();
   const proj = getProjectName();
   const displayTitle = proj ? `[${proj}] ${title}` : title;
+  // E2: дополнительные поля для будущего реестра требований
+  const projectIdRaw = document.getElementById('meeting-project')?.value || '';
+  const projectId = parseInt(projectIdRaw) || null;
+  const protocolNumRaw = document.getElementById('meeting-protocol-num')?.value?.trim() || '';
+  const protocolNumber = parseInt(protocolNumRaw) || null;
+  const functionalAreaIds = (typeof getSelectedAreaIds === 'function') ? getSelectedAreaIds() : [];
+  const meetingDateRaw = document.getElementById('meeting-date')?.value?.trim() || '';
+  const meetingDate = (meetingDateRaw && isValidDateStr(meetingDateRaw)) ? meetingDateRaw : today();
   const list = JSON.parse(localStorage.getItem('protocols') || '[]');
-  list.unshift({ id: Date.now(), title: displayTitle, date: today(), protocol: currentProtocolText, requirements: currentRequirementsText, transcript: currentTranscriptText });
+  list.unshift({
+    id: Date.now(),
+    title: displayTitle,
+    date: meetingDate,
+    protocol: currentProtocolText,
+    requirements: currentRequirementsText,
+    transcript: currentTranscriptText,
+    // E2 новые поля:
+    projectId,
+    protocolNumber,
+    functionalAreaIds
+  });
   localStorage.setItem('protocols', JSON.stringify(list));
   if (!opts.silent) showStatus('protocol-status', 'success', `Протокол «${title}» сохранён`);
 }
@@ -4621,6 +4698,72 @@ function getProjectName() {
   return getNSI().projects.find(p=>p.id===projId)?.name||'';
 }
 
+// ── Функциональные области в Шаге 3 ────────────────
+// Рендерит чипы из NSI. Сохраняет состояние выбранных при перерендере
+// (актуально, если юзер добавил область в НСИ — чипы переотрисуются, но
+// уже выбранные останутся).
+function renderFunctionalAreaChips() {
+  const root = document.getElementById('meeting-areas-chips');
+  if (!root) return;
+  const areas = (getNSI().functionalAreas || []);
+  // Сохраняем уже выбранные id перед перерендером
+  const prevSelected = new Set(getSelectedAreaIds());
+  if (!areas.length) {
+    root.innerHTML = '<div style="font-size:12px;color:#94a3b8">Нет функциональных областей. Добавь в НСИ → 📐 Функциональные области.</div>';
+    return;
+  }
+  root.innerHTML = areas.map(a =>
+    `<div class="area-chip${prevSelected.has(a.id) ? ' area-chip-active' : ''}" data-area-id="${a.id}" onclick="toggleAreaChip(this)">
+      <span class="area-chip-prefix">${escHtml(a.prefix)}</span>
+      <span>${escHtml(a.name)}</span>
+    </div>`
+  ).join('');
+}
+
+function toggleAreaChip(el) {
+  el.classList.toggle('area-chip-active');
+}
+
+// Возвращает массив id выбранных областей (читается из DOM — нет рассинхрона)
+function getSelectedAreaIds() {
+  return Array.from(document.querySelectorAll('#meeting-areas-chips .area-chip-active'))
+    .map(el => parseInt(el.dataset.areaId))
+    .filter(Boolean);
+}
+
+// Возвращает массив объектов {id, name, prefix} для выбранных областей
+function getSelectedAreas() {
+  const ids = new Set(getSelectedAreaIds());
+  return (getNSI().functionalAreas || []).filter(a => ids.has(a.id));
+}
+
+// Подсказывает следующий номер протокола = max+1 среди протоколов выбранного проекта
+function suggestProtocolNumber() {
+  const projIdRaw = document.getElementById('meeting-project')?.value || '';
+  const projId = parseInt(projIdRaw);
+  const input = document.getElementById('meeting-protocol-num');
+  if (!input) return;
+  if (!projId) { input.value = ''; input.placeholder = 'выбери проект'; return; }
+  input.placeholder = 'auto';
+  // Не перетираем то, что юзер уже ввёл вручную
+  if (input.value.trim() && input.dataset.userEdited === '1') return;
+  const protocols = JSON.parse(localStorage.getItem('protocols') || '[]');
+  const maxN = protocols
+    .filter(p => p.projectId === projId)
+    .map(p => parseInt(p.protocolNumber))
+    .filter(n => !isNaN(n) && n > 0)
+    .reduce((a,b) => Math.max(a,b), 0);
+  input.value = String(maxN + 1);
+  input.dataset.userEdited = '0';
+}
+
+function onMeetingProjectChange() {
+  // Сбрасываем флаг ручного редактирования при смене проекта — нужен новый автономер
+  const input = document.getElementById('meeting-protocol-num');
+  if (input) { input.dataset.userEdited = '0'; input.value = ''; }
+  suggestProtocolNumber();
+}
+
 
 // ══════════════════════════════════════════════════════
 // GROQ WHISPER — транскрипция аудио
@@ -4808,6 +4951,8 @@ setTimeout(() => {
   ensureNSIDefaults();
   renderNSI();
   updateProjectSelect();
+  renderFunctionalAreaChips();
+  suggestProtocolNumber();
   // Show Groq status in header
   const groqStatusEl = document.getElementById('groq-status');
   if (groqStatusEl) {
