@@ -172,6 +172,64 @@ textarea{resize:vertical;line-height:1.6}
 .key-hint{font-size:11px;color:#94a3b8;margin-top:4px}
 .list-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .list-header-label{font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.5px}
+
+/* REGISTRY TABLE (E4) */
+.reg-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.reg-toolbar select,.reg-toolbar input[type=text]{border:1px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:13px;font-family:inherit;outline:none;background:#fafafa;color:#1e293b}
+.reg-toolbar select:focus,.reg-toolbar input[type=text]:focus{border-color:#3b82f6;background:#fff}
+.reg-search{flex:1;min-width:180px}
+.reg-filter-chips{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 10px}
+.reg-filter-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid #e2e8f0;border-radius:999px;background:#fafafa;color:#475569;font-size:11px;font-weight:500;cursor:pointer;user-select:none;transition:.15s}
+.reg-filter-chip:hover{border-color:#cbd5e1;background:#f1f5f9}
+.reg-filter-chip-active{background:#eff6ff;border-color:#3b82f6;color:#1d4ed8}
+.reg-filter-row{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:14px;font-size:12px}
+.reg-filter-row .reg-filter-label{font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;padding-top:6px;flex-shrink:0}
+.reg-filter-row .reg-filter-block{flex:1;min-width:240px}
+
+.reg-table-wrap{overflow-x:auto;border:1px solid #e2e8f0;border-radius:9px;background:#fff}
+.reg-table{width:100%;border-collapse:collapse;font-size:12px;min-width:1100px}
+.reg-table thead th{background:#f8fafc;border-bottom:2px solid #e2e8f0;color:#475569;font-weight:600;text-transform:uppercase;letter-spacing:.4px;font-size:10px;padding:9px 8px;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:1}
+.reg-table tbody td{border-bottom:1px solid #f1f5f9;padding:7px 8px;vertical-align:top;color:#1e293b}
+.reg-table tbody tr:hover td{background:#fafbfc}
+.reg-table tbody tr.reg-row-archived td{background:#f8fafc;color:#94a3b8;font-style:italic}
+.reg-table tbody tr.reg-row-archived:hover td{background:#f1f5f9}
+
+.reg-cell-code{font-family:monospace;font-weight:700;color:#1d4ed8;white-space:nowrap}
+.reg-cell-text{min-width:280px;max-width:380px}
+.reg-cell-text [contenteditable]{display:block;outline:none;padding:3px 5px;border-radius:4px;border:1px solid transparent;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}
+.reg-cell-text [contenteditable]:hover{border-color:#e2e8f0;background:#fafafa}
+.reg-cell-text [contenteditable]:focus{border-color:#3b82f6;background:#fff;box-shadow:0 0 0 2px rgba(59,130,246,.12)}
+.reg-cell-text [contenteditable].reg-saved-flash{background:#dcfce7!important;border-color:#10b981!important;transition:background .25s,border-color .25s}
+
+.reg-cell-source{min-width:150px;max-width:200px;font-size:11px;color:#3b82f6;cursor:pointer;text-decoration:none}
+.reg-cell-source:hover{text-decoration:underline}
+
+.reg-cell-owner{min-width:130px;max-width:170px;font-size:11px}
+.reg-cell-owner-name{font-weight:500;color:#334155}
+.reg-cell-owner-pos{color:#94a3b8;font-size:10px}
+
+.reg-select{border:1px solid transparent;border-radius:5px;padding:4px 6px;font-size:11px;font-family:inherit;background:#fafafa;color:#334155;cursor:pointer;outline:none;width:100%;min-width:110px}
+.reg-select:hover{border-color:#cbd5e1;background:#fff}
+.reg-select:focus{border-color:#3b82f6;background:#fff;box-shadow:0 0 0 2px rgba(59,130,246,.12)}
+.reg-select.reg-saved-flash{background:#dcfce7!important;border-color:#10b981!important;transition:background .25s,border-color .25s}
+
+/* Цвет статуса как левая полоска индикатор */
+.reg-status-cell{position:relative}
+.reg-status-cell::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;border-radius:2px;background:var(--reg-status-color,#cbd5e1)}
+.reg-status-cell .reg-select{padding-left:10px}
+
+.reg-cell-actions{white-space:nowrap;text-align:right}
+.reg-action-btn{background:none;border:none;cursor:pointer;font-size:14px;padding:5px;line-height:1;border-radius:5px;color:#94a3b8;transition:.15s;margin-left:2px}
+.reg-action-btn:hover{background:#f1f5f9;color:#334155}
+.reg-action-btn.reg-action-archive:hover{color:#f59e0b;background:#fffbeb}
+.reg-action-btn.reg-action-restore:hover{color:#10b981;background:#dcfce7}
+.reg-action-btn.reg-action-delete:hover{color:#ef4444;background:#fef2f2}
+
+.reg-empty{padding:36px 20px;text-align:center;color:#94a3b8;font-size:13px;background:#fafafa;border-radius:9px}
+.reg-empty-icon{font-size:36px;margin-bottom:10px;opacity:.6}
+
+.reg-stats{font-size:12px;color:#64748b;margin-top:12px;display:flex;gap:14px;flex-wrap:wrap}
+.reg-stats b{color:#1e293b}
 </style>
 </head>
 <body>
@@ -387,20 +445,48 @@ textarea{resize:vertical;line-height:1.6}
 <!-- ======= REGISTRY ======= -->
 <div class="page" id="page-registry">
   <div class="card">
-    <div class="card-title"><div class="card-title-icon icon-purple">📋</div>Сводный реестр требований</div>
-    <p style="font-size:13px;color:#64748b;margin-bottom:18px">Объединяет требования из выбранных протоколов, убирает дубли</p>
-    <div class="list-header">
-      <span class="list-header-label">Протоколы</span>
-      <button class="btn btn-secondary" style="padding:5px 11px;font-size:12px" onclick="selectAll('rg')">Выбрать все</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:6px">
+      <div class="card-title" style="margin:0"><div class="card-title-icon icon-purple">📋</div>Реестр требований проекта</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-success" id="reg-export-btn" onclick="exportRegistryXlsx()">⬇️ Скачать XLSX</button>
+      </div>
     </div>
-    <div id="registry-protocol-list"></div>
-    <div class="btn-row"><button class="btn btn-primary" onclick="generateRegistry()">✨ Сформировать реестр</button></div>
-    <div id="registry-status"></div>
-  </div>
-  <div class="card" id="registry-result-card" style="display:none">
-    <div class="card-title"><div class="card-title-icon icon-purple">📋</div>Реестр</div>
-    <div class="preview" id="registry-preview"></div>
-    <div class="btn-row"><button class="btn btn-success" onclick="downloadDocx('registry')">⬇️ Реестр.docx</button></div>
+    <p style="font-size:13px;color:#64748b;margin:0 0 16px">Требования автоматически собираются сюда после генерации каждого протокола встречи. Любую ячейку можно отредактировать прямо в таблице.</p>
+
+    <!-- Toolbar: project + search -->
+    <div class="reg-toolbar">
+      <div>
+        <label style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px">Проект</label>
+        <select id="reg-project-select" onchange="onRegProjectChange()" style="min-width:240px"></select>
+      </div>
+      <div class="reg-search">
+        <label style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px">Поиск</label>
+        <input type="text" id="reg-search-input" placeholder="🔍 Поиск по тексту требования или коду..." oninput="renderRegistryTable()" style="width:100%">
+      </div>
+    </div>
+
+    <!-- Filter chips: status / area / archived -->
+    <div class="reg-filter-row">
+      <div class="reg-filter-block">
+        <div class="reg-filter-label">Статус</div>
+        <div class="reg-filter-chips" id="reg-status-filter"></div>
+      </div>
+      <div class="reg-filter-block">
+        <div class="reg-filter-label">Область</div>
+        <div class="reg-filter-chips" id="reg-area-filter"></div>
+      </div>
+      <div style="padding-top:6px">
+        <label style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#475569;cursor:pointer;user-select:none">
+          <input type="checkbox" id="reg-show-archived" onchange="renderRegistryTable()" style="width:14px;height:14px;cursor:pointer">
+          Показать архив
+        </label>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div id="reg-table-host"></div>
+
+    <div class="reg-stats" id="reg-stats"></div>
   </div>
 </div>
 
@@ -666,7 +752,7 @@ function showTab(name, el) {
   document.getElementById('page-' + name).classList.add('active');
   if (name === 'protocol') { updateProjectSelect(); renderFunctionalAreaChips(); suggestProtocolNumber(); }
   if (name === 'report') renderList('report');
-  if (name === 'registry') renderList('registry');
+  if (name === 'registry') renderRegistryTab();
   if (name === 'library') { renderLibrary(); refreshGoogleSpace(); updateStorageInfo(); }
   if (name === 'nsi') renderNSI();
   if (name === 'admin') renderAdmin();
@@ -3289,9 +3375,352 @@ function addRequirementsFromProtocol(savedProtocol, selectedAreaIds, requirement
   return { added, total: list.length, projectId: savedProtocol.projectId };
 }
 
+// ══════════════════════════════════════════════════════
+// E4: UI вкладки «Реестр требований»
+// ══════════════════════════════════════════════════════
+
+// Списки значений (фиксированы по требованиям заказчика)
+const REG_STATUSES   = ['Новое', 'На согласовании', 'Согласовано — ожидает начала', 'В работе', 'Отложено', 'Готово'];
+const REG_PRIORITIES = ['Низкий', 'Обычный', 'Срочный'];
+// Цветовая схема статусов (для левой полоски)
+const REG_STATUS_COLORS = {
+  'Новое':                            '#94a3b8',
+  'На согласовании':                  '#f59e0b',
+  'Согласовано — ожидает начала':     '#3b82f6',
+  'В работе':                         '#8b5cf6',
+  'Отложено':                         '#cbd5e1',
+  'Готово':                           '#10b981'
+};
+
+// State фильтров (живёт в памяти, не персистится — при F5 сбрасывается)
+let regState = {
+  projectId: null,
+  search: '',
+  selectedStatuses: new Set(),   // пустой Set = "все"
+  selectedAreas: new Set(),       // пустой Set = "все"
+  showArchived: false
+};
+
+// Главная функция: открытие вкладки. Восстанавливает выбранный проект, рисует селект,
+// фильтры и таблицу.
+function renderRegistryTab() {
+  const nsi = getNSI();
+  const projects = nsi.projects || [];
+  const sel = document.getElementById('reg-project-select');
+  if (!sel) return; // вкладка не загрузилась — защита
+
+  // Заполняем селект проектов
+  if (!projects.length) {
+    sel.innerHTML = '<option value="">— нет проектов —</option>';
+    regState.projectId = null;
+  } else {
+    // Если ранее выбранный проект ещё существует — оставляем его, иначе берём проект с непустым реестром, иначе первый
+    if (regState.projectId && !projects.find(p => p.id === regState.projectId)) regState.projectId = null;
+    if (!regState.projectId) {
+      const withReqs = projects.find(p => getRequirements(p.id).length > 0);
+      regState.projectId = (withReqs || projects[0]).id;
+    }
+    sel.innerHTML = projects.map(p =>
+      `<option value="${p.id}"${p.id === regState.projectId ? ' selected' : ''}>${escHtml(p.name)}</option>`
+    ).join('');
+  }
+
+  // Фильтры: статус и область
+  renderRegStatusFilter();
+  renderRegAreaFilter();
+  // Чекбокс "показать архив"
+  const showArch = document.getElementById('reg-show-archived');
+  if (showArch) showArch.checked = !!regState.showArchived;
+  // Поиск
+  const search = document.getElementById('reg-search-input');
+  if (search) search.value = regState.search || '';
+
+  renderRegistryTable();
+}
+
+function renderRegStatusFilter() {
+  const host = document.getElementById('reg-status-filter');
+  if (!host) return;
+  host.innerHTML = REG_STATUSES.map(s => {
+    const active = regState.selectedStatuses.has(s);
+    return `<div class="reg-filter-chip${active ? ' reg-filter-chip-active' : ''}"
+      onclick="toggleRegStatusFilter(${JSON.stringify(s)})">${escHtml(s)}</div>`;
+  }).join('');
+}
+function renderRegAreaFilter() {
+  const host = document.getElementById('reg-area-filter');
+  if (!host) return;
+  const areas = getNSI().functionalAreas || [];
+  if (!areas.length) { host.innerHTML = '<span style="font-size:11px;color:#94a3b8">нет областей в НСИ</span>'; return; }
+  host.innerHTML = areas.map(a => {
+    const active = regState.selectedAreas.has(a.id);
+    return `<div class="reg-filter-chip${active ? ' reg-filter-chip-active' : ''}"
+      onclick="toggleRegAreaFilter(${a.id})" title="${escHtml(a.name)}"><b style="font-family:monospace">${escHtml(a.prefix)}</b> ${escHtml(a.name)}</div>`;
+  }).join('');
+}
+
+function toggleRegStatusFilter(s) {
+  if (regState.selectedStatuses.has(s)) regState.selectedStatuses.delete(s);
+  else regState.selectedStatuses.add(s);
+  renderRegStatusFilter();
+  renderRegistryTable();
+}
+function toggleRegAreaFilter(id) {
+  if (regState.selectedAreas.has(id)) regState.selectedAreas.delete(id);
+  else regState.selectedAreas.add(id);
+  renderRegAreaFilter();
+  renderRegistryTable();
+}
+
+function onRegProjectChange() {
+  const sel = document.getElementById('reg-project-select');
+  regState.projectId = parseInt(sel.value) || null;
+  renderRegistryTable();
+}
+
+// Применяет фильтры и сортирует.
+// Сортировка: по префиксу алфавитно, внутри префикса — по числовой части кода.
+function getFilteredRequirements() {
+  if (!regState.projectId) return [];
+  const all = getRequirements(regState.projectId);
+  // Применяем синхронно строку поиска
+  const search = document.getElementById('reg-search-input');
+  regState.search = (search?.value || '').trim().toLowerCase();
+  const archCb = document.getElementById('reg-show-archived');
+  if (archCb) regState.showArchived = !!archCb.checked;
+
+  const filtered = all.filter(r => {
+    if (!regState.showArchived && r.archived) return false;
+    if (regState.selectedStatuses.size > 0 && !regState.selectedStatuses.has(r.status)) return false;
+    if (regState.selectedAreas.size > 0 && !regState.selectedAreas.has(r.functionalAreaId)) return false;
+    if (regState.search) {
+      const hay = (r.text + ' ' + (r.code || '')).toLowerCase();
+      if (!hay.includes(regState.search)) return false;
+    }
+    return true;
+  });
+  // Сортировка по коду: сначала префикс, потом число
+  filtered.sort((a, b) => {
+    const pa = (a.code || '').split('-'); const pb = (b.code || '').split('-');
+    if (pa[0] !== pb[0]) return (pa[0] || '').localeCompare(pb[0] || '', 'ru');
+    return (parseInt(pa[1]) || 0) - (parseInt(pb[1]) || 0);
+  });
+  return filtered;
+}
+
+function renderRegistryTable() {
+  const host = document.getElementById('reg-table-host');
+  const stats = document.getElementById('reg-stats');
+  if (!host) return;
+
+  if (!regState.projectId) {
+    host.innerHTML = `<div class="reg-empty"><div class="reg-empty-icon">📭</div>Создай проект на вкладке НСИ → Проекты, чтобы начать вести реестр требований.</div>`;
+    if (stats) stats.innerHTML = '';
+    return;
+  }
+
+  const allInProject = getRequirements(regState.projectId);
+  if (!allInProject.length) {
+    host.innerHTML = `<div class="reg-empty"><div class="reg-empty-icon">📋</div>В этом проекте пока нет требований.<br>Сгенерируй протокол на вкладке <b>Протокол встречи</b> — требования автоматически попадут сюда.</div>`;
+    if (stats) stats.innerHTML = '';
+    return;
+  }
+
+  const filtered = getFilteredRequirements();
+  const nsi = getNSI();
+  const proj = nsi.projects.find(p => p.id === regState.projectId);
+  const executors = (proj?.executor || [])
+    .map(m => { const p = nsi.participants.find(x => x.id === m.participantId); return p ? { id: m.participantId, name: p.name, position: m.position } : null; })
+    .filter(Boolean);
+  const areas = nsi.functionalAreas || [];
+
+  if (!filtered.length) {
+    host.innerHTML = `<div class="reg-empty"><div class="reg-empty-icon">🔍</div>Ничего не найдено по текущим фильтрам.<br><a href="#" onclick="event.preventDefault();resetRegFilters()" style="color:#3b82f6">Сбросить фильтры</a></div>`;
+  } else {
+    const rows = filtered.map(r => regRowHtml(r, executors, areas)).join('');
+    host.innerHTML = `<div class="reg-table-wrap"><table class="reg-table">
+      <thead><tr>
+        <th style="width:80px">Код</th>
+        <th>Требование</th>
+        <th style="width:140px">Исполнитель</th>
+        <th style="width:160px">Владелец</th>
+        <th style="width:140px">Область</th>
+        <th style="width:170px">Источник</th>
+        <th style="width:170px">Статус</th>
+        <th style="width:120px">Приоритет</th>
+        <th style="width:70px"></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  }
+
+  // Stats
+  if (stats) {
+    const total  = allInProject.length;
+    const active = allInProject.filter(r => !r.archived).length;
+    const arch   = total - active;
+    stats.innerHTML = `<span>Всего: <b>${total}</b></span><span>Активных: <b>${active}</b></span><span>В архиве: <b>${arch}</b></span><span>Показано: <b>${filtered.length}</b></span>`;
+  }
+}
+
+function resetRegFilters() {
+  regState.search = '';
+  regState.selectedStatuses.clear();
+  regState.selectedAreas.clear();
+  regState.showArchived = false;
+  const s = document.getElementById('reg-search-input'); if (s) s.value = '';
+  const a = document.getElementById('reg-show-archived'); if (a) a.checked = false;
+  renderRegStatusFilter();
+  renderRegAreaFilter();
+  renderRegistryTable();
+}
+
+// HTML для одной строки таблицы реестра. Все ячейки intra-edit:
+//   - text: contenteditable, blur=save
+//   - select'ы: change=save
+function regRowHtml(r, executors, areas) {
+  const arch = r.archived ? ' reg-row-archived' : '';
+  const statusColor = REG_STATUS_COLORS[r.status] || '#cbd5e1';
+
+  const ownerHtml = `
+    <div class="reg-cell-owner-name" contenteditable="true" data-rid="${r.id}" data-field="ownerName"
+      onblur="onRegCellBlur(event)">${escHtml(r.ownerName || '')}</div>
+    <div class="reg-cell-owner-pos" contenteditable="true" data-rid="${r.id}" data-field="ownerPosition"
+      onblur="onRegCellBlur(event)">${escHtml(r.ownerPosition || '')}</div>`;
+
+  const execOptions = `<option value="">— не назначен —</option>` +
+    executors.map(e => `<option value="${e.id}"${e.id === r.executorId ? ' selected' : ''}>${escHtml(e.name)}</option>`).join('');
+
+  const areaOptions = areas.map(a =>
+    `<option value="${a.id}"${a.id === r.functionalAreaId ? ' selected' : ''}>${escHtml(a.prefix)} — ${escHtml(a.name)}</option>`
+  ).join('');
+
+  const statusOptions = REG_STATUSES.map(s =>
+    `<option value="${escHtml(s)}"${s === r.status ? ' selected' : ''}>${escHtml(s)}</option>`
+  ).join('');
+
+  const prioOptions = REG_PRIORITIES.map(p =>
+    `<option value="${escHtml(p)}"${p === r.priority ? ' selected' : ''}>${escHtml(p)}</option>`
+  ).join('');
+
+  const sourceClickable = r.protocolId
+    ? `<a class="reg-cell-source" onclick="openProtocolFromRegistry(${r.protocolId});return false" href="#" title="Открыть протокол в Библиотеке">${escHtml(r.source || '')}</a>`
+    : `<span style="font-size:11px;color:#94a3b8">${escHtml(r.source || '')}</span>`;
+
+  const actions = r.archived
+    ? `<button class="reg-action-btn reg-action-restore" title="Восстановить из архива" onclick="restoreRegRow('${r.id}')">↩️</button>
+       <button class="reg-action-btn reg-action-delete" title="Удалить безвозвратно" onclick="deleteRegRow('${r.id}')">🗑️</button>`
+    : `<button class="reg-action-btn reg-action-archive" title="В архив (не выгружается в xlsx)" onclick="archiveRegRow('${r.id}')">📁</button>
+       <button class="reg-action-btn reg-action-delete" title="Удалить безвозвратно" onclick="deleteRegRow('${r.id}')">🗑️</button>`;
+
+  return `<tr class="reg-row${arch}" data-rid="${r.id}">
+    <td class="reg-cell-code">${escHtml(r.code || '')}</td>
+    <td class="reg-cell-text">
+      <div contenteditable="true" data-rid="${r.id}" data-field="text" onblur="onRegCellBlur(event)">${escHtml(r.text || '')}</div>
+    </td>
+    <td><select class="reg-select" data-rid="${r.id}" data-field="executorId" onchange="onRegSelectChange(event)">${execOptions}</select></td>
+    <td class="reg-cell-owner">${ownerHtml}</td>
+    <td><select class="reg-select" data-rid="${r.id}" data-field="functionalAreaId" onchange="onRegSelectChange(event)">${areaOptions}</select></td>
+    <td>${sourceClickable}</td>
+    <td class="reg-status-cell" style="--reg-status-color:${statusColor}"><select class="reg-select" data-rid="${r.id}" data-field="status" onchange="onRegSelectChange(event)">${statusOptions}</select></td>
+    <td><select class="reg-select" data-rid="${r.id}" data-field="priority" onchange="onRegSelectChange(event)">${prioOptions}</select></td>
+    <td class="reg-cell-actions">${actions}</td>
+  </tr>`;
+}
+
+// ── Сохранение изменений ячейки ────────────
+function updateRequirement(rid, patch) {
+  if (!regState.projectId) return null;
+  const list = getRequirements(regState.projectId);
+  const idx = list.findIndex(r => r.id === rid);
+  if (idx === -1) return null;
+  Object.assign(list[idx], patch, { updatedAt: new Date().toISOString() });
+  saveRequirements(regState.projectId, list);
+  return list[idx];
+}
+
+function flashSaved(el) {
+  if (!el) return;
+  el.classList.add('reg-saved-flash');
+  setTimeout(() => el.classList.remove('reg-saved-flash'), 350);
+}
+
+function onRegCellBlur(e) {
+  const el = e.target;
+  const rid = el.dataset.rid;
+  const field = el.dataset.field;
+  const value = el.innerText.trim();
+  const updated = updateRequirement(rid, { [field]: value });
+  if (updated) flashSaved(el);
+}
+
+function onRegSelectChange(e) {
+  const el = e.target;
+  const rid = el.dataset.rid;
+  const field = el.dataset.field;
+  let value = el.value;
+  // Числовые поля
+  if (field === 'functionalAreaId') value = parseInt(value) || null;
+  if (field === 'executorId') value = value ? parseInt(value) : null;
+  const updated = updateRequirement(rid, { [field]: value });
+  if (updated) {
+    flashSaved(el);
+    // При смене статуса — обновить цвет полоски без перерендера
+    if (field === 'status') {
+      const cell = el.closest('.reg-status-cell');
+      if (cell) cell.style.setProperty('--reg-status-color', REG_STATUS_COLORS[value] || '#cbd5e1');
+    }
+    // При смене области — код НЕ меняем (юзер сам в курсе, что менять)
+  }
+}
+
+// ── Действия со строкой ────────────
+function archiveRegRow(rid) {
+  updateRequirement(rid, { archived: true });
+  renderRegistryTable();
+}
+function restoreRegRow(rid) {
+  updateRequirement(rid, { archived: false });
+  renderRegistryTable();
+}
+function deleteRegRow(rid) {
+  if (!confirm('Удалить требование безвозвратно? Это действие нельзя отменить.')) return;
+  if (!regState.projectId) return;
+  const list = getRequirements(regState.projectId).filter(r => r.id !== rid);
+  saveRequirements(regState.projectId, list);
+  renderRegistryTable();
+}
+
+// ── Кликабельный источник: переход в Библиотеку ──
+function openProtocolFromRegistry(protocolId) {
+  // Активируем вкладку Library
+  const tabs = document.querySelectorAll('.tab');
+  let libTab = null;
+  tabs.forEach(t => { if (t.textContent.includes('Библиотека')) libTab = t; });
+  if (libTab) libTab.click();
+  // После рендера прокрутимся к нужному элементу (если есть его id-якорь)
+  setTimeout(() => {
+    const item = document.querySelector(`[data-protocol-id="${protocolId}"]`)
+              || document.querySelector(`#lib-${protocolId}`);
+    if (item) {
+      item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      item.style.transition = 'background .8s';
+      const orig = item.style.background;
+      item.style.background = '#fef3c7';
+      setTimeout(() => { item.style.background = orig; }, 1200);
+    }
+  }, 250);
+}
+
+// ── XLSX экспорт (placeholder, реальная реализация в E5) ──
+function exportRegistryXlsx() {
+  alert('Экспорт в XLSX будет в следующем этапе (E5). Сейчас все требования живут в localStorage в ключе requirements_<id_проекта>.');
+}
+
 function renderList(tab) {
   const isReport = tab === 'report';
   const el = document.getElementById(isReport ? 'report-protocol-list' : 'registry-protocol-list');
+  if (!el) return; // E4: для tab='registry' элемента больше нет — старая логика выкл.
   const prefix = isReport ? 'rp' : 'rg';
   const list = getProtocols();
   if (!list.length) {
