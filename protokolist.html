@@ -1153,6 +1153,28 @@ function loadMammoth() {
   return _mammothLoading;
 }
 
+// E5: lazy-load ExcelJS для генерации .xlsx
+let _exceljsLoading = null;
+function loadExcelJS() {
+  if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if (_exceljsLoading) return _exceljsLoading;
+  _exceljsLoading = new Promise((resolve, reject) => {
+    const tryUrl = (url, onFail) => {
+      const s = document.createElement('script');
+      s.src = url;
+      s.onload = () => window.ExcelJS ? resolve(window.ExcelJS) : onFail(new Error('ExcelJS не появился в window'));
+      s.onerror = () => onFail(new Error('сеть/CDN недоступен'));
+      document.head.appendChild(s);
+    };
+    tryUrl('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js', (err1) => {
+      tryUrl('https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js', (err2) => {
+        reject(new Error('Не удалось загрузить генератор XLSX (' + (err2.message || err1.message) + '). Проверь интернет.'));
+      });
+    });
+  });
+  return _exceljsLoading;
+}
+
 async function parseDocxToText(file) {
   const m = await loadMammoth();
   const buf = await file.arrayBuffer();
@@ -3712,9 +3734,146 @@ function openProtocolFromRegistry(protocolId) {
   }, 250);
 }
 
-// ── XLSX экспорт (placeholder, реальная реализация в E5) ──
-function exportRegistryXlsx() {
-  alert('Экспорт в XLSX будет в следующем этапе (E5). Сейчас все требования живут в localStorage в ключе requirements_<id_проекта>.');
+// ── XLSX экспорт по стилям шаблона Cemix ──
+async function exportRegistryXlsx() {
+  if (!regState.projectId) {
+    alert('Не выбран проект.');
+    return;
+  }
+  const all = getRequirements(regState.projectId);
+  const active = all.filter(r => !r.archived);
+  if (!active.length) {
+    alert('В реестре нет активных требований для выгрузки.\n(Архивные требования не выгружаются в xlsx.)');
+    return;
+  }
+
+  const btn = document.getElementById('reg-export-btn');
+  const origText = btn?.innerHTML;
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Генерирую xlsx...'; }
+
+  try {
+    const ExcelJS = await loadExcelJS();
+    const nsi = getNSI();
+    const proj = nsi.projects.find(p => p.id === regState.projectId);
+    const projName = proj?.name || 'Проект';
+
+    // Резолверы для исполнителя и области
+    const participants = nsi.participants || [];
+    const areas = nsi.functionalAreas || [];
+    const execName = (eid) => {
+      if (!eid) return '';
+      const p = participants.find(x => x.id === eid);
+      return p ? p.name : '';
+    };
+    const areaName = (aid) => {
+      if (!aid) return '';
+      const a = areas.find(x => x.id === aid);
+      return a ? a.name : '';
+    };
+    const ownerCell = (r) => {
+      const n = (r.ownerName || '').trim();
+      const p = (r.ownerPosition || '').trim();
+      if (n && p) return `${n} (${p})`;
+      return n || p || '';
+    };
+
+    // Сортируем по коду как в UI
+    const sorted = active.slice().sort((a, b) => {
+      const pa = (a.code || '').split('-'); const pb = (b.code || '').split('-');
+      if (pa[0] !== pb[0]) return (pa[0] || '').localeCompare(pb[0] || '', 'ru');
+      return (parseInt(pa[1]) || 0) - (parseInt(pb[1]) || 0);
+    });
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'Протоколист AI';
+    wb.created = new Date();
+    const ws = wb.addWorksheet('TDSheet', {
+      views: [{ showGridLines: false }]
+    });
+
+    // Колонки: ширины из шаблона Cemix
+    ws.columns = [
+      { width: 17.5  }, // A: Статус
+      { width: 10.16 }, // B: Код
+      { width: 74.66 }, // C: Пользовательское требование
+      { width: 24.5  }, // D: Ответственный исполнитель
+      { width: 28.33 }, // E: Ответственный владелец
+      { width: 27.16 }, // F: Функциональная область
+      { width: 32.33 }, // G: Источник
+      { width: 19.33 }  // H: Приоритет
+    ];
+
+    // Стили для шапки и данных (точно как в шаблоне)
+    const HEADER_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF4ECC5' } };
+    const HEADER_FONT = { name: 'Arial', size: 10, bold: true };
+    const DATA_FONT   = { name: 'Arial', size: 8 };
+    const ALIGN       = { horizontal: 'left', vertical: 'center', wrapText: true };
+    const THIN_BORDER = {
+      top:    { style: 'thin', color: { argb: 'FF000000' } },
+      left:   { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+      right:  { style: 'thin', color: { argb: 'FF000000' } }
+    };
+
+    // R1 пустая (как в шаблоне Cemix)
+    ws.getRow(1).height = 9;
+
+    // R2 — шапка
+    const headerRow = ws.getRow(2);
+    headerRow.height = 25.5;
+    const headers = ['Статус', 'Код', 'Пользовательское требование',
+                     'Ответственный исполнитель', 'Ответственный владелец',
+                     'Функциональная область', 'Источник', 'Приоритет'];
+    headers.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      cell.font = HEADER_FONT;
+      cell.fill = HEADER_FILL;
+      cell.alignment = ALIGN;
+      cell.border = THIN_BORDER;
+    });
+
+    // Данные с R3
+    sorted.forEach((r, idx) => {
+      const row = ws.getRow(3 + idx);
+      row.height = 33.75;
+      const values = [
+        r.status || 'Новое',
+        r.code || '',
+        r.text || '',
+        execName(r.executorId),
+        ownerCell(r),
+        areaName(r.functionalAreaId),
+        r.source || '',
+        r.priority || 'Обычный'
+      ];
+      values.forEach((v, i) => {
+        const cell = row.getCell(i + 1);
+        cell.value = v;
+        cell.font = DATA_FONT;
+        cell.alignment = ALIGN;
+        cell.border = THIN_BORDER;
+      });
+    });
+
+    // Buffer → Blob → download
+    const buf = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const dateStr = today().replace(/\//g, '.'); // ДД.ММ.ГГГГ или ISO — как сегодня вернёт today()
+    a.download = `Реестр требований - ${projName} - ${dateStr}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 200);
+
+    if (btn) { btn.innerHTML = '✓ Скачано'; setTimeout(() => { btn.innerHTML = origText; btn.disabled = false; }, 1500); }
+  } catch (e) {
+    console.error('[E5] xlsx export failed:', e);
+    alert('Ошибка экспорта: ' + (e.message || e));
+    if (btn) { btn.innerHTML = origText; btn.disabled = false; }
+  }
 }
 
 function renderList(tab) {
