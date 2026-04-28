@@ -74,6 +74,13 @@ textarea{resize:vertical;line-height:1.6}
 /* BUTTONS */
 .btn{padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:.2s;display:inline-flex;align-items:center;gap:6px;font-family:inherit}
 .btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Глобальная блокировка операций (E6) */
+.busy-locked{opacity:.45!important;cursor:not-allowed!important;filter:grayscale(.4)}
+body[data-busy-op] .tab{pointer-events:none;opacity:.55}
+body[data-busy-op="uploading"] #step-1 .upload-progress,
+body[data-busy-op="transcribing"] #step-2 .progress-wrap,
+body[data-busy-op="generating"] #step-3{opacity:1!important;filter:none!important}
 .btn-primary{background:#3b82f6;color:#fff}
 .btn-primary:hover:not(:disabled){background:#2563eb;box-shadow:0 4px 12px rgba(59,130,246,.3)}
 .btn-success{background:#10b981;color:#fff}
@@ -193,18 +200,40 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
 .reg-toolbar select,.reg-toolbar input[type=text]{border:1px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:13px;font-family:inherit;outline:none;background:#fafafa;color:#1e293b}
 .reg-toolbar select:focus,.reg-toolbar input[type=text]:focus{border-color:#3b82f6;background:#fff}
 .reg-search{flex:1;min-width:180px}
-.reg-filter-chips{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 10px}
-.reg-filter-chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid #e2e8f0;border-radius:999px;background:#fafafa;color:#475569;font-size:11px;font-weight:500;cursor:pointer;user-select:none;transition:.15s}
+
+/* Карточка фильтров */
+.reg-filters-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:11px;padding:14px 16px;margin-bottom:14px}
+.reg-filters-header{font-size:12px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.reg-filters-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.reg-filter-input-group{display:flex;flex-direction:column;gap:4px;width:240px;max-width:100%}
+.reg-filter-input-group select,
+.reg-filter-input-group input[type=text]{width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:8px 11px;font-size:13px;font-family:inherit;outline:none;background:#fff;color:#1e293b;box-sizing:border-box;height:36px}
+.reg-filter-input-group select:focus,
+.reg-filter-input-group input[type=text]:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.12)}
+.reg-filter-section{margin-top:6px}
+.reg-filter-section .reg-filter-label{margin-bottom:5px}
+
+.reg-filter-chips{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 0}
+.reg-filter-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border:1px solid #e2e8f0;border-radius:999px;background:#fff;color:#475569;font-size:11px;font-weight:500;cursor:pointer;user-select:none;transition:.15s}
 .reg-filter-chip:hover{border-color:#cbd5e1;background:#f1f5f9}
 .reg-filter-chip-active{background:#eff6ff;border-color:#3b82f6;color:#1d4ed8}
 .reg-filter-row{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:14px;font-size:12px}
-.reg-filter-row .reg-filter-label{font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;padding-top:6px;flex-shrink:0}
+.reg-filter-row .reg-filter-label{font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;flex-shrink:0}
+.reg-filter-label{font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.4px;display:block}
 .reg-filter-row .reg-filter-block{flex:1;min-width:240px}
+
+/* Toggle-кнопка "Архив" */
+.reg-archive-toggle{background:#10b981;color:#fff;border:none;transition:.18s}
+.reg-archive-toggle:hover:not(:disabled){background:#059669;box-shadow:0 4px 12px rgba(16,185,129,.3)}
+.reg-archive-toggle.reg-archive-toggle-on{background:#3b82f6}
+.reg-archive-toggle.reg-archive-toggle-on:hover:not(:disabled){background:#2563eb;box-shadow:0 4px 12px rgba(59,130,246,.3)}
 
 .reg-table-wrap{overflow-x:auto;border:1px solid #e2e8f0;border-radius:9px;background:#fff}
 .reg-table{width:100%;border-collapse:collapse;font-size:12px}
-.reg-table thead th{background:#f8fafc;border-bottom:2px solid #e2e8f0;color:#475569;font-weight:600;text-transform:uppercase;letter-spacing:.4px;font-size:10px;padding:9px 8px;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:1}
-.reg-table tbody td{border-bottom:1px solid #f1f5f9;padding:7px 8px;vertical-align:top;color:#1e293b}
+.reg-table thead th{background:#f8fafc;border-bottom:2px solid #e2e8f0;border-right:1px solid #e2e8f0;color:#475569;font-weight:600;text-transform:uppercase;letter-spacing:.4px;font-size:10px;padding:9px 8px;text-align:left;white-space:nowrap;position:sticky;top:0;z-index:1}
+.reg-table thead th:last-child{border-right:none}
+.reg-table tbody td{border-bottom:1px solid #f1f5f9;border-right:1px solid #f1f5f9;padding:7px 8px;vertical-align:top;color:#1e293b}
+.reg-table tbody td:last-child{border-right:none}
 .reg-table tbody tr:hover td{background:#fafbfc}
 .reg-table tbody tr.reg-row-archived td{background:#f8fafc;color:#94a3b8;font-style:italic}
 .reg-table tbody tr.reg-row-archived:hover td{background:#f1f5f9}
@@ -414,7 +443,7 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
             class="step3-input" style="font-family:monospace;font-weight:600">
         </div>
         <div class="step3-submit">
-          <button class="btn btn-primary" id="btn-generate" onclick="generateProtocol()" style="width:100%">✨ Создать протокол</button>
+          <button class="btn btn-primary" id="btn-generate" onclick="generateProtocol()">✨ Создать протокол</button>
         </div>
       </div>
 
@@ -470,45 +499,46 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
     <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:6px">
       <div class="card-title" style="margin:0"><div class="card-title-icon icon-purple">📋</div>Реестр требований проекта</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn reg-archive-toggle" id="reg-archive-toggle" onclick="toggleRegArchiveBtn()" title="Показать/скрыть архивные требования">📁 Архив</button>
         <button class="btn btn-success" id="reg-export-btn" onclick="exportRegistryXlsx()">⬇️ Скачать XLSX</button>
       </div>
     </div>
     <p style="font-size:13px;color:#64748b;margin:0 0 16px">Требования автоматически собираются сюда после генерации каждого протокола встречи. Любую ячейку можно отредактировать прямо в таблице.</p>
 
-    <!-- Toolbar: project + search -->
-    <div class="reg-toolbar">
-      <div>
-        <label style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px">Проект</label>
-        <select id="reg-project-select" onchange="onRegProjectChange()" style="min-width:240px"></select>
-      </div>
-      <div class="reg-search">
-        <label style="font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:3px">Поиск</label>
-        <input type="text" id="reg-search-input" placeholder="🔍 Поиск по тексту требования или коду..." oninput="renderRegistryTable()" style="width:100%">
-      </div>
-    </div>
+    <!-- ФИЛЬТРЫ — обёрнуты в подкарточку -->
+    <div class="reg-filters-card">
+      <div class="reg-filters-header">🔎 Фильтры</div>
 
-    <!-- Filter chips: status / area / archived -->
-    <div class="reg-filter-row">
-      <div class="reg-filter-block">
+      <!-- Project + Search в одну строку, обе одной ширины -->
+      <div class="reg-filters-row">
+        <div class="reg-filter-input-group">
+          <label class="reg-filter-label">Проект</label>
+          <select id="reg-project-select" onchange="onRegProjectChange()"></select>
+        </div>
+        <div class="reg-filter-input-group">
+          <label class="reg-filter-label">Поиск</label>
+          <input type="text" id="reg-search-input" placeholder="🔍 По тексту или коду..." oninput="renderRegistryTable()">
+        </div>
+      </div>
+
+      <!-- Status filter -->
+      <div class="reg-filter-section">
         <div class="reg-filter-label">Статус</div>
         <div class="reg-filter-chips" id="reg-status-filter"></div>
       </div>
-      <div class="reg-filter-block">
+
+      <!-- Area filter -->
+      <div class="reg-filter-section">
         <div class="reg-filter-label">Область</div>
         <div class="reg-filter-chips" id="reg-area-filter"></div>
       </div>
-      <div style="padding-top:6px">
-        <label style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#475569;cursor:pointer;user-select:none">
-          <input type="checkbox" id="reg-show-archived" onchange="renderRegistryTable()" style="width:14px;height:14px;cursor:pointer">
-          Показать архив
-        </label>
-      </div>
     </div>
 
-    <!-- Table -->
-    <div id="reg-table-host"></div>
-
+    <!-- Статистика — над таблицей, под фильтрами -->
     <div class="reg-stats" id="reg-stats"></div>
+
+    <!-- Таблица -->
+    <div id="reg-table-host"></div>
   </div>
 </div>
 
@@ -706,6 +736,45 @@ let currentTranscriptText = '';
 // Upload state
 // 'idle' | 'uploading' | 'ready' | 'transcribing' | 'transcribed' | 'error'
 let uploadState = 'idle';
+
+// ── Глобальная блокировка одновременных операций (E6) ────────────────
+// Когда идёт активная операция (загрузка/транскрипция/генерация), все
+// остальные интерактивные элементы во всех шагах блокируются — чтобы
+// юзер не нажал ничего лишнего, что может конфликтовать с текущей задачей.
+let _busyOp = null; // null | 'uploading' | 'transcribing' | 'generating'
+
+// Селекторы элементов, которые блокируются во время busy:
+// все кнопки в шагах + .tab навигация + dropzone + поля ввода в Шаге 3.
+const BUSY_LOCK_SELECTORS = [
+  '#step-1 button', '#step-1 input', '#step-1 .dropzone',
+  '#step-2 button',
+  '#step-3 button', '#step-3 input', '#step-3 select', '#step-3 .area-chip'
+].join(',');
+
+function setBusy(op) {
+  _busyOp = op;
+  document.body.dataset.busyOp = op || '';
+  // Блокируем всё, что попало в селекторы
+  document.querySelectorAll(BUSY_LOCK_SELECTORS).forEach(el => {
+    el.dataset.prevDisabled = el.disabled ? '1' : '0';
+    el.disabled = true;
+    el.classList.add('busy-locked');
+    el.style.pointerEvents = 'none';
+  });
+}
+
+function clearBusy() {
+  _busyOp = null;
+  delete document.body.dataset.busyOp;
+  document.querySelectorAll('.busy-locked').forEach(el => {
+    // Восстановим только то, что МЫ заблокировали (не трогаем кнопки которые
+    // были уже disabled до busy — например, шаги 2/3 пока шаг 1 не готов).
+    if (el.dataset.prevDisabled === '0') el.disabled = false;
+    delete el.dataset.prevDisabled;
+    el.classList.remove('busy-locked');
+    el.style.pointerEvents = '';
+  });
+}
 let uploadedFile = null;      // { uri, mimeType } for short videos
 let uploadedParts = [];       // [{ uri, mimeType, label }] for long videos
 let currentFileKey = null;    // fileKey of current upload session (for transcript saving)
@@ -1310,6 +1379,7 @@ async function startFileUpload(file) {
   // WEBM, MP4, MOV, MKV, AVI — отправляем как есть, Google поддерживает
 
   uploadState = 'uploading';
+  setBusy('uploading');
   uploadedFile = null;
   uploadedParts = [];
   currentTranscriptText = '';
@@ -1366,6 +1436,7 @@ async function startFileUpload(file) {
       await waitForActive(result.uri);
       uploadedFile = result;
       uploadState = 'ready';
+      clearBusy();
       const meetingTitle = document.getElementById('meeting-title').value.trim() || file.name;
       saveSingleFileURI(file, result.uri, result.mimeType, meetingTitle, duration);
       // Сохраняем извлечённое аудио в IDB — переиспользуем audioFile, без повторного ffmpeg
@@ -1424,6 +1495,7 @@ async function startFileUpload(file) {
         }
 
         uploadState = 'ready';
+        clearBusy();
         setUploadUI('ready', {
           title: file.name,
           sub: duration > 0
@@ -1453,6 +1525,7 @@ async function startFileUpload(file) {
         await waitForActive(result.uri);
         uploadedFile = result;
         uploadState = 'ready';
+        clearBusy();
         saveSingleFileURI(file, result.uri, result.mimeType, meetingTitle, duration);
         setUploadUI('ready', {
           title: file.name,
@@ -1503,6 +1576,7 @@ async function startFileUpload(file) {
 
   } catch (e) {
     uploadState = 'error';
+    clearBusy();
     setUploadUI('error', { msg: e.message });
     setStepState(1, 'active', '❌ ошибка');
   }
@@ -1618,6 +1692,7 @@ async function startTranscription() {
   setStepHint(2, 'Whisper расшифровывает аудио. Между чанками ~65 сек паузы — это лимит бесплатного Groq.');
   moveProgressTo(2);  // прогресс-бар внутрь Шага 2 — это его операция
   markStepStart(2);   // хронометраж Шага 2
+  setBusy('transcribing');
 
   try {
     // ── Step A: Whisper raw transcription ──
@@ -1694,6 +1769,8 @@ async function startTranscription() {
     setStepHint(2, `⚠️ Ошибка транскрипции: ${e.message.slice(0,80)}. Попробуй ещё раз.`);
     const statusEl = document.getElementById('protocol-status');
     if (statusEl) statusEl.innerHTML = `<div style="color:#dc2626;margin-top:8px">❌ Транскрипция: ${e.message}</div>`;
+  } finally {
+    clearBusy();
   }
 
   // На успешном пути кнопка остаётся disabled (см. блок выше). На ошибке — разблокируем для повтора.
@@ -2984,6 +3061,7 @@ async function generateProtocol() {
   currentRequirementsText = '';
 
   try {
+    setBusy('generating');
     let protocolText = '';
 
     if (manualText) {
@@ -3221,10 +3299,9 @@ async function generateProtocol() {
     }
   } finally {
     btn.disabled = false;
+    clearBusy();
   }
 }
-
-// ── SAVE / LIST ───────────────────────────────────────
 // ── SAVE / LIST ───────────────────────────────────────
 function saveProtocol(opts = {}) {
   if (!currentProtocolText) {
@@ -3472,9 +3549,8 @@ function renderRegistryTab() {
   // Фильтры: статус и область
   renderRegStatusFilter();
   renderRegAreaFilter();
-  // Чекбокс "показать архив"
-  const showArch = document.getElementById('reg-show-archived');
-  if (showArch) showArch.checked = !!regState.showArchived;
+  // Кнопка-toggle "Архив" в верхнем правом углу
+  updateRegArchiveBtn();
   // Поиск
   const search = document.getElementById('reg-search-input');
   if (search) search.value = regState.search || '';
@@ -3485,11 +3561,23 @@ function renderRegistryTab() {
 function renderRegStatusFilter() {
   const host = document.getElementById('reg-status-filter');
   if (!host) return;
+  // Используем data-status вместо onclick(JSON.stringify) — старый подход ломался на тире и пробелах
   host.innerHTML = REG_STATUSES.map(s => {
     const active = regState.selectedStatuses.has(s);
-    return `<div class="reg-filter-chip${active ? ' reg-filter-chip-active' : ''}"
-      onclick="toggleRegStatusFilter(${JSON.stringify(s)})">${escHtml(s)}</div>`;
+    return `<div class="reg-filter-chip${active ? ' reg-filter-chip-active' : ''}" data-status="${escHtml(s)}">${escHtml(s)}</div>`;
   }).join('');
+  // Делегированный обработчик: ставим один раз на host через addEventListener
+  // (заменяем существующий onclick если был навешан)
+  host.onclick = (e) => {
+    const chip = e.target.closest('.reg-filter-chip');
+    if (!chip) return;
+    const s = chip.dataset.status;
+    if (!s) return;
+    if (regState.selectedStatuses.has(s)) regState.selectedStatuses.delete(s);
+    else regState.selectedStatuses.add(s);
+    renderRegStatusFilter();
+    renderRegistryTable();
+  };
 }
 function renderRegAreaFilter() {
   const host = document.getElementById('reg-area-filter');
@@ -3498,11 +3586,21 @@ function renderRegAreaFilter() {
   if (!areas.length) { host.innerHTML = '<span style="font-size:11px;color:#94a3b8">нет областей в НСИ</span>'; return; }
   host.innerHTML = areas.map(a => {
     const active = regState.selectedAreas.has(a.id);
-    return `<div class="reg-filter-chip${active ? ' reg-filter-chip-active' : ''}"
-      onclick="toggleRegAreaFilter(${a.id})" title="${escHtml(a.name)}"><b style="font-family:monospace">${escHtml(a.prefix)}</b> ${escHtml(a.name)}</div>`;
+    return `<div class="reg-filter-chip${active ? ' reg-filter-chip-active' : ''}" data-area-id="${a.id}" title="${escHtml(a.name)}"><b style="font-family:monospace">${escHtml(a.prefix)}</b> ${escHtml(a.name)}</div>`;
   }).join('');
+  host.onclick = (e) => {
+    const chip = e.target.closest('.reg-filter-chip');
+    if (!chip) return;
+    const id = parseInt(chip.dataset.areaId);
+    if (!id) return;
+    if (regState.selectedAreas.has(id)) regState.selectedAreas.delete(id);
+    else regState.selectedAreas.add(id);
+    renderRegAreaFilter();
+    renderRegistryTable();
+  };
 }
 
+// Старые toggle* оставляем как алиасы — на случай если где-то они вызываются.
 function toggleRegStatusFilter(s) {
   if (regState.selectedStatuses.has(s)) regState.selectedStatuses.delete(s);
   else regState.selectedStatuses.add(s);
@@ -3514,6 +3612,24 @@ function toggleRegAreaFilter(id) {
   else regState.selectedAreas.add(id);
   renderRegAreaFilter();
   renderRegistryTable();
+}
+
+// Toggle-кнопка "Архив" в правом верхнем углу
+function toggleRegArchiveBtn() {
+  regState.showArchived = !regState.showArchived;
+  updateRegArchiveBtn();
+  renderRegistryTable();
+}
+function updateRegArchiveBtn() {
+  const btn = document.getElementById('reg-archive-toggle');
+  if (!btn) return;
+  if (regState.showArchived) {
+    btn.classList.add('reg-archive-toggle-on');
+    btn.innerHTML = '📁 Архив включён';
+  } else {
+    btn.classList.remove('reg-archive-toggle-on');
+    btn.innerHTML = '📁 Архив';
+  }
 }
 
 function onRegProjectChange() {
@@ -3530,8 +3646,7 @@ function getFilteredRequirements() {
   // Применяем синхронно строку поиска
   const search = document.getElementById('reg-search-input');
   regState.search = (search?.value || '').trim().toLowerCase();
-  const archCb = document.getElementById('reg-show-archived');
-  if (archCb) regState.showArchived = !!archCb.checked;
+  // showArchived теперь живёт только в regState, синхронизируется кнопкой-toggle
 
   const filtered = all.filter(r => {
     if (!regState.showArchived && r.archived) return false;
@@ -3613,7 +3728,7 @@ function resetRegFilters() {
   regState.selectedAreas.clear();
   regState.showArchived = false;
   const s = document.getElementById('reg-search-input'); if (s) s.value = '';
-  const a = document.getElementById('reg-show-archived'); if (a) a.checked = false;
+  updateRegArchiveBtn();
   renderRegStatusFilter();
   renderRegAreaFilter();
   renderRegistryTable();
@@ -5526,8 +5641,8 @@ function suggestProtocolNumber() {
   const projId = parseInt(projIdRaw);
   const input = document.getElementById('meeting-protocol-num');
   if (!input) return;
-  if (!projId) { input.value = ''; input.placeholder = 'выбери проект'; return; }
   input.placeholder = 'auto';
+  if (!projId) { input.value = ''; return; }
   // Не перетираем то, что юзер уже ввёл вручную
   if (input.value.trim() && input.dataset.userEdited === '1') return;
   const protocols = JSON.parse(localStorage.getItem('protocols') || '[]');
