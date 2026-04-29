@@ -77,7 +77,8 @@ textarea{resize:vertical;line-height:1.6}
 
 /* Глобальная блокировка операций (E6) */
 .busy-locked{opacity:.45!important;cursor:not-allowed!important;filter:grayscale(.4)}
-body[data-busy-op] .tab{pointer-events:none;opacity:.55}
+/* Во время операции блокируем ТОЛЬКО вкладку «Протокол встречи» — остальные доступны */
+body[data-busy-op] #tab-protocol{pointer-events:none;opacity:.55}
 body[data-busy-op="uploading"] #step-1 .upload-progress,
 body[data-busy-op="transcribing"] #step-2 .progress-wrap,
 body[data-busy-op="generating"] #step-3{opacity:1!important;filter:none!important}
@@ -290,12 +291,12 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
 </div>
 
 <div class="tabs">
-  <div class="tab active" onclick="showTab('protocol',this)">🎙️ Протокол встречи</div>
-  <div class="tab" onclick="showTab('registry',this)">📋 Реестр требований</div>
-  <div class="tab" onclick="showTab('report',this)">📄 Отчёт об обследовании</div>
-  <div class="tab" onclick="showTab('library',this)">📂 Библиотека файлов</div>
-  <div class="tab" onclick="showTab('nsi',this)">⚙️ НСИ</div>
-  <div class="tab" onclick="showTab('admin',this)">🛠️ Администрирование</div>
+  <div class="tab active" id="tab-protocol" onclick="showTab('protocol',this)">🎙️ Протокол встречи</div>
+  <div class="tab" id="tab-registry" onclick="showTab('registry',this)">📋 Реестр требований</div>
+  <div class="tab" id="tab-report" onclick="showTab('report',this)">📄 Отчёт об обследовании</div>
+  <div class="tab" id="tab-library" onclick="showTab('library',this)">📂 Библиотека файлов</div>
+  <div class="tab" id="tab-nsi" onclick="showTab('nsi',this)">⚙️ НСИ</div>
+  <div class="tab" id="tab-admin" onclick="showTab('admin',this)">🛠️ Администрирование</div>
 </div>
 
 <div class="main">
@@ -580,9 +581,6 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
       <button class="btn btn-secondary admin-btn" onclick="adminDeleteAllProtocols()" title="Чистит localStorage.protocols (список во вкладке Реестр)">
         📄 Удалить все готовые протоколы <span style="color:#94a3b8;font-size:12px">— список сохранённых протоколов</span>
       </button>
-      <button class="btn btn-secondary admin-btn" onclick="adminDeleteRequirementsRegistry()" title="Очищает текущий показанный текст реестра требований (in-memory, F5 тоже его убьёт)">
-        📋 Удалить реестр требований <span style="color:#94a3b8;font-size:12px">— только сам сводный реестр (внутри протоколов остаётся)</span>
-      </button>
       <button class="btn btn-secondary admin-btn" onclick="adminDeleteSurveyReport()" title="Очищает текущий показанный текст отчёта об обследовании (in-memory, F5 тоже его убьёт)">
         📊 Удалить отчёт об обследовании <span style="color:#94a3b8;font-size:12px">— только текст агрегированного отчёта</span>
       </button>
@@ -730,7 +728,6 @@ const MODEL = 'gemini-3.1-flash-lite-preview'; // free tier: 500 RPD, качес
 let currentProtocolText = '';
 let currentRequirementsText = '';
 let currentReportText = '';
-let currentRegistryText = '';
 let currentTranscriptText = '';
 
 // Upload state
@@ -1719,7 +1716,8 @@ async function startTranscription() {
       }
 
       // Save raw Whisper separately so cleanup can be retried without re-running Whisper
-      try { safeSetItem('whisper_raw_' + currentFileKey, whisperRaw); } catch(e) {}
+      // F2: теперь в IDB (раньше было safeSetItem('whisper_raw_'+key) в localStorage — лимит 5МБ)
+      idbSaveTranscript(currentFileKey, whisperRaw).catch(e => console.warn('[F2] save raw failed:', e));
       currentTranscriptText = finalTranscript;
       saveTranscriptToSession(currentFileKey, finalTranscript);
 
@@ -1898,8 +1896,8 @@ async function enrichTranscriptWithVideo() {
 async function retryGeminiCleanup() {
   if (!getKey()) { openSettings(); return; }
 
-  const rawTranscript = localStorage.getItem('whisper_raw_' + currentFileKey)
-    || currentTranscriptText;
+  // F2: читаем из IDB (раньше — localStorage.getItem('whisper_raw_'+key))
+  const rawTranscript = (await idbGetTranscript(currentFileKey)) || currentTranscriptText;
 
   if (!rawTranscript) {
     alert('Нет сохранённой транскрипции. Сначала выполни транскрибацию.');
@@ -2087,8 +2085,9 @@ async function loadFFmpeg() {
 //   value = { blob: Blob, fileName: string, savedAt: timestamp, sizeBytes: number }
 
 const AUDIO_DB_NAME = 'protokolist_audio_cache';
-const AUDIO_DB_VERSION = 1;
+const AUDIO_DB_VERSION = 2; // v1: audio_blobs only; v2: + transcripts store
 const AUDIO_STORE = 'audio_blobs';
+const TRANSCRIPT_STORE = 'transcripts';
 
 let _audioDbPromise = null;
 function openAudioDB() {
@@ -2099,6 +2098,9 @@ function openAudioDB() {
       const db = e.target.result;
       if (!db.objectStoreNames.contains(AUDIO_STORE)) {
         db.createObjectStore(AUDIO_STORE);
+      }
+      if (!db.objectStoreNames.contains(TRANSCRIPT_STORE)) {
+        db.createObjectStore(TRANSCRIPT_STORE);
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -2175,6 +2177,120 @@ async function cleanupOrphanAudioBlobs() {
   } catch (e) {
     console.warn('[audio-cache] cleanupOrphanAudioBlobs failed:', e);
   }
+}
+
+// ── F2: TRANSCRIPTS в IndexedDB ───────────────────────
+// Раньше сырые транскрипции хранились в localStorage под ключом whisper_raw_<fileKey>.
+// localStorage имеет лимит 5-10 МБ, а одна транскрипция 1.5-часового видео = 200-500 КБ.
+// После 20-30 встреч localStorage переполняется. Перенесли в IDB (1+ ГБ).
+//
+// Object store: transcripts
+//   key   = fileKey (тот же что у audio_blobs и upload_sessions)
+//   value = { raw: string, savedAt: number, sizeBytes: number }
+
+async function idbSaveTranscript(fileKey, rawText) {
+  if (!fileKey || !rawText) return false;
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(TRANSCRIPT_STORE, 'readwrite');
+      const store = tx.objectStore(TRANSCRIPT_STORE);
+      const record = { raw: rawText, savedAt: Date.now(), sizeBytes: rawText.length };
+      const req = store.put(record, fileKey);
+      req.onsuccess = () => resolve(true);
+      req.onerror  = () => reject(req.error);
+    });
+  } catch (e) {
+    console.warn('[transcripts] idbSaveTranscript failed:', e);
+    return false;
+  }
+}
+
+async function idbGetTranscript(fileKey) {
+  if (!fileKey) return null;
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(TRANSCRIPT_STORE, 'readonly');
+      const req = tx.objectStore(TRANSCRIPT_STORE).get(fileKey);
+      req.onsuccess = () => resolve(req.result?.raw || null);
+      req.onerror  = () => resolve(null);
+    });
+  } catch (e) {
+    console.warn('[transcripts] idbGetTranscript failed:', e);
+    return null;
+  }
+}
+
+async function idbDeleteTranscript(fileKey) {
+  if (!fileKey) return;
+  try {
+    const db = await openAudioDB();
+    await new Promise((resolve) => {
+      const tx = db.transaction(TRANSCRIPT_STORE, 'readwrite');
+      const req = tx.objectStore(TRANSCRIPT_STORE).delete(fileKey);
+      req.onsuccess = () => resolve();
+      req.onerror  = () => resolve();
+    });
+  } catch (e) {
+    console.warn('[transcripts] idbDeleteTranscript failed:', e);
+  }
+}
+
+async function idbListTranscriptKeys() {
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(TRANSCRIPT_STORE, 'readonly');
+      const req = tx.objectStore(TRANSCRIPT_STORE).getAllKeys();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror  = () => resolve([]);
+    });
+  } catch (e) {
+    return [];
+  }
+}
+
+async function idbTranscriptsSize() {
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(TRANSCRIPT_STORE, 'readonly');
+      const req = tx.objectStore(TRANSCRIPT_STORE).getAll();
+      req.onsuccess = () => {
+        const total = (req.result || []).reduce((s, r) => s + (r.sizeBytes || (r.raw?.length || 0)), 0);
+        resolve(total);
+      };
+      req.onerror  = () => resolve(0);
+    });
+  } catch (e) {
+    return 0;
+  }
+}
+
+// Миграция при старте: переносит whisper_raw_* из localStorage в IDB и удаляет из LS.
+// Идемпотентна — можно вызывать каждый старт.
+async function migrateWhisperRawFromLS() {
+  const lsKeys = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('whisper_raw_')) lsKeys.push(k);
+  }
+  if (!lsKeys.length) return { migrated: 0 };
+  let migrated = 0;
+  for (const lsKey of lsKeys) {
+    const fileKey = lsKey.substring('whisper_raw_'.length);
+    const raw = localStorage.getItem(lsKey);
+    if (raw) {
+      const ok = await idbSaveTranscript(fileKey, raw);
+      if (ok) {
+        localStorage.removeItem(lsKey);
+        migrated++;
+      }
+    }
+  }
+  if (migrated) console.info(`[F2] Перенесено ${migrated} транскрипций из localStorage в IDB`);
+  return { migrated };
 }
 
 // Извлечь аудио (или взять уже-извлечённое) и положить в IDB как часть Шага 1.
@@ -2926,19 +3042,6 @@ ${instr ? '\nДоп. инструкции: ' + instr : ''}
 
 ПРОТОКОЛЫ:
 ${protocols}`;
-}
-
-function REGISTRY_PROMPT(reqs) {
-  return `Сводный реестр требований без дублей. Уникальный ID каждому. Укажи источник.
-
-СВОДНЫЙ РЕЕСТР ТРЕБОВАНИЙ · Дата: ${today()}
-
-Формат: ID | Описание | Тип | Приоритет | Источник | Статус
-
-ИТОГО: Всего: N | Функциональных: N | Нефункциональных: N | Высокий: N | Средний: N | Низкий: N
-
-ВХОДНЫЕ РЕЕСТРЫ:
-${reqs}`;
 }
 
 // ── PARSE GEMINI RESPONSE BLOCKS ────────────────────
@@ -4074,22 +4177,6 @@ async function generateReport() {
   } catch (e) { showStatus('report-status', 'error', e.message); }
 }
 
-// ── GENERATE REGISTRY ─────────────────────────────────
-async function generateRegistry() {
-  const checked = [...document.querySelectorAll('input[id^="rg-"]:checked')].map(c => c.value);
-  if (!checked.length) { showStatus('registry-status', 'error', 'Выбери хотя бы один протокол'); return; }
-  const sel = getProtocols().filter(p => checked.includes(String(p.id)));
-  const combined = sel.map(p => `=== ${p.title} (${p.date}) ===\n${p.requirements}`).join('\n\n');
-  try {
-    showStatus('registry-status', 'info', `Формирую реестр из ${sel.length} протоколов...`);
-    currentRegistryText = await callGemini([{ text: REGISTRY_PROMPT(combined) }]);
-    document.getElementById('registry-preview').textContent = currentRegistryText;
-    document.getElementById('registry-result-card').style.display = 'block';
-    document.getElementById('registry-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    showStatus('registry-status', 'success', 'Реестр готов!');
-  } catch (e) { showStatus('registry-status', 'error', e.message); }
-}
-
 // ── DOCX ──────────────────────────────────────────────
 function downloadSessionTranscript(sessionId) {
   const sessions = getUploadSessions();
@@ -4116,8 +4203,7 @@ async function downloadDocx(type) {
   const map = {
     protocol:     { text: currentProtocolText,     file: 'протокол.docx' },
     requirements: { text: currentRequirementsText,  file: 'требования.docx' },
-    report:       { text: currentReportText,        file: 'отчёт.docx' },
-    registry:     { text: currentRegistryText,      file: 'реестр.docx' }
+    report:       { text: currentReportText,        file: 'отчёт.docx' }
   };
   const { text, file } = map[type] || {};
   if (!text) { alert('Сначала сгенерируй документ'); return; }
@@ -4885,7 +4971,7 @@ async function clearLibrary() {
   localStorage.setItem('upload_sessions', JSON.stringify([]));
   // На случай если в IDB остались сироты (например fileKey изменился) — добиваем
   await cleanupOrphanAudioBlobs().catch(() => {});
-  const cleared = clearWhisperCache();
+  const cleared = await clearWhisperCache();
 
   // ── Шаг D: финальный статус ──
   const parts = [];
@@ -4973,8 +5059,7 @@ async function getStorageBreakdown() {
     idbAudio, idbAudioCount,
     hasGeminiKey: !!localStorage.getItem('gemini_key'),
     hasGroqKey: !!localStorage.getItem('groq_key'),
-    currentReportInMemory: !!currentReportText,
-    currentRegistryInMemory: !!currentRegistryText
+    currentReportInMemory: !!currentReportText
   };
 }
 
@@ -5119,7 +5204,7 @@ async function adminDeleteAllAudioAndTranscripts() {
         }
       } catch (_) {}
       // Whisper-кэш
-      const whisperCleared = clearWhisperCache();
+      const whisperCleared = await clearWhisperCache();
       // Чистим transcript в оставшихся сессиях (если кнопка 1 не нажата)
       const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
       for (const s of sessions) { if (s.transcript) delete s.transcript; }
@@ -5149,21 +5234,7 @@ async function adminDeleteAllProtocols() {
     });
 }
 
-// ── Кнопка 4: реестр требований (in-memory + DOM-превью) ──
-async function adminDeleteRequirementsRegistry() {
-  await _adminAct('Очищаю реестр требований',
-    'УДАЛИТЬ РЕЕСТР ТРЕБОВАНИЙ:\n\n' +
-    'Очистит сводный текст реестра (in-memory). Внутри отдельных протоколов раздел «Требования» останется.\n\n' +
-    'Продолжить?',
-    async () => {
-      currentRegistryText = '';
-      const prev = document.getElementById('registry-preview');
-      if (prev) prev.textContent = '';
-      return 'Реестр требований очищен';
-    });
-}
-
-// ── Кнопка 5: отчёт об обследовании ──
+// ── Кнопка 4: отчёт об обследовании ──
 async function adminDeleteSurveyReport() {
   await _adminAct('Очищаю отчёт об обследовании',
     'УДАЛИТЬ ОТЧЁТ ОБ ОБСЛЕДОВАНИИ:\n\n' +
@@ -5234,7 +5305,7 @@ async function adminDeleteEverything() {
     });
     for (const k of allKeys) await deleteAudioBlob(k).catch(() => {});
   } catch (_) {}
-  clearWhisperCache();
+  await clearWhisperCache();
   currentTranscriptText = '';
 
   // Шаг 3: протоколы
@@ -5243,14 +5314,8 @@ async function adminDeleteEverything() {
   currentProtocolText = '';
   currentRequirementsText = '';
 
-  // Шаг 4: реестр требований
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 4/5: реестр требований...</div>');
-  currentRegistryText = '';
-  const regPrev = document.getElementById('registry-preview');
-  if (regPrev) regPrev.textContent = '';
-
-  // Шаг 5: отчёт об обследовании
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 5/5: отчёт об обследовании...</div>');
+  // Шаг 4: отчёт об обследовании
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 4/4: отчёт об обследовании...</div>');
   currentReportText = '';
   const repPrev = document.getElementById('report-preview');
   if (repPrev) repPrev.textContent = '';
@@ -5265,9 +5330,9 @@ async function adminDeleteEverything() {
   await renderAdmin();
 }
 
-// Удаляет все whisper_raw_* и whisper_progress_* из localStorage.
-// Возвращает количество удалённых ключей.
-function clearWhisperCache() {
+// Удаляет все whisper_raw_* и whisper_progress_* из localStorage + ВСЕ транскрипции из IDB.
+// Возвращает количество удалённых ключей (LS + IDB).
+async function clearWhisperCache() {
   const toDelete = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
@@ -5276,7 +5341,10 @@ function clearWhisperCache() {
     }
   }
   for (const k of toDelete) localStorage.removeItem(k);
-  return toDelete.length;
+  // F2: также чистим транскрипции из IDB
+  const idbKeys = await idbListTranscriptKeys();
+  for (const k of idbKeys) await idbDeleteTranscript(k);
+  return toDelete.length + idbKeys.length;
 }
 
 // Считает сколько места занимает приложение в localStorage (байты на символ ≈ 2 в UTF-16).
@@ -5319,11 +5387,11 @@ function updateStorageInfo() {
 }
 
 // Отдельная очистка только whisper-кэша (для осторожных — не трогает протоколы и сессии).
-function clearWhisperCacheWithConfirm() {
+async function clearWhisperCacheWithConfirm() {
   const u = getStorageUsage();
   if (u.whisper === 0) { alert('Кэш расшифровок уже пустой.'); return; }
   if (!confirm(`Удалить сохранённые расшифровки Whisper?\n\nЗанято: ${formatBytes(u.whisper)} в ${u.whisperCount} записях.\n\nЭто сырые результаты до постобработки. Сессии и протоколы останутся.`)) return;
-  const n = clearWhisperCache();
+  const n = await clearWhisperCache();
   alert(`Удалено записей: ${n}`);
   updateStorageInfo();
 }
@@ -5847,6 +5915,8 @@ function encodeWAV(samples, sampleRate) {
 if (!getKey()) setTimeout(openSettings, 500);
 setTimeout(() => {
   ensureNSIDefaults();
+  // F2: фоновая миграция транскрипций из localStorage в IDB (идемпотентна)
+  migrateWhisperRawFromLS().catch(e => console.warn('[F2] migration failed:', e));
   renderNSI();
   updateProjectSelect();
   renderFunctionalAreaChips();
