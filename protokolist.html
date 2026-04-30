@@ -77,8 +77,8 @@ textarea{resize:vertical;line-height:1.6}
 
 /* Глобальная блокировка операций (E6) */
 .busy-locked{opacity:.45!important;cursor:not-allowed!important;filter:grayscale(.4)}
-/* Во время операции блокируем ТОЛЬКО вкладку «Протокол встречи» — остальные доступны */
-body[data-busy-op] #tab-protocol{pointer-events:none;opacity:.55}
+/* Во время операции вкладки навигации остаются кликабельными — блокируется только содержимое */
+/* (содержимое блокируется JS-функцией setBusy через BUSY_LOCK_SELECTORS) */
 body[data-busy-op="uploading"] #step-1 .upload-progress,
 body[data-busy-op="transcribing"] #step-2 .progress-wrap,
 body[data-busy-op="generating"] #step-3{opacity:1!important;filter:none!important}
@@ -129,7 +129,7 @@ body[data-busy-op="generating"] #step-3{opacity:1!important;filter:none!importan
 .step-0-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .step-0-icon{font-size:18px}
 .step-0-title{font-size:15px;font-weight:600;color:#1e293b;margin:0}
-.step-0-options{display:flex;gap:10px;flex-wrap:wrap}
+.step-0-options{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}
 .step-0-checkbox{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#475569;border:1px solid #cbd5e1;border-radius:9px;padding:8px 14px;background:#fff;margin:0;transition:all .15s;text-transform:none;letter-spacing:0;font-weight:400}
 .step-0-checkbox:hover{border-color:#94a3b8;background:#f8fafc}
 .step-0-checkbox input[type=checkbox]{width:15px;height:15px;cursor:pointer;margin:0}
@@ -841,6 +841,106 @@ let currentRawFile = null;    // original File object — needed for separate tr
 let audioOnlyMode = false;    // if true: extract audio, upload as audio-only to Gemini
 let currentMediaInfo = { durationSec: 0, numChunks: 0 };  // обновляется в startFileUpload — длительность и кол-во чанков для UI
 
+// ── F3: AUTO-РЕЖИМ (Шаг 0 → авто-цепочка Шаг1→2→3) ────────────────────
+let _autoMode = false;  // включается чекбоксом #auto-mode-flag
+
+// Проверка заполненности Шага 3 — необходимое условие для запуска Авто-режима
+function isStep3Filled() {
+  const proj  = document.getElementById('meeting-project')?.value || '';
+  const title = document.getElementById('meeting-title')?.value.trim() || '';
+  const date  = document.getElementById('meeting-date')?.value.trim() || '';
+  const areas = (typeof getSelectedAreaIds === 'function') ? getSelectedAreaIds() : [];
+  // Дата должна быть в формате ДД.ММ.ГГГГ (10 символов с точками)
+  const dateOk = /^\d{2}\.\d{2}\.\d{4}$/.test(date);
+  return Boolean(proj && title && dateOk && areas.length > 0);
+}
+
+// Что именно не заполнено — для подсказки в баннере
+function step3MissingFields() {
+  const missing = [];
+  if (!document.getElementById('meeting-project')?.value)       missing.push('Проект');
+  if (!document.getElementById('meeting-title')?.value.trim())  missing.push('Название');
+  const date = document.getElementById('meeting-date')?.value.trim() || '';
+  if (!/^\d{2}\.\d{2}\.\d{4}$/.test(date))                      missing.push('Дата');
+  const areas = (typeof getSelectedAreaIds === 'function') ? getSelectedAreaIds() : [];
+  if (!areas.length)                                            missing.push('Область');
+  return missing;
+}
+
+// Показать/скрыть баннер «Заполни Шаг 3» — вызывать каждый раз, когда меняется
+// либо чекбокс Авто, либо любое поле Шага 3.
+function updateAutoModeBanner() {
+  const banner = document.getElementById('step-0-warning');
+  if (!banner) return;
+  if (_autoMode && !isStep3Filled()) {
+    banner.style.display = '';
+    const sub = document.getElementById('step-0-warning-sub');
+    if (sub) {
+      const miss = step3MissingFields();
+      sub.textContent = miss.length
+        ? 'Не заполнено: ' + miss.join(', ')
+        : 'Нужны: Проект, Название, Дата, Область';
+    }
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+// Обработчик чекбокса Авто-режима
+function onAutoModeToggle(checked) {
+  _autoMode = !!checked;
+  updateAutoModeBanner();
+}
+
+// Подсветить Шаг 3 кратковременно (когда юзер пытается загрузить файл с пустым Шагом 3)
+function flashStep3() {
+  const step3 = document.getElementById('step-3');
+  if (!step3) return;
+  step3.classList.remove('step3-flash');
+  // reflow чтобы анимация перезапустилась
+  void step3.offsetWidth;
+  step3.classList.add('step3-flash');
+  step3.scrollIntoView({behavior:'smooth', block:'start'});
+  setTimeout(() => step3.classList.remove('step3-flash'), 2200);
+}
+
+// Проверка перед загрузкой файла — если Авто включён и Шаг 3 пустой, не пускаем
+// (используется в onUploadAreaClick, drop-handler и в начале startFileUpload).
+function canAcceptFileForAuto() {
+  if (!_autoMode) return true;
+  if (isStep3Filled()) return true;
+  flashStep3();
+  updateAutoModeBanner();
+  alert('🚀 Авто-режим включён.\n\nСначала заполни Шаг 3:\n• Проект\n• Название встречи\n• Дата\n• Хотя бы одна функциональная область\n\nИначе авто-цепочка не сможет дойти до конца.');
+  return false;
+}
+
+// Авто-триггер транскрипции — вызывается из конца startFileUpload в случае успеха.
+function maybeAutoStartTranscription() {
+  if (!_autoMode) return;
+  if (uploadState !== 'ready') return;
+  if (!getGroqKey()) return;          // без Groq-ключа Whisper не запустится — оставим юзера решать
+  if (!currentRawFile) return;        // защита: нечего транскрибировать
+  // Небольшая задержка — даём UI отрендериться, busyOp снять
+  setTimeout(() => {
+    if (_busyOp || uploadState !== 'ready') return;
+    console.log('[auto] auto-trigger startTranscription');
+    startTranscription();
+  }, 300);
+}
+
+// Авто-триггер генерации протокола — вызывается из конца startTranscription в случае успеха.
+function maybeAutoStartGeneration() {
+  if (!_autoMode) return;
+  if (uploadState !== 'transcribed') return;
+  if (!isStep3Filled()) return;       // защита: Шаг 3 должен быть заполнен (но мы это уже проверили на этапе загрузки)
+  setTimeout(() => {
+    if (_busyOp) return;
+    console.log('[auto] auto-trigger generateProtocol');
+    generateProtocol();
+  }, 300);
+}
+
 // ── SETTINGS ─────────────────────────────────────────
 const getKey = () => localStorage.getItem('gemini_key') || '';
 const getGroqKey = () => localStorage.getItem('groq_key') || '';
@@ -1216,6 +1316,7 @@ async function loadSessionToMainPage(sessionId) {
 function onUploadAreaClick() {
   // Allow re-select only if not currently uploading
   if (uploadState === 'uploading') return;
+  if (!canAcceptFileForAuto()) return;  // F3: блок если Авто включён и Шаг 3 пуст
   document.getElementById('audio-file').click();
 }
 
@@ -1264,6 +1365,7 @@ function onUploadAreaClick() {
     e.preventDefault();
     hideOverlay();
     if (uploadState === 'uploading') return;
+    if (!canAcceptFileForAuto()) return;  // F3: блок если Авто включён и Шаг 3 пуст
     const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
     if (f) startFileUpload(f);
   });
@@ -1277,6 +1379,10 @@ function onUploadAreaClick() {
 function handleFileSelect(input) {
   const f = input.files[0];
   if (!f) return;
+  if (!canAcceptFileForAuto()) {  // F3: финальная защита
+    input.value = '';
+    return;
+  }
   startFileUpload(f);
   input.value = ''; // reset so same file can be re-selected
 }
@@ -1633,6 +1739,9 @@ async function startFileUpload(file) {
       setStepHint(2, '⚠️ Добавь Groq API-ключ в ⚙️ настройках вверху справа' + etaSuffix);
     }
 
+    // F3: Авто-режим — автоматически переходим к Шагу 2 (транскрипция)
+    maybeAutoStartTranscription();
+
   } catch (e) {
     uploadState = 'error';
     clearBusy();
@@ -1840,6 +1949,9 @@ async function startTranscription() {
   } else if (tBtn) {
     tBtn.textContent = '🎙️ Транскрибировать';
   }
+
+  // F3: Авто-режим — автоматически переходим к Шагу 3 (генерация протокола)
+  maybeAutoStartGeneration();
 }
 
 // ── GEMINI TRANSCRIPT CLEANUP ─────────────────────────
@@ -5750,6 +5862,8 @@ function renderFunctionalAreaChips() {
 
 function toggleAreaChip(el) {
   el.classList.toggle('area-chip-active');
+  // F3: при изменении выбора областей — пересчитать состояние Авто-баннера
+  if (typeof updateAutoModeBanner === 'function') updateAutoModeBanner();
 }
 
 // Возвращает массив id выбранных областей (читается из DOM — нет рассинхрона)
@@ -5994,6 +6108,28 @@ setTimeout(() => {
   setStepHint(1, 'Загрузи видео или аудио в область выше. MP4, MKV, WEBM, MOV, MP3, WAV и т.п. До 2 ГБ.');
   setStepState(2, 'disabled', '');
   setStepState(3, 'disabled', '');
+
+  // F3: Авто-режим — обработчик чекбокса + реактивность полей Шага 3
+  const autoFlag = document.getElementById('auto-mode-flag');
+  if (autoFlag) {
+    autoFlag.addEventListener('change', e => onAutoModeToggle(e.target.checked));
+  }
+  ['meeting-project','meeting-title','meeting-date'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input',  updateAutoModeBanner);
+    el.addEventListener('change', updateAutoModeBanner);
+  });
+  // F3: предупреждение перед закрытием вкладки во время активной операции
+  window.addEventListener('beforeunload', e => {
+    if (_busyOp) {
+      e.preventDefault();
+      // Большинство современных браузеров игнорируют кастомный текст и показывают свой,
+      // но returnValue нужно установить — иначе диалог не сработает.
+      e.returnValue = 'Идёт активная операция (загрузка/транскрипция/генерация). Если закроешь — прогресс потеряется.';
+      return e.returnValue;
+    }
+  });
 }, 100);
 </script>
 </body>
