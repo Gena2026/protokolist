@@ -130,12 +130,13 @@ body[data-busy-op="generating"] #step-3{opacity:1!important;filter:none!importan
 .step-0-icon{font-size:18px}
 .step-0-title{font-size:15px;font-weight:600;color:#1e293b;margin:0}
 .step-0-options{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}
-.step-0-checkbox{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#475569;border:1px solid #cbd5e1;border-radius:9px;padding:8px 14px;background:#fff;margin:0;transition:all .15s;text-transform:none;letter-spacing:0;font-weight:400}
+.step-0-checkbox{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#475569;border:1px solid #cbd5e1;border-radius:9px;padding:9px 14px;background:#fff;margin:0;transition:all .15s;text-transform:none;letter-spacing:0;font-weight:400}
 .step-0-checkbox:hover{border-color:#94a3b8;background:#f8fafc}
-.step-0-checkbox input[type=checkbox]{width:15px;height:15px;cursor:pointer;margin:0}
+.step-0-checkbox input[type=checkbox]{width:15px;height:15px;cursor:pointer;margin:0;flex-shrink:0}
 .step-0-checkbox:has(input:checked){border-color:#3b82f6;background:#eff6ff;color:#1d4ed8}
-.step-0-checkbox-text{display:flex;align-items:center;gap:6px}
-.step-0-checkbox-emoji{font-size:14px}
+.step-0-checkbox-emoji{font-size:16px;flex-shrink:0;line-height:1}
+.step-0-checkbox-text{display:flex;flex-direction:column;gap:1px;line-height:1.25}
+.step-0-checkbox-name{font-size:13px;font-weight:500;color:inherit}
 .step-0-checkbox-hint{color:#94a3b8;font-size:11px;font-weight:400}
 .step-0-checkbox:has(input:checked) .step-0-checkbox-hint{color:#60a5fa}
 /* Баннер «Заполни Шаг 3» — виден только при включённом Авто и пустом Шаге 3 */
@@ -149,6 +150,14 @@ body[data-busy-op="generating"] #step-3{opacity:1!important;filter:none!importan
 /* Подсветка Шага 3 при попытке загрузить с пустыми полями (включается JS-кодом, висит ~2 сек) */
 @keyframes step3-flash{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0)}50%{box-shadow:0 0 0 4px rgba(245,158,11,.4)}}
 #step-3.step3-flash{animation:step3-flash 1s ease-in-out 2}
+
+/* Подсветка отдельных незаполненных полей Шага 3 — красная рамка + краткий пульс */
+@keyframes field-pulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0)}50%{box-shadow:0 0 0 4px rgba(239,68,68,.25)}}
+.step3-input.field-empty-warn,
+input.field-empty-warn,
+select.field-empty-warn{border-color:#ef4444!important;background:#fef2f2!important;animation:field-pulse .9s ease-in-out 2}
+/* Контейнер чипов выделяем не рамкой (там нет default border) — через outline */
+#meeting-areas-chips.area-chips-warn{outline:2px dashed #ef4444;outline-offset:6px;border-radius:6px;animation:field-pulse .9s ease-in-out 2;background:#fef2f2}
 
 /* === Шаг 3: 2-колоночная раскладка (форма ↔ функ. области) === */
 .step3-grid{display:grid;grid-template-columns:2fr 1fr;gap:24px;margin-top:14px;align-items:start}
@@ -340,18 +349,18 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
     <div class="step-0-options">
       <label class="step-0-checkbox">
         <input type="checkbox" id="auto-mode-flag">
+        <span class="step-0-checkbox-emoji">🚀</span>
         <span class="step-0-checkbox-text">
-          <span class="step-0-checkbox-emoji">🚀</span>
-          Авто-режим
+          <span class="step-0-checkbox-name">Авто-режим</span>
           <span class="step-0-checkbox-hint">загрузил → ушёл пить кофе</span>
         </span>
       </label>
 
       <label class="step-0-checkbox">
         <input type="checkbox" id="audio-only-flag" onchange="audioOnlyMode=this.checked">
+        <span class="step-0-checkbox-emoji">🔊</span>
         <span class="step-0-checkbox-text">
-          <span class="step-0-checkbox-emoji">🔊</span>
-          Только аудио
+          <span class="step-0-checkbox-name">Только аудио</span>
           <span class="step-0-checkbox-hint">нет показа экрана</span>
         </span>
       </label>
@@ -803,9 +812,10 @@ let uploadState = 'idle';
 let _busyOp = null; // null | 'uploading' | 'transcribing' | 'generating'
 
 // Селекторы элементов, которые блокируются во время busy:
-// все кнопки в шагах + .tab навигация + dropzone + поля ввода в Шаге 3.
+// Шаг 0 (чекбоксы) + все кнопки в шагах + правильная dropzone (.upload-area) + поля ввода в Шаге 3.
 const BUSY_LOCK_SELECTORS = [
-  '#step-1 button', '#step-1 input', '#step-1 .dropzone',
+  '#step-0 input',
+  '#step-1 button', '#step-1 input', '#step-1 .upload-area',
   '#step-2 button',
   '#step-3 button', '#step-3 input', '#step-3 select', '#step-3 .area-chip'
 ].join(',');
@@ -890,6 +900,51 @@ function updateAutoModeBanner() {
 function onAutoModeToggle(checked) {
   _autoMode = !!checked;
   updateAutoModeBanner();
+  if (_autoMode && !isStep3Filled()) {
+    // Сразу показываем юзеру что нужно заполнить — подсветка + плавный скролл к Шагу 3
+    highlightStep3MissingFields();
+    flashStep3();
+  } else if (!_autoMode) {
+    // Авто выключен — снимаем подсветку
+    ['meeting-project','meeting-title','meeting-date'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('field-empty-warn');
+    });
+    const chips = document.getElementById('meeting-areas-chips');
+    if (chips) chips.classList.remove('area-chips-warn');
+  }
+}
+
+// Подсветить незаполненные поля Шага 3 — красная рамка + пульс
+function highlightStep3MissingFields() {
+  const proj  = document.getElementById('meeting-project');
+  const title = document.getElementById('meeting-title');
+  const date  = document.getElementById('meeting-date');
+  const chips = document.getElementById('meeting-areas-chips');
+  if (proj  && !proj.value)                                  proj.classList.add('field-empty-warn');
+  if (title && !title.value.trim())                          title.classList.add('field-empty-warn');
+  if (date  && !/^\d{2}\.\d{2}\.\d{4}$/.test(date.value.trim())) date.classList.add('field-empty-warn');
+  const areas = (typeof getSelectedAreaIds === 'function') ? getSelectedAreaIds() : [];
+  if (chips && !areas.length)                                chips.classList.add('area-chips-warn');
+}
+
+// Снять подсветку с конкретного поля если оно стало валидным
+function refreshFieldHighlight(targetId) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  let filled = false;
+  if (targetId === 'meeting-project') filled = !!el.value;
+  else if (targetId === 'meeting-title') filled = !!el.value.trim();
+  else if (targetId === 'meeting-date')  filled = /^\d{2}\.\d{2}\.\d{4}$/.test(el.value.trim());
+  if (filled) el.classList.remove('field-empty-warn');
+}
+
+// Снять подсветку с контейнера чипов если есть хотя бы одна выбранная область
+function refreshAreasHighlight() {
+  const chips = document.getElementById('meeting-areas-chips');
+  if (!chips) return;
+  const areas = (typeof getSelectedAreaIds === 'function') ? getSelectedAreaIds() : [];
+  if (areas.length) chips.classList.remove('area-chips-warn');
 }
 
 // Подсветить Шаг 3 кратковременно (когда юзер пытается загрузить файл с пустым Шагом 3)
@@ -904,14 +959,14 @@ function flashStep3() {
   setTimeout(() => step3.classList.remove('step3-flash'), 2200);
 }
 
-// Проверка перед загрузкой файла — если Авто включён и Шаг 3 пустой, не пускаем
-// (используется в onUploadAreaClick, drop-handler и в начале startFileUpload).
+// Проверка перед загрузкой файла — если Авто включён и Шаг 3 пустой, не пускаем.
+// Вместо alert визуально подсвечиваем красным незаполненные поля + общий flash Шага 3.
 function canAcceptFileForAuto() {
   if (!_autoMode) return true;
   if (isStep3Filled()) return true;
+  highlightStep3MissingFields();
   flashStep3();
   updateAutoModeBanner();
-  alert('🚀 Авто-режим включён.\n\nСначала заполни Шаг 3:\n• Проект\n• Название встречи\n• Дата\n• Хотя бы одна функциональная область\n\nИначе авто-цепочка не сможет дойти до конца.');
   return false;
 }
 
@@ -1314,7 +1369,8 @@ async function loadSessionToMainPage(sessionId) {
 
 // ── UPLOAD AREA CLICK ─────────────────────────────────
 function onUploadAreaClick() {
-  // Allow re-select only if not currently uploading
+  // Блок если идёт ЛЮБАЯ операция (загрузка/транскрипция/генерация)
+  if (_busyOp) return;
   if (uploadState === 'uploading') return;
   if (!canAcceptFileForAuto()) return;  // F3: блок если Авто включён и Шаг 3 пуст
   document.getElementById('audio-file').click();
@@ -1341,6 +1397,7 @@ function onUploadAreaClick() {
 
   window.addEventListener('dragenter', e => {
     if (!isFileDrag(e)) return;
+    if (_busyOp) return;  // Не показываем overlay во время операции
     if (uploadState === 'uploading') return;
     e.preventDefault();
     depth++;
@@ -1364,6 +1421,7 @@ function onUploadAreaClick() {
     if (!isFileDrag(e)) return;
     e.preventDefault();
     hideOverlay();
+    if (_busyOp) return;  // Блок если идёт любая операция
     if (uploadState === 'uploading') return;
     if (!canAcceptFileForAuto()) return;  // F3: блок если Авто включён и Шаг 3 пуст
     const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
@@ -5862,8 +5920,9 @@ function renderFunctionalAreaChips() {
 
 function toggleAreaChip(el) {
   el.classList.toggle('area-chip-active');
-  // F3: при изменении выбора областей — пересчитать состояние Авто-баннера
+  // F3: при изменении выбора областей — пересчитать состояние Авто-баннера и подсветку
   if (typeof updateAutoModeBanner === 'function') updateAutoModeBanner();
+  if (typeof refreshAreasHighlight === 'function') refreshAreasHighlight();
 }
 
 // Возвращает массив id выбранных областей (читается из DOM — нет рассинхрона)
@@ -6117,8 +6176,9 @@ setTimeout(() => {
   ['meeting-project','meeting-title','meeting-date'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.addEventListener('input',  updateAutoModeBanner);
-    el.addEventListener('change', updateAutoModeBanner);
+    const handler = () => { refreshFieldHighlight(id); updateAutoModeBanner(); };
+    el.addEventListener('input',  handler);
+    el.addEventListener('change', handler);
   });
   // F3: предупреждение перед закрытием вкладки во время активной операции
   window.addEventListener('beforeunload', e => {
