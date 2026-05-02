@@ -3849,49 +3849,147 @@ function REQUIREMENTS_PROMPT(protocol, selectedAreasText) {
 ${protocol}`;
 }
 
-function REPORT_PROMPT(protocols, instr) {
-  return `Ты — старший системный аналитик. Составь отчёт об обследовании.
-${instr ? '\nДоп. инструкции: ' + instr : ''}
+// ── F-Report-4: ПРОМПТЫ ОТЧЁТА ОБ ОБСЛЕДОВАНИИ ─────────
+// Старый REPORT_PROMPT (один большой) удалён — он не справлялся с длинными отчётами
+// (8192 token output limit Gemini обрезал результат).
+// Вместо этого 3 фокусированных промпта + сборка из реквизитов:
+//   1. REPORT_INTRO_PROMPT       → разделы 1.1, 1.2, 1.3 + раздел 3 (цели/задачи/границы)
+//   2. REPORT_AREA_AS_IS_PROMPT  → один вызов на каждую функ.область — раздел 2.2.X
+//   3. REPORT_GLOSSARY_PROMPT    → глоссарий из терминов всех протоколов
+// Раздел 2.1 (общие сведения) собирается напрямую из реквизитов проекта без Gemini.
 
-ОТЧЁТ ОБ ОБСЛЕДОВАНИИ · Дата: ${today()}
-Период: [из дат протоколов]
+// Промпт 1: Введение (1.1–1.3) и Цели/задачи/границы (раздел 3)
+function REPORT_INTRO_PROMPT(project, protocolsMeta, allToBeTheses, instr) {
+  const meetingsList = protocolsMeta.map(p =>
+    `— ${p.areasNames.join(', ')} (${p.date})${p.title ? ` — ${p.title}` : ''}`
+  ).join('\n');
+  const toBeBlocks = allToBeTheses.length
+    ? allToBeTheses.map(t => `[${t.areaName}] ${t.topic}: ${t.toBe}`).join('\n')
+    : '(тезисы To Be не зафиксированы — выводи общие цели на основе перечня встреч)';
+  const dateRange = formatDateRange(project.surveyDateFrom, project.surveyDateTo);
+  return `Ты — старший системный аналитик. Составь две части отчёта об обследовании по шаблону.
+${instr ? `\nДоп. инструкции пользователя: ${instr}` : ''}
 
-АННОТАЦИЯ [2–3 предложения]
+ДАННЫЕ ПРОЕКТА:
+Заказчик: ${project.customerOrg}
+Исполнитель: ${project.executorOrg}
+Договор: № ${project.contractNumber} от ${project.contractDate}
+Период обследования: ${dateRange}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. ВВЕДЕНИЕ
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1.1. Цель обследования
-1.2. Состав рабочей группы
-1.3. Перечень встреч
+ВСТРЕЧИ:
+${meetingsList || '(встречи не указаны)'}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-2. ТЕКУЩЕЕ СОСТОЯНИЕ
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Бизнес-процессы и системы]
+ОБСУЖДЁННЫЕ ИЗМЕНЕНИЯ (To Be по областям):
+${toBeBlocks}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-3. СВОДНЫЙ РЕЕСТР ТРЕБОВАНИЙ
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Требования сгруппированные по тематике]
+⚠️ КРИТИЧНО:
+— Пиши ПРОФЕССИОНАЛЬНО, в деловом стиле. Никаких разговорных оборотов, эмодзи, маркеров «-», «*», «•».
+— Связные абзацы. Не buleted-списки внутри текста (списки только там где явно указано).
+— Не выдумывай факты которых нет в данных. Если данных мало — пиши общими формулировками.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-4. ВЫЯВЛЕННЫЕ ПРОБЛЕМЫ И РИСКИ
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Из открытых вопросов]
+ВЕРНИ СТРОГО В ТАКОМ ФОРМАТЕ (без преамбулы, без обёртки, без лишних строк):
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-5. РЕКОМЕНДАЦИИ
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Конкретные рекомендации]
+===INTRO===
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-6. ЗАКЛЮЧЕНИЕ
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-[Итог]
+## 1.1. Назначение документа
+
+Данный документ представляет собой отчет по результатам проведения аудита (далее — Отчет). Основанием для проведения аудита является Договор № ${project.contractNumber} от ${project.contractDate} между ${project.customerOrg} (далее — Заказчик) и ${project.executorOrg} (далее — Исполнитель).
+
+Данный документ предназначен для обобщения следующей информации:
+- Описание целей и задач проекта.
+- Краткое описание текущего состояния учета на предприятии.
+- Краткое описание существующих проблем, задач и особенностей учета.
+- Функциональные границы и ограничения предстоящих работ.
+- Предложение по проектной технологии.
+- Предложение по дальнейшему сотрудничеству.
+
+## 1.2. Резюме отчета
+
+[2–3 связных абзаца: какие цели поставил Заказчик, что было выявлено в ходе аудита, основные итоги. Строго деловой тон.]
+
+## 1.3. Формат проведения аудита
+
+Аудит проводился методом интервью с ключевыми сотрудниками Заказчика и анализом предоставленных документов и копий информационных баз, в период ${dateRange}, с оформлением протоколов интервью.
+
+В аудите были задействованы следующие подразделения Заказчика (с указанием дат проведения интервью):
+[маркированный список ${'`-`'}: подразделение/функ.область — дата(ы) встреч в формате ДД.ММ.ГГГГ. Используй данные из перечня встреч выше.]
+
+Функциональные границы аудита:
+[маркированный список ${'`-`'}: уникальные функциональные области из встреч, по одной на строку.]
+
+===END_INTRO===
+
+===GOALS===
+
+## 3.1. Стратегические цели автоматизации
+
+[1–2 абзаца о стратегических целях проекта, основанные на To Be тезисах. Например: формализация бизнес-процессов, единое информационное пространство, прозрачность учёта, снижение ручного труда. Без перечислений-буллетов внутри абзацев.]
+
+## 3.2. Ключевые задачи
+
+[Связный абзац или 2 абзаца — что конкретно нужно сделать, основываясь на To Be тезисах по всем областям. Не повторяй конкретные требования — обобщай в задачи. Стиль: «Внедрить...», «Перенести...», «Автоматизировать...».]
+
+## 3.3. Описание целевых механизмов и схем учета предприятия
+
+[Краткое описание целевого состояния (TO-BE) обобщённо по всем функциональным областям — 2–3 абзаца. Какие принципиальные изменения произойдут в учёте.]
+
+===END_GOALS===`;
+}
+
+// Промпт 2: Раздел 2.2.X — описание AS-IS по одной функциональной области
+function REPORT_AREA_AS_IS_PROMPT(areaName, asIsTheses) {
+  const blocks = asIsTheses.map(t =>
+    `### ${t.topic}\n${t.asIs}`
+  ).join('\n\n');
+  return `Ты — старший системный аналитик. Составь раздел отчёта об обследовании
+с описанием текущего состояния (AS IS) функциональной области «${areaName}».
+
+ИСХОДНЫЕ ТЕЗИСЫ (компактные выжимки из протоколов встреч):
+${blocks || `(тезисов нет — функциональная область упоминалась только формально)`}
+
+⚠️ ТРЕБОВАНИЯ К РАЗДЕЛУ:
+— ПРОФЕССИОНАЛЬНЫЙ ДЕЛОВОЙ СТИЛЬ. Никаких эмодзи, разговорных оборотов, восклицательных знаков.
+— Связные абзацы. Расширяй каждый тезис до полноценного описания процесса.
+— Каждая тема (### Tема) → подзаголовок жирным шрифтом + 2–4 абзаца под ним. Можно структурировать сложные темы внутренними подзаголовками.
+— Сохраняй ВСЕ темы из тезисов. Не объединяй и не пропускай.
+— Конкретика: названия систем (1С, Excel, Teams, ...), документов, ролей, статусов, ключевых правил процесса. Это обязательно.
+— Если в тезисах есть числа, термины, должности — переноси их в текст.
+— НЕ добавляй буллеты внутри абзацев. Списки только если в тезисах явно указаны перечни (ассортимент, направления и т.п.) — тогда это допустимо.
+
+ВЕРНИ ТОЛЬКО ТЕКСТ РАЗДЕЛА (без заголовка «2.2.X. ${areaName}» — он добавится автоматически).
+Каждая тема — жирный подзаголовок ${'`**Тема**`'} на отдельной строке, потом абзацы.
+Без преамбулы, без маркеров типа ===.`;
+}
+
+// Промпт 3: Глоссарий — извлекает уникальные термины из всех протоколов
+function REPORT_GLOSSARY_PROMPT(combinedProtocolsText) {
+  return `Ты — технический редактор. Извлеки ТЕХНИЧЕСКИЕ ТЕРМИНЫ И АББРЕВИАТУРЫ из всех протоколов обследования ниже.
+
+ЗАДАЧА:
+— Найди все аббревиатуры (3–6 заглавных букв), специальные термины, профессиональный жаргон, названия систем и стандартов.
+— Для каждого дай ёмкое определение (1 предложение).
+— Объедини дубликаты (один термин — одна строка).
+— Отсортируй по алфавиту в порядке: сначала русские (А–Я), потом английские/латинские.
+
+ФОРМАТ ОТВЕТА — ТОЛЬКО валидный JSON-массив, без преамбулы, без \`\`\`json:
+[
+  {"term": "ТМЦ", "definition": "Товарно-материальные ценности"},
+  {"term": "МОЛ", "definition": "Материально-ответственное лицо"},
+  {"term": "Incoterms", "definition": "Международные коммерческие термины..."}
+]
+
+Если терминов нет — верни []. Не выдумывай.
 
 ПРОТОКОЛЫ:
-${protocols}`;
+${combinedProtocolsText}`;
+}
+
+// ── HELPERS ─────────────────────────────────────────────
+function formatDateRange(from, to) {
+  if (from && to) return `с ${from} по ${to}`;
+  if (from) return `с ${from}`;
+  if (to) return `до ${to}`;
+  return '[период не указан]';
 }
 
 // ── PARSE GEMINI RESPONSE BLOCKS ────────────────────
@@ -5240,32 +5338,226 @@ function deleteProtocol(id) {
 function selectAll(prefix) { document.querySelectorAll(`input[id^="${prefix}-"]`).forEach(c => c.checked = true); }
 const escHtml = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-// ── GENERATE REPORT ───────────────────────────────────
+// ── F-Report-4: НОВАЯ ГЕНЕРАЦИЯ ОТЧЁТА ────────────────────
+// reportData — структурированный результат генерации, используется для:
+//   1. Превью (рендерится в текст)
+//   2. Сборки docx (downloadReportDocx)
+let reportData = null;
+
 async function generateReport() {
-  // F-Report-1: валидация проекта
+  // ── 1. Валидация: проект, дата, выбранные протоколы ──────
   const projSel = document.getElementById('report-project');
   const projectId = projSel ? parseInt(projSel.value) : 0;
   if (!projectId) { showStatus('report-status', 'error', 'Сначала выбери проект'); return; }
 
-  // Валидация даты (если введена — должна быть валидной; пустая = сегодня)
-  const dateRaw = document.getElementById('report-date')?.value?.trim() || '';
-  if (dateRaw && !isValidDateStr(dateRaw)) {
-    showStatus('report-status', 'error', 'Проверь дату отчёта: формат ДД.ММ.ГГГГ');
+  const project = getNSI().projects.find(p => p.id === projectId);
+  if (!project) { showStatus('report-status', 'error', 'Проект не найден в НСИ'); return; }
+
+  // Проверка что у проекта заполнены реквизиты (без них шаблон не соберётся)
+  const projectReqMissing = pcValidate({
+    ...pcMakeBlankProject(), ...project
+  }).filter(e => !e.message.startsWith('Команда')); // команду проверим отдельно
+  if (projectReqMissing.length) {
+    showStatus('report-status', 'error',
+      `У проекта «${project.name}» не заполнены обязательные поля. Открой НСИ → Проекты → ${project.name} и заполни карточку.`);
     return;
   }
 
+  // Дата отчёта (по умолчанию сегодня)
+  const reportDateRaw = document.getElementById('report-date')?.value?.trim() || '';
+  if (reportDateRaw && !isValidDateStr(reportDateRaw)) {
+    showStatus('report-status', 'error', 'Проверь дату отчёта: формат ДД.ММ.ГГГГ'); return;
+  }
+  const reportDate = reportDateRaw || today();
+
   const checked = [...document.querySelectorAll('input[id^="rp-"]:checked')].map(c => c.value);
   if (!checked.length) { showStatus('report-status', 'error', 'Выбери хотя бы один протокол'); return; }
-  const sel = getProtocols().filter(p => checked.includes(String(p.id)));
-  const combined = sel.map(p => `=== ${p.title} (${p.date}) ===\n${p.protocol}`).join('\n\n');
+  const selectedProtocols = getProtocols().filter(p => checked.includes(String(p.id)));
+
+  const instr = document.getElementById('report-instructions').value.trim();
+  const btn = document.querySelector('#page-report .btn-primary');
+
   try {
-    showStatus('report-status', 'info', `Формирую отчёт из ${sel.length} протоколов...`);
-    currentReportText = await callGemini([{ text: REPORT_PROMPT(combined, document.getElementById('report-instructions').value) }]);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Готовлю...'; }
+
+    // ── 2. Сбор данных для промптов ──────────────────────
+    // Метаданные встреч (дата, заголовок, области)
+    const allAreas = (getNSI().functionalAreas || []);
+    const areaNameById = {};
+    allAreas.forEach(a => { areaNameById[a.id] = a.name; });
+
+    const protocolsMeta = selectedProtocols.map(p => ({
+      id: p.id,
+      title: (p.title || '').replace(/^\[[^\]]+\]\s*/, ''), // снять префикс [Проект]
+      date: p.date,
+      areasNames: (p.functionalAreaIds || []).map(id => areaNameById[id]).filter(Boolean)
+    }));
+
+    // Все тезисы по протоколам (объединённые), сгруппированные по areaId
+    const thesesByArea = {}; // areaId -> [{topic, asIs, toBe, sourceProtocolTitle}]
+    const allToBeTheses = []; // отдельный список для целей/задач
+    selectedProtocols.forEach(p => {
+      (p.reportTheses || []).forEach(t => {
+        const aid = t.areaId;
+        if (!thesesByArea[aid]) thesesByArea[aid] = [];
+        thesesByArea[aid].push(t);
+        if (t.toBe) allToBeTheses.push(t);
+      });
+    });
+
+    // Уникальные области среди всех протоколов
+    const usedAreaIds = [...new Set(selectedProtocols.flatMap(p => p.functionalAreaIds || []))];
+
+    // ── 3. Запускаем Gemini-вызовы ──────────────────────
+    // Запускаем Intro+Goals параллельно с глоссарием — оба используют общий контекст
+    showStatus('report-status', 'info', `🤖 Готовлю Введение и Цели (1 из ${2 + usedAreaIds.length})...`);
+
+    const introPromise = callGemini([{
+      text: REPORT_INTRO_PROMPT(project, protocolsMeta, allToBeTheses, instr)
+    }]);
+
+    const combinedProtocolsText = selectedProtocols.map(p =>
+      `=== ${p.title} (${p.date}) ===\n${p.protocol}`
+    ).join('\n\n');
+    const glossaryPromise = callGemini([{
+      text: REPORT_GLOSSARY_PROMPT(combinedProtocolsText)
+    }]);
+
+    // AS-IS по каждой функциональной области — параллельно
+    const areaPromises = usedAreaIds.map(aid => {
+      const areaName = areaNameById[aid] || 'Прочее';
+      const asIsTheses = (thesesByArea[aid] || []).filter(t => t.asIs);
+      return callGemini([{
+        text: REPORT_AREA_AS_IS_PROMPT(areaName, asIsTheses)
+      }]).then(text => ({ areaId: aid, areaName, text }))
+        .catch(e => ({ areaId: aid, areaName, text: `[Ошибка генерации: ${e.message}]` }));
+    });
+
+    // ── 4. Ожидание всех вызовов ──────────────────────
+    showStatus('report-status', 'info', `🤖 Жду ответ от Gemini (${2 + usedAreaIds.length} запросов параллельно)...`);
+    const [introRaw, glossaryRaw, ...areaResults] = await Promise.all([
+      introPromise, glossaryPromise, ...areaPromises
+    ]);
+
+    // ── 5. Парсинг результатов ──────────────────────
+    const introBlocks = parseReportIntroBlocks(introRaw);
+    const glossaryItems = parseGlossaryJson(glossaryRaw);
+
+    // ── 6. Складываем reportData (структурированные данные для docx) ──
+    reportData = {
+      project,
+      reportDate,
+      protocolsMeta,
+      sortedProtocols: [...protocolsMeta].sort((a, b) => parseDate(a.date) - parseDate(b.date)),
+      glossary: glossaryItems,
+      sectionIntro: introBlocks.intro,        // markdown 1.1, 1.2, 1.3
+      sectionGoals: introBlocks.goals,        // markdown 3.1, 3.2, 3.3
+      areaSections: areaResults               // [{areaId, areaName, text}]
+    };
+
+    // ── 7. Превью текстом ──
+    currentReportText = buildReportPreviewText(reportData);
     document.getElementById('report-preview').textContent = currentReportText;
     document.getElementById('report-result-card').style.display = 'block';
     document.getElementById('report-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    showStatus('report-status', 'success', 'Отчёт готов!');
-  } catch (e) { showStatus('report-status', 'error', e.message); }
+    showStatus('report-status', 'success', `✅ Отчёт готов! Скачай .docx ниже.`);
+  } catch (e) {
+    console.error('[report] generation failed:', e);
+    showStatus('report-status', 'error', `Ошибка: ${e.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✨ Создать отчёт'; }
+  }
+}
+
+// Парсит ответ REPORT_INTRO_PROMPT — два блока с маркерами
+function parseReportIntroBlocks(raw) {
+  if (!raw) return { intro: '', goals: '' };
+  const intro = (raw.match(/===INTRO===([\s\S]*?)===END_INTRO===/) || [])[1] || '';
+  const goals = (raw.match(/===GOALS===([\s\S]*?)===END_GOALS===/) || [])[1] || '';
+  // Если маркеров нет — Gemini проигнорировал инструкцию, отдаст всё как intro
+  if (!intro && !goals) {
+    return { intro: raw.trim(), goals: '' };
+  }
+  return { intro: intro.trim(), goals: goals.trim() };
+}
+
+// Парсит JSON-глоссарий (использует тот же парсер что и для тезисов)
+function parseGlossaryJson(raw) {
+  if (!raw) return [];
+  let s = raw.trim();
+  if (s.startsWith('```')) s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  const a = s.indexOf('['), b = s.lastIndexOf(']');
+  if (a >= 0 && b > a) s = s.slice(a, b + 1);
+  try {
+    const arr = JSON.parse(s);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter(x => x && typeof x === 'object' && x.term && x.definition)
+      .map(x => ({ term: String(x.term).trim(), definition: String(x.definition).trim() }));
+  } catch (e) {
+    console.warn('[report-glossary] parse failed:', e.message);
+    return [];
+  }
+}
+
+// Парсит дату ДД.ММ.ГГГГ → Date (для сортировки)
+function parseDate(s) {
+  const m = String(s || '').match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (!m) return new Date(0);
+  return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]));
+}
+
+// Превью отчёта текстом — для report-preview <div>
+function buildReportPreviewText(d) {
+  const lines = [];
+  lines.push(`ОТЧЁТ ОБ ОБСЛЕДОВАНИИ`);
+  lines.push(`по проекту автоматизации в ${d.project.shortName}`);
+  lines.push('');
+  lines.push(`Заказчик: ${d.project.customerOrg}`);
+  lines.push(`Исполнитель: ${d.project.executorOrg}`);
+  lines.push(`Договор № ${d.project.contractNumber} от ${d.project.contractDate}`);
+  lines.push(`Период обследования: ${formatDateRange(d.project.surveyDateFrom, d.project.surveyDateTo)}`);
+  lines.push(`Дата отчёта: ${d.reportDate}`);
+  lines.push('');
+  if (d.glossary.length) {
+    lines.push('━━━ ГЛОССАРИЙ ━━━');
+    d.glossary.forEach(g => lines.push(`${g.term} — ${g.definition}`));
+    lines.push('');
+  }
+  lines.push('━━━ 1. ОБЩИЕ ПОЛОЖЕНИЯ ━━━');
+  lines.push(d.sectionIntro || '(пусто)');
+  lines.push('');
+  lines.push('━━━ 2. ОПИСАНИЕ ОБЪЕКТА АУДИТА ━━━');
+  lines.push('');
+  lines.push('## 2.1. Общие сведения');
+  lines.push('');
+  lines.push('**2.1.1. Юридическая структура**');
+  lines.push(d.project.customerOrg);
+  lines.push('');
+  lines.push('**2.1.2. Территориальная структура**');
+  lines.push(`Юридический адрес: ${d.project.customerLegalAddress}`);
+  lines.push('');
+  lines.push('**2.1.3. Описание предприятия**');
+  lines.push(d.project.customerDescription);
+  lines.push('');
+  lines.push('**2.1.4. Организационно-функциональная структура**');
+  lines.push(`Численность персонала предприятия — ${d.project.customerHeadcount} сотрудников.`);
+  lines.push('');
+  lines.push('## 2.2. Описание существующих механизмов и схем учета предприятия');
+  lines.push('Бизнес-процессы в текущем разделе описаны исходя из состояния «AS IS» — «как есть» на момент аудита.');
+  lines.push('');
+  d.areaSections.forEach((s, i) => {
+    lines.push(`### 2.2.${i + 1}. ${s.areaName}`);
+    lines.push(s.text || '(пусто)');
+    lines.push('');
+  });
+  lines.push('━━━ 3. ЦЕЛИ, ЗАДАЧИ И ГРАНИЦЫ АВТОМАТИЗАЦИИ ━━━');
+  lines.push(d.sectionGoals || '(пусто)');
+  lines.push('');
+  lines.push('━━━ ЛИСТ СОГЛАСОВАНИЯ ━━━');
+  const approvers = [...(d.project.customer || []), ...(d.project.executor || [])].filter(m => m.isApprover);
+  approvers.forEach(m => lines.push(`${m.fio} — ${m.position}`));
+  return lines.join('\n');
 }
 
 // ── DOCX ──────────────────────────────────────────────
@@ -5324,6 +5616,16 @@ async function downloadDocx(type) {
       mergedText = text.trimEnd() + '\n\nЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ:\n' + currentRequirementsText.trim() + '\n';
     }
     await downloadProtocolDocx(mergedText, file);
+  } else if (type === 'report') {
+    // F-Report-5: используем структурированный генератор для отчёта.
+    // reportData (заполняется в generateReport) содержит все данные для шаблона Cemix.
+    if (!reportData) {
+      // Fallback на простой генератор если по какой-то причине reportData потерян
+      // (например, юзер открыл сохранённый отчёт из другого места — но пока такого пути нет)
+      await downloadSimpleDocx(text, file);
+      return;
+    }
+    await downloadReportDocx(file);
   } else {
     await downloadSimpleDocx(text, file);
   }
@@ -5781,6 +6083,353 @@ async function downloadSimpleDocx(text, filename) {
     }
   }
   const doc = new Document({ sections: [{ properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1134, right: 851, bottom: 1134, left: 1701 } } }, children }] });
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── F-Report-5: ГЕНЕРАЦИЯ DOCX ОТЧЁТА ОБ ОБСЛЕДОВАНИИ ─────
+// Использует структурированный reportData (заполняется в generateReport).
+// Шаблон Cemix: шапка «Утверждаю» → Заголовок → таблица параметров → Глоссарий
+//   → Раздел 1 → Раздел 2 (с подразделами AS-IS) → Раздел 3 → Лист согласования.
+
+async function downloadReportDocx(filename) {
+  if (!reportData) { alert('Сначала сгенерируй отчёт'); return; }
+  const d = reportData;
+  const D = window.docx;
+  if (!D) { alert('Библиотека docx не загрузилась'); return; }
+
+  const {
+    Document, Packer, Paragraph, TextRun,
+    Table, TableRow, TableCell,
+    AlignmentType, WidthType, BorderStyle, ShadingType,
+    HeadingLevel, PageBreak, VerticalAlign, LevelFormat
+  } = D;
+
+  // ── Стилевые константы ────────────────────────────
+  const FONT = 'Times New Roman';
+  const COLOR_HEADING = '2E4057';
+  const thinBorder = { style: BorderStyle.SINGLE, size: 4, color: '888888' };
+  const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+  const cellBorders = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+  const noCellBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
+
+  // ── Хелперы для построения частей ──────────────────
+  // Параграф обычного текста
+  const para = (text, opts = {}) => new Paragraph({
+    children: [new TextRun({ text: text || '', font: FONT, size: opts.size || 22, bold: !!opts.bold, italics: !!opts.italic, color: opts.color })],
+    alignment: opts.align,
+    spacing: opts.spacing || { after: 100 },
+    indent: opts.indent
+  });
+  // Заголовок 1 уровня (с outlineLevel для TOC)
+  const h1 = (text) => new Paragraph({
+    heading: HeadingLevel.HEADING_1,
+    children: [new TextRun({ text, font: FONT, size: 32, bold: true, color: COLOR_HEADING })],
+    spacing: { before: 360, after: 200 }
+  });
+  // Заголовок 2 уровня
+  const h2 = (text) => new Paragraph({
+    heading: HeadingLevel.HEADING_2,
+    children: [new TextRun({ text, font: FONT, size: 28, bold: true, color: COLOR_HEADING })],
+    spacing: { before: 280, after: 150 }
+  });
+  // Заголовок 3 уровня
+  const h3 = (text) => new Paragraph({
+    heading: HeadingLevel.HEADING_3,
+    children: [new TextRun({ text, font: FONT, size: 24, bold: true, color: COLOR_HEADING })],
+    spacing: { before: 200, after: 100 }
+  });
+
+  // Ячейка таблицы
+  const cell = (children, opts = {}) => new TableCell({
+    children: Array.isArray(children) ? children : [children],
+    width: opts.width ? { size: opts.width, type: WidthType.DXA } : undefined,
+    borders: opts.borderless ? noCellBorders : cellBorders,
+    shading: opts.shade ? { fill: opts.shade, type: ShadingType.CLEAR } : undefined,
+    margins: { top: 80, bottom: 80, left: 120, right: 120 },
+    verticalAlign: opts.valign || VerticalAlign.TOP,
+    columnSpan: opts.colSpan
+  });
+
+  // ── Парсер markdown-строк → массив Paragraph ──────
+  // Простой парсер: ## Header2, ### Header3, **bold** в строке, - bullet
+  const parseMarkdownToParagraphs = (md) => {
+    const out = [];
+    if (!md) return out;
+    const lines = md.split('\n');
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) { out.push(new Paragraph({ children: [new TextRun({ text: '', font: FONT, size: 22 })], spacing: { after: 80 } })); continue; }
+
+      // ## заголовки
+      if (/^##\s+/.test(line)) {
+        out.push(h2(line.replace(/^##\s+/, '')));
+        continue;
+      }
+      if (/^###\s+/.test(line)) {
+        out.push(h3(line.replace(/^###\s+/, '')));
+        continue;
+      }
+      // - bullet
+      if (/^[-•*]\s+/.test(line)) {
+        out.push(new Paragraph({
+          numbering: { reference: 'bullets', level: 0 },
+          children: parseInlineRuns(line.replace(/^[-•*]\s+/, ''))
+        }));
+        continue;
+      }
+      // **жирная строка целиком** или **жирный заголовок**
+      out.push(new Paragraph({
+        children: parseInlineRuns(line),
+        spacing: { after: 120 },
+        alignment: AlignmentType.JUSTIFIED
+      }));
+    }
+    return out;
+  };
+
+  // Inline разбор **bold** → массив TextRun
+  const parseInlineRuns = (line) => {
+    const runs = [];
+    const re = /\*\*([^*]+)\*\*/g;
+    let last = 0, m;
+    while ((m = re.exec(line)) !== null) {
+      if (m.index > last) {
+        runs.push(new TextRun({ text: line.slice(last, m.index), font: FONT, size: 22 }));
+      }
+      runs.push(new TextRun({ text: m[1], font: FONT, size: 22, bold: true }));
+      last = m.index + m[0].length;
+    }
+    if (last < line.length) {
+      runs.push(new TextRun({ text: line.slice(last), font: FONT, size: 22 }));
+    }
+    if (!runs.length) runs.push(new TextRun({ text: line, font: FONT, size: 22 }));
+    return runs;
+  };
+
+  // ── Команды по ролям ─────────────────────────────
+  const customerCurators = (d.project.customer || []).filter(m => m.isCurator);
+  const customerLeads    = (d.project.customer || []).filter(m => m.isLead);
+  const customerApprovers= (d.project.customer || []).filter(m => m.isApprover);
+  const executorCurators = (d.project.executor || []).filter(m => m.isCurator);
+  const executorLeads    = (d.project.executor || []).filter(m => m.isLead);
+  const executorApprovers= (d.project.executor || []).filter(m => m.isApprover);
+
+  const teamLine = (members) => members.map(m => `${m.fio} (${m.position})`).join(', ') || '—';
+  const initialsOf = (fio) => {
+    // Иванов И.И. → И. Иванов; Иван Иванов Иваныч → И. Иванов
+    const parts = String(fio || '').trim().split(/\s+/);
+    if (parts.length >= 2) {
+      // Если уже в формате «Фамилия И.О.» — возвращаем как есть
+      if (/\.[А-ЯЁA-Z]/.test(parts[1])) return fio;
+      return parts[1].charAt(0) + '. ' + parts[0];
+    }
+    return fio;
+  };
+
+  // ── Шапка «Утверждаю» (две колонки: Заказчик | Исполнитель) ─
+  const approveCellContent = (orgName, approver) => [
+    new Paragraph({
+      children: [new TextRun({ text: 'Утверждаю', font: FONT, size: 24, bold: true })],
+      alignment: AlignmentType.CENTER, spacing: { after: 100 }
+    }),
+    para(`Куратор проекта ${orgName}`, { align: AlignmentType.CENTER, size: 20, spacing: { after: 200 } }),
+    para('____________', { align: AlignmentType.CENTER, size: 20, spacing: { after: 60 } }),
+    para(approver ? initialsOf(approver.fio) : '_________________', { align: AlignmentType.CENTER, size: 20, spacing: { after: 200 } }),
+    para('«____» ____________ ' + (new Date().getFullYear()) + ' г.', { align: AlignmentType.CENTER, size: 20 })
+  ];
+
+  const approveTable = new Table({
+    width: { size: 9360, type: WidthType.DXA },
+    columnWidths: [4500, 360, 4500],
+    rows: [
+      new TableRow({
+        children: [
+          cell(approveCellContent(d.project.customerOrg, customerApprovers[0]), { width: 4500, borderless: true, valign: VerticalAlign.CENTER }),
+          cell([para('', { size: 20 })], { width: 360, borderless: true }),
+          cell(approveCellContent(d.project.executorOrg, executorApprovers[0]), { width: 4500, borderless: true, valign: VerticalAlign.CENTER })
+        ]
+      })
+    ]
+  });
+
+  // ── Параметры проекта (таблица) ─────────────────
+  const paramRow = (label, value) => new TableRow({
+    children: [
+      cell(para(label, { size: 22 }), { width: 4680, shade: 'F1F5F9' }),
+      cell(para(value || '—', { size: 22 }), { width: 4680 })
+    ]
+  });
+
+  const paramsTable = new Table({
+    width: { size: 9360, type: WidthType.DXA },
+    columnWidths: [4680, 4680],
+    rows: [
+      paramRow('Краткое наименование проекта', d.project.shortName),
+      paramRow('Планируемое время начала и окончания проекта',
+        formatDateRange(d.project.projectDateFrom, d.project.projectDateTo)),
+      paramRow('Куратор проекта от Заказчика', teamLine(customerCurators)),
+      paramRow('Руководитель проекта от Заказчика', teamLine(customerLeads)),
+      paramRow('Куратор проекта от Исполнителя', teamLine(executorCurators)),
+      paramRow('Операционный руководитель проекта от Исполнителя', teamLine(executorLeads))
+    ]
+  });
+
+  // ── Глоссарий (таблица) ────────────────────────
+  const glossaryTable = (() => {
+    if (!d.glossary.length) return null;
+    const rows = [
+      new TableRow({
+        tableHeader: true,
+        children: [
+          cell(para('Термин', { bold: true, size: 22 }), { width: 2800, shade: 'D5E8F0' }),
+          cell(para('Определение', { bold: true, size: 22 }), { width: 6560, shade: 'D5E8F0' })
+        ]
+      }),
+      ...d.glossary.map(g => new TableRow({
+        children: [
+          cell(para(g.term, { bold: true, size: 22 }), { width: 2800 }),
+          cell(para(g.definition, { size: 22 }), { width: 6560 })
+        ]
+      }))
+    ];
+    return new Table({ width: { size: 9360, type: WidthType.DXA }, columnWidths: [2800, 6560], rows });
+  })();
+
+  // ── Лист согласования ────────────────────────────
+  const allApprovers = [...customerApprovers, ...executorApprovers];
+  const approvalTable = new Table({
+    width: { size: 9360, type: WidthType.DXA },
+    columnWidths: [3000, 3000, 1680, 1680],
+    rows: [
+      new TableRow({
+        tableHeader: true,
+        children: [
+          cell(para('ФИО', { bold: true, size: 22 }), { width: 3000, shade: 'D5E8F0' }),
+          cell(para('Должность', { bold: true, size: 22 }), { width: 3000, shade: 'D5E8F0' }),
+          cell(para('Дата', { bold: true, size: 22 }), { width: 1680, shade: 'D5E8F0' }),
+          cell(para('Подпись', { bold: true, size: 22 }), { width: 1680, shade: 'D5E8F0' })
+        ]
+      }),
+      ...allApprovers.map(m => new TableRow({
+        children: [
+          cell(para(m.fio, { size: 22 }), { width: 3000 }),
+          cell(para(m.position, { size: 22 }), { width: 3000 }),
+          cell(para('', { size: 22 }), { width: 1680 }),
+          cell(para('', { size: 22 }), { width: 1680 })
+        ]
+      }))
+    ]
+  });
+
+  // ── Сборка children всего документа ────────────────
+  const children = [];
+
+  // 1. Шапка «Утверждаю»
+  children.push(approveTable);
+  children.push(para('', { spacing: { after: 240 } }));
+
+  // 2. Заголовок отчёта
+  children.push(new Paragraph({
+    children: [new TextRun({ text: 'Отчёт об обследовании', font: FONT, size: 36, bold: true })],
+    alignment: AlignmentType.CENTER, spacing: { after: 100 }
+  }));
+  children.push(new Paragraph({
+    children: [new TextRun({ text: `по проекту автоматизации в ${d.project.shortName}`, font: FONT, size: 28, bold: true })],
+    alignment: AlignmentType.CENTER, spacing: { after: 360 }
+  }));
+
+  // 3. Параметры проекта
+  children.push(paramsTable);
+  children.push(para('', { spacing: { after: 240 } }));
+
+  // 4. Город и год
+  children.push(new Paragraph({
+    children: [new TextRun({ text: `${d.project.city} ${new Date().getFullYear()}`, font: FONT, size: 24 })],
+    alignment: AlignmentType.CENTER, spacing: { after: 200 }
+  }));
+
+  // PageBreak → Глоссарий
+  children.push(new Paragraph({ children: [new PageBreak()] }));
+
+  if (glossaryTable) {
+    children.push(h1('Глоссарий'));
+    children.push(glossaryTable);
+    children.push(para('', { spacing: { after: 240 } }));
+  }
+
+  // Раздел 1
+  children.push(h1('1. Общие положения'));
+  parseMarkdownToParagraphs(d.sectionIntro).forEach(p => children.push(p));
+
+  // Раздел 2
+  children.push(h1('2. Описание объекта аудита'));
+  children.push(h2('2.1. Общие сведения'));
+  children.push(h3('2.1.1. Юридическая структура'));
+  children.push(para(d.project.customerOrg + '.'));
+  children.push(h3('2.1.2. Территориальная структура'));
+  children.push(para(`Юридический адрес: ${d.project.customerLegalAddress}`));
+  children.push(h3('2.1.3. Описание предприятия'));
+  // Многострочное описание разбиваем на абзацы
+  String(d.project.customerDescription).split('\n').forEach(p => {
+    if (p.trim()) children.push(para(p.trim(), { spacing: { after: 120 }, align: AlignmentType.JUSTIFIED }));
+  });
+  children.push(h3('2.1.4. Организационно-функциональная структура'));
+  children.push(para(`Организационная структура предприятия представлена в Приложении №2 к настоящему документу.`, { align: AlignmentType.JUSTIFIED }));
+  children.push(para(`Численность персонала предприятия — ${d.project.customerHeadcount} сотрудников.`, { align: AlignmentType.JUSTIFIED }));
+
+  children.push(h2('2.2. Описание существующих механизмов и схем учета предприятия'));
+  children.push(para('Бизнес-процессы в текущем разделе описаны исходя из состояния «AS IS» — «как есть» на момент аудита.', { align: AlignmentType.JUSTIFIED }));
+
+  d.areaSections.forEach((s, i) => {
+    children.push(h3(`2.2.${i + 1}. ${s.areaName}`));
+    parseMarkdownToParagraphs(s.text).forEach(p => children.push(p));
+  });
+
+  // Раздел 3
+  children.push(h1('3. Цели, задачи и границы автоматизации'));
+  parseMarkdownToParagraphs(d.sectionGoals).forEach(p => children.push(p));
+
+  // Лист согласования
+  children.push(h1('Лист согласования'));
+  children.push(approvalTable);
+
+  // ── Создание документа ──────────────────────────
+  const doc = new Document({
+    creator: 'Протоколист AI',
+    title: `Отчёт об обследовании — ${d.project.shortName}`,
+    styles: {
+      default: { document: { run: { font: FONT, size: 22 } } },
+      paragraphStyles: [
+        { id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+          run: { size: 32, bold: true, font: FONT, color: COLOR_HEADING },
+          paragraph: { spacing: { before: 360, after: 200 }, outlineLevel: 0 } },
+        { id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+          run: { size: 28, bold: true, font: FONT, color: COLOR_HEADING },
+          paragraph: { spacing: { before: 280, after: 150 }, outlineLevel: 1 } },
+        { id: 'Heading3', name: 'Heading 3', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+          run: { size: 24, bold: true, font: FONT, color: COLOR_HEADING },
+          paragraph: { spacing: { before: 200, after: 100 }, outlineLevel: 2 } }
+      ]
+    },
+    numbering: {
+      config: [
+        { reference: 'bullets', levels: [{ level: 0, format: LevelFormat.BULLET, text: '•', alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720, hanging: 360 } } } }] }
+      ]
+    },
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 11906, height: 16838 }, // A4
+          margin: { top: 1134, right: 1134, bottom: 1134, left: 1701 }
+        }
+      },
+      children
+    }]
+  });
+
   const blob = await Packer.toBlob(doc);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
@@ -6334,6 +6983,7 @@ async function adminDeleteSurveyReport() {
     'Продолжить?',
     async () => {
       currentReportText = '';
+      reportData = null;
       const prev = document.getElementById('report-preview');
       if (prev) prev.textContent = '';
       return 'Отчёт об обследовании очищен';
@@ -6410,6 +7060,7 @@ async function adminDeleteEverything() {
   // Шаг 4: отчёт об обследовании
   setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 4/4: отчёт об обследовании...</div>');
   currentReportText = '';
+  reportData = null;
   const repPrev = document.getElementById('report-preview');
   if (repPrev) repPrev.textContent = '';
 
