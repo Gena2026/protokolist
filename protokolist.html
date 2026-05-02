@@ -347,6 +347,28 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 .reg-action-btn.reg-action-restore:hover{color:#10b981;background:#dcfce7}
 .reg-action-btn.reg-action-delete:hover{color:#ef4444;background:#fef2f2}
 
+/* === F-Registry-1: Multi-select требований === */
+.reg-table thead th.reg-cell-check,
+.reg-table tbody td.reg-cell-check{width:36px;text-align:center;padding-left:6px;padding-right:6px}
+.reg-cell-check input[type="checkbox"]{cursor:pointer;width:14px;height:14px;margin:0;vertical-align:middle}
+.reg-table tbody tr.reg-row-selected td{background:#eff6ff}
+.reg-table tbody tr.reg-row-selected:hover td{background:#dbeafe}
+.reg-table tbody tr.reg-row-selected.reg-row-archived td{background:#e0e7ff}
+/* Тулбар массовых операций — появляется когда выбрана хотя бы 1 строка */
+.reg-bulkbar{display:none;align-items:center;gap:10px;flex-wrap:wrap;background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;padding:10px 14px;margin:12px 0 8px}
+.reg-bulkbar.is-active{display:flex}
+.reg-bulkbar-count{font-size:13px;font-weight:600;color:#1d4ed8;margin-right:auto}
+.reg-bulkbar-count b{color:#1e3a8a}
+.reg-bulkbar select{font-size:12px;padding:5px 9px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;font-family:inherit;color:#1e293b;cursor:pointer;max-width:170px}
+.reg-bulkbar select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.15)}
+.reg-bulkbar-btn{font-size:12px;padding:5px 11px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;color:#475569;font-family:inherit;display:inline-flex;align-items:center;gap:5px;transition:.15s}
+.reg-bulkbar-btn:hover{background:#f1f5f9;border-color:#94a3b8;color:#1e293b}
+.reg-bulkbar-btn-archive:hover{background:#fffbeb;border-color:#f59e0b;color:#92400e}
+.reg-bulkbar-btn-delete:hover{background:#fef2f2;border-color:#ef4444;color:#b91c1c}
+.reg-bulkbar-btn-clear{background:transparent;border-color:transparent}
+.reg-bulkbar-btn-clear:hover{background:#fff;border-color:#cbd5e1}
+.reg-bulkbar-divider{width:1px;height:18px;background:#bfdbfe}
+
 .reg-empty{padding:36px 20px;text-align:center;color:#94a3b8;font-size:13px;background:#fafafa;border-radius:9px}
 .reg-empty-icon{font-size:36px;margin-bottom:10px;opacity:.6}
 
@@ -671,6 +693,27 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
     <!-- Статистика — над таблицей, под фильтрами -->
     <div class="reg-stats" id="reg-stats"></div>
 
+    <!-- F-Registry-1: Тулбар массовых операций (появляется при выделении строк) -->
+    <div class="reg-bulkbar" id="reg-bulkbar">
+      <span class="reg-bulkbar-count">Выбрано: <b id="reg-bulkbar-count-num">0</b> из <span id="reg-bulkbar-count-total">0</span></span>
+      <select id="reg-bulk-status" onchange="onRegBulkStatusChange()" title="Изменить статус для всех выбранных">
+        <option value="">— Изменить статус —</option>
+      </select>
+      <select id="reg-bulk-priority" onchange="onRegBulkPriorityChange()" title="Изменить приоритет для всех выбранных">
+        <option value="">— Изменить приоритет —</option>
+      </select>
+      <select id="reg-bulk-executor" onchange="onRegBulkExecutorChange()" title="Назначить исполнителя для всех выбранных">
+        <option value="">— Назначить исполнителя —</option>
+      </select>
+      <select id="reg-bulk-area" onchange="onRegBulkAreaChange()" title="Изменить область для всех выбранных">
+        <option value="">— Изменить область —</option>
+      </select>
+      <span class="reg-bulkbar-divider"></span>
+      <button class="reg-bulkbar-btn reg-bulkbar-btn-archive" onclick="onRegBulkArchive()" title="В архив все выбранные">📁 В архив</button>
+      <button class="reg-bulkbar-btn reg-bulkbar-btn-delete" onclick="onRegBulkDelete()" title="Удалить безвозвратно">🗑 Удалить</button>
+      <button class="reg-bulkbar-btn reg-bulkbar-btn-clear" onclick="clearRegSelection()" title="Снять выделение">✕ Сбросить</button>
+    </div>
+
     <!-- Таблица -->
     <div id="reg-table-host"></div>
   </div>
@@ -714,6 +757,9 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <button class="btn btn-secondary admin-btn" onclick="adminDeleteAllProtocols()" title="Чистит localStorage.protocols (список во вкладке Реестр)">
         📄 Удалить все готовые протоколы <span style="color:#94a3b8;font-size:12px">— список сохранённых протоколов</span>
       </button>
+      <button class="btn btn-secondary admin-btn" onclick="adminDeleteAllRequirements()" title="Чистит все ключи requirements_* в localStorage (требования всех проектов)">
+        🗂️ Удалить все требования <span style="color:#94a3b8;font-size:12px">— реестр всех проектов</span>
+      </button>
       <button class="btn btn-secondary admin-btn" onclick="adminDeleteSurveyReport()" title="Очищает текущий показанный текст отчёта об обследовании (in-memory, F5 тоже его убьёт)">
         📊 Удалить отчёт об обследовании <span style="color:#94a3b8;font-size:12px">— только текст агрегированного отчёта</span>
       </button>
@@ -723,7 +769,7 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
   <div class="card" style="border-color:#fecaca;background:#fffbfb">
     <div class="card-title" style="color:#991b1b"><div class="card-title-icon" style="background:#fee2e2;color:#dc2626">⚠️</div>Полный сброс пользовательских данных</div>
     <p style="font-size:13px;color:#7f1d1d;margin-bottom:14px">
-      Один клик = последовательно нажать все 5 кнопок выше. После — на дисках, серверах Google и в памяти браузера не остаётся <strong>ничего</strong> из созданных тобой данных.<br>
+      Один клик = последовательно нажать все 6 кнопок выше. После — на дисках, серверах Google и в памяти браузера не остаётся <strong>ничего</strong> из созданных тобой данных.<br>
       <strong>Не трогается:</strong> API-ключи (Gemini, Groq) и НСИ (команда, проекты — заполняешь руками).
     </p>
     <button class="btn" style="background:#dc2626;color:#fff;font-weight:600" onclick="adminDeleteEverything()">🔥 Удалить ВСЁ одним кликом</button>
@@ -4686,7 +4732,10 @@ let regState = {
   search: '',
   selectedStatuses: new Set(),   // пустой Set = "все"
   selectedAreas: new Set(),       // пустой Set = "все"
-  showArchived: false
+  showArchived: false,
+  // F-Registry-1: multi-select
+  selectedIds: new Set(),         // id выбранных требований
+  lastClickedId: null             // для shift+click диапазона
 };
 
 // Главная функция: открытие вкладки. Восстанавливает выбранный проект, рисует селект,
@@ -4802,6 +4851,9 @@ function updateRegArchiveBtn() {
 function onRegProjectChange() {
   const sel = document.getElementById('reg-project-select');
   regState.projectId = parseInt(sel.value) || null;
+  // F-Registry-1: при смене проекта — сбрасываем выделение (требования другие)
+  regState.selectedIds.clear();
+  regState.lastClickedId = null;
   renderRegistryTable();
 }
 
@@ -4855,9 +4907,12 @@ function renderRegistryTable() {
   const filtered = getFilteredRequirements();
   const nsi = getNSI();
   const proj = nsi.projects.find(p => p.id === regState.projectId);
-  const executors = (proj?.executor || [])
-    .map(m => { const p = nsi.participants.find(x => x.id === m.participantId); return p ? { id: m.participantId, name: p.name, position: m.position } : null; })
-    .filter(Boolean);
+  // F-Report-3 + F-Registry-1: новая структура команды — { fio, position }, старая — { participantId, position }
+  const executors = (proj?.executor || []).map(m => {
+    if (m.fio) return { id: m.fio, name: m.fio, position: m.position || '' }; // новая схема — id = ФИО (строка)
+    const p = nsi.participants.find(x => x.id === m.participantId);
+    return p ? { id: m.participantId, name: p.name, position: m.position || '' } : null;
+  }).filter(Boolean);
   const areas = nsi.functionalAreas || [];
 
   if (!filtered.length) {
@@ -4866,6 +4921,7 @@ function renderRegistryTable() {
     const rows = filtered.map(r => regRowHtml(r, executors, areas)).join('');
     host.innerHTML = `<div class="reg-table-wrap"><table class="reg-table">
       <thead><tr>
+        <th class="reg-cell-check"><input type="checkbox" id="reg-th-checkbox" onclick="onRegHeaderCheckboxClick(event)" title="Выбрать все / снять все"></th>
         <th style="width:80px">Код</th>
         <th>Требование</th>
         <th style="width:140px">Исполнитель</th>
@@ -4878,6 +4934,8 @@ function renderRegistryTable() {
       </tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
+    // F-Registry-1: восстановить состояние выделения после рендера + обновить тулбар
+    syncRegSelectionUI();
   }
 
   // Stats
@@ -4940,6 +4998,7 @@ function regRowHtml(r, executors, areas) {
        <button class="reg-action-btn reg-action-delete" title="Удалить безвозвратно" onclick="deleteRegRow('${r.id}')">🗑️</button>`;
 
   return `<tr class="reg-row${arch}" data-rid="${r.id}">
+    <td class="reg-cell-check"><input type="checkbox" class="reg-row-checkbox" data-rid="${r.id}" onclick="onRegRowCheckboxClick(event)"></td>
     <td class="reg-cell-code">${escHtml(r.code || '')}</td>
     <td class="reg-cell-text">
       <div contenteditable="true" data-rid="${r.id}" data-field="text" onblur="onRegCellBlur(event)">${escHtml(r.text || '')}</div>
@@ -4987,7 +5046,9 @@ function onRegSelectChange(e) {
   let value = el.value;
   // Числовые поля
   if (field === 'functionalAreaId') value = parseInt(value) || null;
-  if (field === 'executorId') value = value ? parseInt(value) : null;
+  // executorId: для новой схемы команды (F-Report-3) это ФИО-строка, для старой — число.
+  // Не приводим к числу — используем строку как есть, либо null если пусто.
+  if (field === 'executorId') value = value || null;
   const updated = updateRequirement(rid, { [field]: value });
   if (updated) {
     flashSaved(el);
@@ -4998,6 +5059,222 @@ function onRegSelectChange(e) {
     }
     // При смене области — код НЕ меняем (юзер сам в курсе, что менять)
   }
+}
+
+// ── F-Registry-1: MULTI-SELECT ────────────────────────
+// Все действия идут через regState.selectedIds (Set<string>). UI чекбоксов
+// синхронизируется через syncRegSelectionUI() — вызывается после ре-рендера таблицы.
+
+// Хелпер: id всех видимых сейчас (отфильтрованных) строк
+function getVisibleRegIds() {
+  return getFilteredRequirements().map(r => r.id);
+}
+
+// Восстановить чекбоксы и подсветку строк после ре-рендера + обновить тулбар
+function syncRegSelectionUI() {
+  // Чекбоксы строк
+  document.querySelectorAll('.reg-row-checkbox').forEach(cb => {
+    const id = cb.dataset.rid;
+    cb.checked = regState.selectedIds.has(id);
+    const tr = cb.closest('tr');
+    if (tr) tr.classList.toggle('reg-row-selected', cb.checked);
+  });
+  // Хедер-чекбокс: checked если все видимые отмечены, indeterminate если часть
+  const thCb = document.getElementById('reg-th-checkbox');
+  if (thCb) {
+    const visibleArr = getVisibleRegIds();
+    const checkedCount = visibleArr.filter(id => regState.selectedIds.has(id)).length;
+    if (visibleArr.length > 0 && checkedCount === visibleArr.length) {
+      thCb.checked = true; thCb.indeterminate = false;
+    } else if (checkedCount > 0) {
+      thCb.checked = false; thCb.indeterminate = true;
+    } else {
+      thCb.checked = false; thCb.indeterminate = false;
+    }
+  }
+  updateRegBulkbar();
+}
+
+// Обновляет видимость и контент тулбара массовых операций
+function updateRegBulkbar() {
+  const bar = document.getElementById('reg-bulkbar');
+  if (!bar) return;
+  const total = getVisibleRegIds().length;
+  const sel = regState.selectedIds.size;
+  const numEl = document.getElementById('reg-bulkbar-count-num');
+  const totEl = document.getElementById('reg-bulkbar-count-total');
+  if (numEl) numEl.textContent = sel;
+  if (totEl) totEl.textContent = total;
+  bar.classList.toggle('is-active', sel > 0);
+  if (sel === 0) return;
+  // Заполняем dropdown'ы (могут меняться при смене проекта)
+  fillRegBulkSelects();
+}
+
+// Заполняет dropdown'ы тулбара (статусы, приоритеты, исполнители проекта, области)
+function fillRegBulkSelects() {
+  // Статус
+  const stSel = document.getElementById('reg-bulk-status');
+  if (stSel) {
+    stSel.innerHTML = '<option value="">— Изменить статус —</option>' +
+      REG_STATUSES.map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+    stSel.value = '';
+  }
+  // Приоритет
+  const prSel = document.getElementById('reg-bulk-priority');
+  if (prSel) {
+    prSel.innerHTML = '<option value="">— Изменить приоритет —</option>' +
+      REG_PRIORITIES.map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+    prSel.value = '';
+  }
+  // Исполнители проекта
+  const exSel = document.getElementById('reg-bulk-executor');
+  if (exSel) {
+    const nsi = getNSI();
+    const proj = nsi.projects.find(p => p.id === regState.projectId);
+    const executors = (proj?.executor || []).map(m => {
+      if (m.fio) return { id: m.fio, name: m.fio };
+      const p = nsi.participants.find(x => x.id === m.participantId);
+      return p ? { id: m.participantId, name: p.name } : null;
+    }).filter(Boolean);
+    exSel.innerHTML = '<option value="">— Назначить исполнителя —</option>' +
+      '<option value="__null__">— Снять исполнителя —</option>' +
+      executors.map(e => `<option value="${escHtml(String(e.id))}">${escHtml(e.name)}</option>`).join('');
+    exSel.value = '';
+  }
+  // Области
+  const arSel = document.getElementById('reg-bulk-area');
+  if (arSel) {
+    const areas = (getNSI().functionalAreas || []);
+    arSel.innerHTML = '<option value="">— Изменить область —</option>' +
+      areas.map(a => `<option value="${a.id}">${escHtml(a.prefix)} — ${escHtml(a.name)}</option>`).join('');
+    arSel.value = '';
+  }
+}
+
+// Клик на чекбокс строки — поддержка Shift+Click для выделения диапазона
+function onRegRowCheckboxClick(e) {
+  const cb = e.target;
+  const id = cb.dataset.rid;
+  if (!id) return;
+  // Shift+Click: выделить диапазон от lastClickedId до текущего среди ВИДИМЫХ
+  if (e.shiftKey && regState.lastClickedId && regState.lastClickedId !== id) {
+    const visible = getVisibleRegIds();
+    const a = visible.indexOf(regState.lastClickedId);
+    const b = visible.indexOf(id);
+    if (a >= 0 && b >= 0) {
+      const [from, to] = a < b ? [a, b] : [b, a];
+      const targetState = cb.checked; // итоговое состояние после клика
+      for (let i = from; i <= to; i++) {
+        if (targetState) regState.selectedIds.add(visible[i]);
+        else             regState.selectedIds.delete(visible[i]);
+      }
+    }
+  } else {
+    // Обычный клик
+    if (cb.checked) regState.selectedIds.add(id);
+    else            regState.selectedIds.delete(id);
+  }
+  regState.lastClickedId = id;
+  syncRegSelectionUI();
+}
+
+// Клик по чекбоксу в шапке — выбрать/снять все ВИДИМЫЕ строки
+function onRegHeaderCheckboxClick(e) {
+  const cb = e.target;
+  const visible = getVisibleRegIds();
+  if (cb.checked) {
+    visible.forEach(id => regState.selectedIds.add(id));
+  } else {
+    visible.forEach(id => regState.selectedIds.delete(id));
+  }
+  regState.lastClickedId = null;
+  syncRegSelectionUI();
+}
+
+// Очистить выделение
+function clearRegSelection() {
+  regState.selectedIds.clear();
+  regState.lastClickedId = null;
+  syncRegSelectionUI();
+}
+
+// ── Массовые операции ──────────────────────────────────
+// Применяет patch ко всем выбранным требованиям проекта
+function _regBulkApply(patch) {
+  if (!regState.projectId) return 0;
+  if (!regState.selectedIds.size) return 0;
+  const list = getRequirements(regState.projectId);
+  let n = 0;
+  list.forEach(r => {
+    if (regState.selectedIds.has(r.id)) {
+      Object.assign(r, patch, { updatedAt: new Date().toISOString() });
+      n++;
+    }
+  });
+  saveRequirements(regState.projectId, list);
+  return n;
+}
+
+function onRegBulkStatusChange() {
+  const sel = document.getElementById('reg-bulk-status');
+  const v = sel ? sel.value : '';
+  if (!v) return;
+  const n = _regBulkApply({ status: v });
+  sel.value = '';
+  if (n) renderRegistryTable();
+}
+
+function onRegBulkPriorityChange() {
+  const sel = document.getElementById('reg-bulk-priority');
+  const v = sel ? sel.value : '';
+  if (!v) return;
+  const n = _regBulkApply({ priority: v });
+  sel.value = '';
+  if (n) renderRegistryTable();
+}
+
+function onRegBulkExecutorChange() {
+  const sel = document.getElementById('reg-bulk-executor');
+  const v = sel ? sel.value : '';
+  if (!v) return;
+  // Спецзначение "__null__" = снять исполнителя
+  const newVal = v === '__null__' ? null
+    : (/^\d+$/.test(v) ? parseInt(v) : v); // число для legacy participantId, иначе ФИО
+  const n = _regBulkApply({ executorId: newVal });
+  sel.value = '';
+  if (n) renderRegistryTable();
+}
+
+function onRegBulkAreaChange() {
+  const sel = document.getElementById('reg-bulk-area');
+  const v = sel ? sel.value : '';
+  if (!v) return;
+  const n = _regBulkApply({ functionalAreaId: parseInt(v) || null });
+  sel.value = '';
+  if (n) renderRegistryTable();
+}
+
+function onRegBulkArchive() {
+  if (!regState.selectedIds.size) return;
+  if (!confirm(`В архив ${regState.selectedIds.size} требований? (Архивные не выгружаются в xlsx)`)) return;
+  const n = _regBulkApply({ archived: true });
+  if (n) {
+    // После архивации очищаем выделение архивных строк (если архив скрыт — они исчезнут)
+    if (!regState.showArchived) regState.selectedIds.clear();
+    renderRegistryTable();
+  }
+}
+
+function onRegBulkDelete() {
+  if (!regState.selectedIds.size) return;
+  if (!confirm(`Удалить безвозвратно ${regState.selectedIds.size} требований? Это действие нельзя отменить.`)) return;
+  if (!regState.projectId) return;
+  const list = getRequirements(regState.projectId).filter(r => !regState.selectedIds.has(r.id));
+  saveRequirements(regState.projectId, list);
+  regState.selectedIds.clear();
+  regState.lastClickedId = null;
+  renderRegistryTable();
 }
 
 // ── Действия со строкой ────────────
@@ -5066,6 +5343,9 @@ async function exportRegistryXlsx() {
     const areas = nsi.functionalAreas || [];
     const execName = (eid) => {
       if (!eid) return '';
+      // F-Report-3: новая схема — eid это ФИО-строка
+      if (typeof eid === 'string') return eid;
+      // Старая схема (legacy): число → ищем в participants
       const p = participants.find(x => x.id === eid);
       return p ? p.name : '';
     };
@@ -6975,7 +7255,37 @@ async function adminDeleteAllProtocols() {
     });
 }
 
-// ── Кнопка 4: отчёт об обследовании ──
+// ── Кнопка 4 (новая): требования ──
+async function adminDeleteAllRequirements() {
+  await _adminAct('Удаляю все требования',
+    'УДАЛИТЬ ВСЕ ТРЕБОВАНИЯ:\n\n' +
+    '• Все ключи requirements_* в localStorage (по всем проектам)\n\n' +
+    'Готовые протоколы и НСИ НЕ ТРОГАЮТСЯ.\n' +
+    'Продолжить?',
+    async () => {
+      // Соберём все ключи requirements_* и удалим
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('requirements_')) keys.push(k);
+      }
+      let total = 0;
+      keys.forEach(k => {
+        try { total += JSON.parse(localStorage.getItem(k) || '[]').length; } catch (_) {}
+        localStorage.removeItem(k);
+      });
+      // Сбрасываем выделение в реестре (если открыт)
+      if (typeof regState !== 'undefined' && regState.selectedIds) {
+        regState.selectedIds.clear();
+        regState.lastClickedId = null;
+      }
+      // Перерисовываем реестр (если открыт)
+      try { renderRegistryTable && renderRegistryTable(); } catch (_) {}
+      return `Удалено требований: ${total} (из ${keys.length} проектов)`;
+    });
+}
+
+// ── Кнопка 5: отчёт об обследовании ──
 async function adminDeleteSurveyReport() {
   await _adminAct('Очищаю отчёт об обследовании',
     'УДАЛИТЬ ОТЧЁТ ОБ ОБСЛЕДОВАНИИ:\n\n' +
@@ -7006,7 +7316,7 @@ async function adminDeleteEverything() {
 
   const status = document.getElementById('admin-status');
   const setS = (html) => { if (status) status.innerHTML = html; };
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 1/5: видео и сессии...</div>');
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 1/6: видео и сессии...</div>');
 
   // Шаг 1: Google + sessions + аудио сессий
   try {
@@ -7036,7 +7346,7 @@ async function adminDeleteEverything() {
   } catch (_) {}
 
   // Шаг 2: оставшийся аудио-кэш + Whisper
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 2/5: аудио-кэш и Whisper...</div>');
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 2/6: аудио-кэш и Whisper...</div>');
   try {
     const db = await openAudioDB();
     const allKeys = await new Promise((resolve) => {
@@ -7051,19 +7361,36 @@ async function adminDeleteEverything() {
   currentTranscriptText = '';
 
   // Шаг 3: протоколы
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 3/5: протоколы...</div>');
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 3/6: протоколы...</div>');
   localStorage.setItem('protocols', JSON.stringify([]));
   currentProtocolText = '';
   currentRequirementsText = '';
   currentReportTheses = [];
 
-  // Шаг 4: отчёт об обследовании
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 4/4: отчёт об обследовании...</div>');
+  // Шаг 4: требования
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 4/6: требования (все проекты)...</div>');
+  try {
+    const reqKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('requirements_')) reqKeys.push(k);
+    }
+    reqKeys.forEach(k => localStorage.removeItem(k));
+    if (typeof regState !== 'undefined' && regState.selectedIds) {
+      regState.selectedIds.clear();
+      regState.lastClickedId = null;
+    }
+  } catch (_) {}
+
+  // Шаг 5: отчёт об обследовании
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 5/6: отчёт об обследовании...</div>');
   currentReportText = '';
   reportData = null;
   const repPrev = document.getElementById('report-preview');
   if (repPrev) repPrev.textContent = '';
 
+  // Шаг 6: финальный refresh UI
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 6/6: обновление интерфейса...</div>');
   // Refresh UI всех вкладок
   try { renderLibrary(); } catch (_) {}
   try { renderList && renderList('report'); } catch (_) {}
