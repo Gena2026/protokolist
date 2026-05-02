@@ -227,7 +227,7 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
 
 /* Логотип в карточке проекта */
 .pc-logo-block{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
-.pc-logo-preview{width:120px;height:120px;border-radius:12px;border:2px dashed #cbd5e1;background:#fafafa;display:flex;align-items:center;justify-content:center;font-size:14px;color:#94a3b8;overflow:hidden;flex-shrink:0;position:relative;background-size:cover;background-position:center}
+.pc-logo-preview{width:220px;height:110px;border-radius:12px;border:2px dashed #cbd5e1;background:#fafafa;display:flex;align-items:center;justify-content:center;font-size:14px;color:#94a3b8;overflow:hidden;flex-shrink:0;position:relative;background-size:contain;background-position:center;background-repeat:no-repeat}
 .pc-logo-preview.has-image{border-style:solid;border-color:#3b82f6}
 .pc-logo-controls{display:flex;flex-direction:column;gap:8px;flex:1;min-width:200px}
 .pc-logo-info{font-size:12px;color:#64748b;line-height:1.4}
@@ -435,6 +435,7 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
   <div class="tab active" id="tab-protocol" onclick="showTab('protocol',this)">🎙️ Протокол встречи</div>
   <div class="tab" id="tab-registry" onclick="showTab('registry',this)">📋 Реестр требований</div>
   <div class="tab" id="tab-report" onclick="showTab('report',this)">📄 Отчёт об обследовании</div>
+  <div class="tab" id="tab-presentation" onclick="showTab('presentation',this)">🎬 Презентация</div>
   <div class="tab" id="tab-library" onclick="showTab('library',this)">📂 Библиотека файлов</div>
   <div class="tab" id="tab-nsi" onclick="showTab('nsi',this)">⚙️ НСИ</div>
   <div class="tab" id="tab-admin" onclick="showTab('admin',this)">🛠️ Администрирование</div>
@@ -758,6 +759,18 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 
     <!-- Таблица -->
     <div id="reg-table-host"></div>
+  </div>
+</div>
+
+<!-- ======= PRESENTATION ======= -->
+<div class="page" id="page-presentation">
+  <div class="card">
+    <div class="card-title"><div class="card-title-icon icon-purple">🎬</div>Презентация</div>
+    <div class="empty-state" style="padding:48px 24px;text-align:center">
+      <div class="empty-state-icon" style="font-size:48px">🚧</div>
+      <div style="font-size:15px;color:#64748b;margin-top:12px;font-weight:500">Раздел в разработке</div>
+      <div style="font-size:13px;color:#94a3b8;margin-top:8px;line-height:1.5">Здесь скоро появится генерация презентации<br>по итогам обследования.</div>
+    </div>
   </div>
 </div>
 
@@ -7804,7 +7817,7 @@ function deleteFunctionalArea(id) {
 // Эти справочники не требуют полноценной формы. Делаем минимальную карточку:
 //   - participants: одно поле «ФИО»
 //   - positions:    одно поле «Название»
-//   - areas:        два поля «Название» + «Префикс (2 русские буквы)»
+//   - areas:        два поля «Название» + «Префикс (1–2 буквы/цифры)»
 // editingMcId: id редактируемого элемента (null = новый)
 // editingMcDict: какой справочник
 let editingMcId = null;
@@ -7880,8 +7893,8 @@ function pcRenderMiniCard(dict, id) {
         <label>Название <span class="pc-req">*</span></label>
         <input type="text" id="mc-areas-name" class="pc-input" placeholder="Планирование" value="${a ? escHtml(a.name) : ''}">
       </div>
-      <div class="pc-field" style="max-width:240px">
-        <label>Префикс (2 русские буквы) <span class="pc-req">*</span></label>
+      <div class="pc-field" style="max-width:110px">
+        <label>Префикс <span class="pc-req">*</span></label>
         <input type="text" id="mc-areas-prefix" class="pc-input" maxlength="2" style="text-transform:uppercase;font-family:monospace;letter-spacing:.5px;text-align:center" placeholder="ПЛ" value="${a ? escHtml(a.prefix) : ''}">
       </div>`;
   }
@@ -7927,7 +7940,7 @@ function saveMiniCard(closeAfter) {
     const name = document.getElementById('mc-areas-name').value.trim();
     const prefix = document.getElementById('mc-areas-prefix').value.trim().toUpperCase();
     if (!name) return showErr('Введи название области');
-    if (!/^[А-ЯЁ]{2}$/.test(prefix)) return showErr('Префикс должен состоять из ровно 2 заглавных русских букв (например: ПЛ, ЗА, ДО, СК)');
+    if (!/^[A-Za-zА-ЯЁа-яё0-9]{1,2}$/.test(prefix)) return showErr('Префикс должен содержать 1–2 буквы или цифры (например: ПЛ, IT, F1)');
     if (!Array.isArray(nsi.functionalAreas)) nsi.functionalAreas = [];
     const dupName = nsi.functionalAreas.find(a => a.name.toLowerCase() === name.toLowerCase() && a.id !== editingMcId);
     if (dupName) return showErr('Область с таким названием уже существует');
@@ -8536,8 +8549,7 @@ function renderNSILists() {
       projList.innerHTML = '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Пока нет проектов. Нажми «+ Добавить» сверху.</div>';
     } else {
       projList.innerHTML = `<div class="nsi-proj-tiles">${nsi.projects.map(proj => {
-        const ec = proj.executor?.length || 0;
-        const cc = proj.customer?.length || 0;
+        const cityText = proj.city ? escHtml(proj.city) : '<span style="color:#cbd5e1">— не указан —</span>';
         const displayName = proj.name || '<em style="color:#94a3b8">(без названия)</em>';
         const initial = (proj.name || '?').trim().charAt(0).toUpperCase();
         // Префикс цвета на основе id (детерминированный)
@@ -8546,7 +8558,7 @@ function renderNSILists() {
         return `<div class="nsi-proj-tile" onclick="openProjectCard(${proj.id})">
           <div class="nsi-proj-tile-logo" style="background:${bg}" id="proj-logo-${proj.id}">${escHtml(initial)}</div>
           <div class="nsi-proj-tile-name">${displayName.startsWith('<') ? displayName : escHtml(displayName)}</div>
-          <div class="nsi-proj-tile-sub">Заказчик: ${cc} · Исполнитель: ${ec}</div>
+          <div class="nsi-proj-tile-sub">📍 ${cityText}</div>
           <button class="nsi-proj-tile-del protocol-del" onclick="event.stopPropagation();deleteProject(${proj.id})" title="Удалить">×</button>
         </div>`;
       }).join('')}</div>`;
