@@ -137,7 +137,7 @@ body[data-busy-op="generating"] #step-3 .step-stop-btn{display:inline-flex;align
 .step-0-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .step-0-icon{font-size:18px}
 .step-0-title{font-size:15px;font-weight:600;color:#1e293b;margin:0}
-.step-0-options{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}
+.step-0-options{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
 .step-0-checkbox{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#475569;border:1px solid #cbd5e1;border-radius:9px;padding:0 14px;background:#fff;margin:0;transition:all .15s;text-transform:none;letter-spacing:0;font-weight:400;min-width:240px;flex:0 1 auto;height:56px;box-sizing:border-box}
 .step-0-checkbox:hover{border-color:#94a3b8;background:#f8fafc}
 .step-0-checkbox input[type=checkbox]{width:15px;height:15px;cursor:pointer;margin:0;flex-shrink:0}
@@ -189,6 +189,49 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
 .area-chip-active .area-chip-prefix{background:#3b82f6}
 .step-card label:first-of-type{margin-top:14px}
 .cleanup-status-line{font-size:12px;color:#475569;margin-top:8px;line-height:1.4}
+
+/* === F-NSI-Hierarchy: 3-уровневая навигация по справочникам === */
+.nsi-breadcrumb{display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px}
+.nsi-back-btn{font-size:13px;padding:6px 12px}
+.nsi-breadcrumb-trail{font-size:13px;color:#64748b;flex:1}
+.nsi-breadcrumb-trail b{color:#1e293b;font-weight:600}
+.nsi-variant-label{font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px dashed #e2e8f0}
+
+/* Вариант A — квадратные плитки */
+.nsi-tiles-a{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media (max-width:900px){.nsi-tiles-a{grid-template-columns:repeat(2,1fr)}}
+.nsi-tile-a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 16px;background:#fafafa;border:1px solid #e2e8f0;border-radius:12px;cursor:pointer;transition:.15s;text-align:center;min-height:140px}
+.nsi-tile-a:hover{background:#fff;border-color:#3b82f6;box-shadow:0 4px 12px rgba(59,130,246,.1);transform:translateY(-2px)}
+.nsi-tile-a-icon{width:54px;height:54px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px}
+.nsi-tile-a-name{font-size:14px;font-weight:600;color:#1e293b;line-height:1.3}
+.nsi-tile-a-count{font-size:11px;color:#94a3b8;font-weight:500}
+
+/* Вариант B — кнопки-строки (стиль macOS Settings) */
+.nsi-tiles-b{display:flex;flex-direction:column;gap:6px}
+.nsi-tile-b{display:flex;align-items:center;gap:14px;padding:12px 14px;background:#fafafa;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;transition:.15s}
+.nsi-tile-b:hover{background:#fff;border-color:#3b82f6;box-shadow:0 2px 8px rgba(59,130,246,.08)}
+.nsi-tile-b-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.nsi-tile-b-text{flex:1;min-width:0}
+.nsi-tile-b-name{font-size:14px;font-weight:600;color:#1e293b;line-height:1.3}
+.nsi-tile-b-sub{font-size:12px;color:#64748b;line-height:1.3;margin-top:2px}
+.nsi-tile-b-count{font-size:12px;color:#64748b;font-weight:500;background:#fff;padding:3px 9px;border-radius:6px;border:1px solid #e2e8f0;min-width:28px;text-align:center}
+.nsi-tile-b-chev{color:#cbd5e1;font-size:22px;font-weight:300;line-height:1}
+
+/* Вариант C — компактный список */
+.nsi-tiles-c{display:flex;flex-direction:column;gap:0;border:1px solid #e2e8f0;border-radius:9px;overflow:hidden}
+.nsi-tile-c{display:flex;align-items:center;gap:12px;padding:11px 14px;background:#fff;cursor:pointer;transition:.15s;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit}
+.nsi-tile-c:last-child{border-bottom:none}
+.nsi-tile-c:hover{background:#f8fafc}
+.nsi-tile-c-icon{font-size:16px;width:24px;text-align:center;flex-shrink:0}
+.nsi-tile-c-name{flex:1;font-size:13px;color:#1e293b}
+.nsi-tile-c-count{font-size:11px;color:#94a3b8;font-weight:500}
+
+/* Строки в списке элементов справочника (Уровень 2) — кликабельны для перехода в карточку */
+.nsi-row{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px;cursor:pointer;border:1px solid transparent;transition:.15s}
+.nsi-row:hover{background:#eff6ff;border-color:#bfdbfe}
+.nsi-row-text{flex:1;min-width:0}
+.nsi-row-proj{padding:10px 14px;border-radius:9px;border:1px solid #e2e8f0;margin-bottom:7px}
+.nsi-row-proj:hover{border-color:#3b82f6;background:#fff}
 
 /* === F-Report-3: Карточка проекта === */
 .pc-section{margin-bottom:22px;padding-bottom:18px;border-bottom:1px dashed #e2e8f0}
@@ -412,20 +455,20 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 
     <div class="step-0-options">
       <label class="step-0-checkbox">
-        <input type="checkbox" id="auto-mode-flag">
-        <span class="step-0-checkbox-emoji">🚀</span>
-        <span class="step-0-checkbox-text">
-          <span class="step-0-checkbox-name">Авто-режим</span>
-          <span class="step-0-checkbox-hint">загрузил → ушёл пить кофе</span>
-        </span>
-      </label>
-
-      <label class="step-0-checkbox">
         <input type="checkbox" id="audio-only-flag" onchange="audioOnlyMode=this.checked">
         <span class="step-0-checkbox-emoji">🔊</span>
         <span class="step-0-checkbox-text">
           <span class="step-0-checkbox-name">Только аудио</span>
           <span class="step-0-checkbox-hint">нет показа экрана</span>
+        </span>
+      </label>
+
+      <label class="step-0-checkbox">
+        <input type="checkbox" id="auto-mode-flag">
+        <span class="step-0-checkbox-emoji">🚀</span>
+        <span class="step-0-checkbox-text">
+          <span class="step-0-checkbox-name">Авто-режим</span>
+          <span class="step-0-checkbox-hint">загрузил → ушёл пить кофе</span>
         </span>
       </label>
     </div>
@@ -782,194 +825,331 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 <!-- ======= NSI ======= -->
 <div class="page" id="page-nsi">
 
-  <!-- POSITIONS -->
-  <div class="card">
-    <div class="card-title"><div class="card-title-icon icon-purple">📋</div>Должности</div>
-    <div id="positions-list" style="margin-bottom:12px"></div>
-    <div style="display:flex;gap:8px">
-      <input type="text" id="new-position" placeholder="Название должности" style="flex:1">
-      <button class="btn btn-primary" onclick="addPosition()">+ Добавить</button>
+  <!-- ═══════════════════════════════════════════════════════════
+       NSI: 3-уровневая навигация
+         level=main  → плитки справочников
+         level=list  → список элементов выбранного справочника
+         level=card  → карточка элемента (пока полная только для projects)
+       Все уровни живут внутри #page-nsi, переключаются через nsiState/renderNSI
+       ═══════════════════════════════════════════════════════════ -->
+
+  <!-- Breadcrumb (виден на уровнях list / card) -->
+  <div id="nsi-breadcrumb" class="nsi-breadcrumb" style="display:none">
+    <button class="btn btn-secondary nsi-back-btn" onclick="nsiGoBack()">← Назад</button>
+    <span class="nsi-breadcrumb-trail" id="nsi-breadcrumb-trail"></span>
+  </div>
+
+  <!-- ═══ УРОВЕНЬ 1: ГЛАВНАЯ — плитки справочников ═══ -->
+  <div id="nsi-level-main">
+    <div class="card">
+      <div class="card-title"><div class="card-title-icon icon-blue">⚙️</div>Справочники</div>
+      <p style="font-size:13px;color:#64748b;margin:0 0 18px">Выбери справочник чтобы открыть список его элементов.</p>
+
+      <!-- Вариант A — крупные квадратные плитки в сетке -->
+      <div class="nsi-variant-label">Вариант A — Квадратные плитки</div>
+      <div class="nsi-tiles-a">
+        <div class="nsi-tile-a" onclick="nsiOpenList('projects')">
+          <div class="nsi-tile-a-icon" style="background:#fef3c7">🗂️</div>
+          <div class="nsi-tile-a-name">Проекты</div>
+          <div class="nsi-tile-a-count" id="nsi-count-a-projects">0</div>
+        </div>
+        <div class="nsi-tile-a" onclick="nsiOpenList('participants')">
+          <div class="nsi-tile-a-icon" style="background:#dbeafe">👤</div>
+          <div class="nsi-tile-a-name">Участники</div>
+          <div class="nsi-tile-a-count" id="nsi-count-a-participants">0</div>
+        </div>
+        <div class="nsi-tile-a" onclick="nsiOpenList('positions')">
+          <div class="nsi-tile-a-icon" style="background:#ede9fe">📋</div>
+          <div class="nsi-tile-a-name">Должности</div>
+          <div class="nsi-tile-a-count" id="nsi-count-a-positions">0</div>
+        </div>
+        <div class="nsi-tile-a" onclick="nsiOpenList('areas')">
+          <div class="nsi-tile-a-icon" style="background:#d1fae5">📐</div>
+          <div class="nsi-tile-a-name">Функциональные области</div>
+          <div class="nsi-tile-a-count" id="nsi-count-a-areas">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <!-- Вариант B — большие кнопки-строки -->
+      <div class="nsi-variant-label">Вариант B — Кнопки-строки (стиль macOS Settings)</div>
+      <div class="nsi-tiles-b">
+        <div class="nsi-tile-b" onclick="nsiOpenList('projects')">
+          <div class="nsi-tile-b-icon" style="background:#fef3c7">🗂️</div>
+          <div class="nsi-tile-b-text">
+            <div class="nsi-tile-b-name">Проекты</div>
+            <div class="nsi-tile-b-sub">Карточки клиентов и команды</div>
+          </div>
+          <div class="nsi-tile-b-count" id="nsi-count-b-projects">0</div>
+          <div class="nsi-tile-b-chev">›</div>
+        </div>
+        <div class="nsi-tile-b" onclick="nsiOpenList('participants')">
+          <div class="nsi-tile-b-icon" style="background:#dbeafe">👤</div>
+          <div class="nsi-tile-b-text">
+            <div class="nsi-tile-b-name">Участники</div>
+            <div class="nsi-tile-b-sub">Сотрудники и контактные лица</div>
+          </div>
+          <div class="nsi-tile-b-count" id="nsi-count-b-participants">0</div>
+          <div class="nsi-tile-b-chev">›</div>
+        </div>
+        <div class="nsi-tile-b" onclick="nsiOpenList('positions')">
+          <div class="nsi-tile-b-icon" style="background:#ede9fe">📋</div>
+          <div class="nsi-tile-b-text">
+            <div class="nsi-tile-b-name">Должности</div>
+            <div class="nsi-tile-b-sub">Список должностей для команды</div>
+          </div>
+          <div class="nsi-tile-b-count" id="nsi-count-b-positions">0</div>
+          <div class="nsi-tile-b-chev">›</div>
+        </div>
+        <div class="nsi-tile-b" onclick="nsiOpenList('areas')">
+          <div class="nsi-tile-b-icon" style="background:#d1fae5">📐</div>
+          <div class="nsi-tile-b-text">
+            <div class="nsi-tile-b-name">Функциональные области</div>
+            <div class="nsi-tile-b-sub">Бизнес-блоки для протоколов</div>
+          </div>
+          <div class="nsi-tile-b-count" id="nsi-count-b-areas">0</div>
+          <div class="nsi-tile-b-chev">›</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <!-- Вариант C — компактный список ссылок (минимализм) -->
+      <div class="nsi-variant-label">Вариант C — Компактный список (минимализм)</div>
+      <div class="nsi-tiles-c">
+        <a class="nsi-tile-c" onclick="nsiOpenList('projects')">
+          <span class="nsi-tile-c-icon">🗂️</span>
+          <span class="nsi-tile-c-name">Проекты</span>
+          <span class="nsi-tile-c-count" id="nsi-count-c-projects">0</span>
+        </a>
+        <a class="nsi-tile-c" onclick="nsiOpenList('participants')">
+          <span class="nsi-tile-c-icon">👤</span>
+          <span class="nsi-tile-c-name">Участники</span>
+          <span class="nsi-tile-c-count" id="nsi-count-c-participants">0</span>
+        </a>
+        <a class="nsi-tile-c" onclick="nsiOpenList('positions')">
+          <span class="nsi-tile-c-icon">📋</span>
+          <span class="nsi-tile-c-name">Должности</span>
+          <span class="nsi-tile-c-count" id="nsi-count-c-positions">0</span>
+        </a>
+        <a class="nsi-tile-c" onclick="nsiOpenList('areas')">
+          <span class="nsi-tile-c-icon">📐</span>
+          <span class="nsi-tile-c-name">Функциональные области</span>
+          <span class="nsi-tile-c-count" id="nsi-count-c-areas">0</span>
+        </a>
+      </div>
+      <p style="font-size:12px;color:#94a3b8;margin:14px 0 0;font-style:italic">Скажи какой вариант оставить — остальные удалю.</p>
     </div>
   </div>
 
-  <!-- PARTICIPANTS -->
-  <div class="card">
-    <div class="card-title"><div class="card-title-icon icon-blue">👤</div>Участники</div>
-    <div id="participants-list" style="margin-bottom:12px"></div>
-    <div style="display:flex;gap:8px">
-      <input type="text" id="new-participant" placeholder="ФИО участника" style="flex:1">
-      <button class="btn btn-primary" onclick="addParticipant()">+ Добавить</button>
+  <!-- ═══ УРОВЕНЬ 2: СПИСОК ЭЛЕМЕНТОВ СПРАВОЧНИКА ═══ -->
+  <div id="nsi-level-list" style="display:none">
+
+    <!-- POSITIONS list -->
+    <div class="card nsi-list-card" data-dict="positions" style="display:none">
+      <div class="card-title"><div class="card-title-icon icon-purple">📋</div>Должности</div>
+      <div id="positions-list" style="margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="new-position" placeholder="Название должности" style="flex:1">
+        <button class="btn btn-primary" onclick="addPosition()">+ Добавить</button>
+      </div>
+    </div>
+
+    <!-- PARTICIPANTS list -->
+    <div class="card nsi-list-card" data-dict="participants" style="display:none">
+      <div class="card-title"><div class="card-title-icon icon-blue">👤</div>Участники</div>
+      <div id="participants-list" style="margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="new-participant" placeholder="ФИО участника" style="flex:1">
+        <button class="btn btn-primary" onclick="addParticipant()">+ Добавить</button>
+      </div>
+    </div>
+
+    <!-- PROJECTS list -->
+    <div class="card nsi-list-card" id="projects-card" data-dict="projects" style="display:none">
+      <div class="card-title"><div class="card-title-icon icon-amber">🗂️</div>Проекты</div>
+      <div id="projects-list" style="margin-bottom:12px"></div>
+      <button class="btn btn-primary" onclick="createProjectAndOpen()" style="width:100%">+ Создать проект</button>
+    </div>
+
+    <!-- FUNCTIONAL AREAS list -->
+    <div class="card nsi-list-card" data-dict="areas" style="display:none">
+      <div class="card-title"><div class="card-title-icon icon-green">📐</div>Функциональные области</div>
+      <div id="functional-areas-list" style="margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="new-area-name" placeholder="Название (напр., Планирование)" style="flex:1">
+        <input type="text" id="new-area-prefix" placeholder="Префикс" maxlength="2" style="width:120px;text-transform:uppercase;font-family:monospace;letter-spacing:.5px;text-align:center">
+        <button class="btn btn-primary" onclick="addFunctionalArea()">+ Добавить</button>
+      </div>
     </div>
   </div>
 
-  <!-- PROJECTS -->
-  <div class="card" id="projects-card">
-    <div class="card-title"><div class="card-title-icon icon-amber">🗂️</div>Проекты</div>
-    <div id="projects-list" style="margin-bottom:12px"></div>
-    <button class="btn btn-primary" onclick="createProjectAndOpen()" style="width:100%">+ Создать проект</button>
-  </div>
+  <!-- ═══ УРОВЕНЬ 3: КАРТОЧКА ЭЛЕМЕНТА ═══ -->
+  <div id="nsi-level-card" style="display:none">
 
-  <!-- FUNCTIONAL AREAS -->
-  <div class="card">
-    <div class="card-title"><div class="card-title-icon icon-green">📐</div>Функциональные области</div>
-    <div id="functional-areas-list" style="margin-bottom:12px"></div>
-    <div style="display:flex;gap:8px">
-      <input type="text" id="new-area-name" placeholder="Название (напр., Планирование)" style="flex:1">
-      <input type="text" id="new-area-prefix" placeholder="Префикс" maxlength="2" style="width:120px;text-transform:uppercase;font-family:monospace;letter-spacing:.5px;text-align:center">
-      <button class="btn btn-primary" onclick="addFunctionalArea()">+ Добавить</button>
-    </div>
-  </div>
-
-  <!-- PROJECT CARD (F-Report-3) -->
-  <div class="card" id="project-card" style="display:none">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <button class="btn btn-secondary" onclick="closeProjectCard()" style="font-size:13px">← Назад к НСИ</button>
+    <!-- Карточка проекта (полноценная — F-Report-3) -->
+    <div class="card nsi-card-page" id="project-card" data-card="project" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
         <div class="card-title" style="margin:0">
           <div class="card-title-icon icon-amber">📋</div>
           <span id="pc-title">Карточка проекта</span>
         </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-success" onclick="saveProjectCard(false)" id="pc-save-btn">💾 Сохранить</button>
+          <button class="btn btn-success" onclick="saveProjectCard(true)" id="pc-save-close-btn">💾 Сохранить и закрыть</button>
+        </div>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-success" onclick="saveProjectCard(false)" id="pc-save-btn">💾 Сохранить</button>
-        <button class="btn btn-success" onclick="saveProjectCard(true)" id="pc-save-close-btn">💾 Сохранить и закрыть</button>
-      </div>
-    </div>
 
-    <div id="pc-error-summary" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px"></div>
+      <div id="pc-error-summary" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px"></div>
 
-    <!-- Раздел: Основное -->
-    <div class="pc-section">
-      <div class="pc-section-title">Основное</div>
-      <div class="pc-grid-2">
-        <div class="pc-field">
-          <label>Полное название проекта <span class="pc-req">*</span></label>
-          <input type="text" id="pc-name" class="pc-input" placeholder="Автоматизация учёта в Cemix Uzbekistan">
-        </div>
-        <div class="pc-field">
-          <label>Краткое название <span class="pc-req">*</span></label>
-          <input type="text" id="pc-short-name" class="pc-input" placeholder="Cemix Uzbekistan">
-        </div>
-        <div class="pc-field">
-          <label>Город <span class="pc-req">*</span></label>
-          <input type="text" id="pc-city" class="pc-input" placeholder="Ташкент">
-        </div>
-      </div>
-    </div>
-
-    <!-- Раздел: Стороны -->
-    <div class="pc-section">
-      <div class="pc-section-title">Стороны</div>
-      <div class="pc-grid-2">
-        <div class="pc-field">
-          <label>Заказчик (организация) <span class="pc-req">*</span></label>
-          <input type="text" id="pc-customer-org" class="pc-input" placeholder="ИП ООО «CEMIX»">
-        </div>
-        <div class="pc-field">
-          <label>Исполнитель (организация) <span class="pc-req">*</span></label>
-          <input type="text" id="pc-executor-org" class="pc-input" placeholder="ИП ООО «1С-РАРУС»">
-        </div>
-      </div>
-    </div>
-
-    <!-- Раздел: Договор -->
-    <div class="pc-section">
-      <div class="pc-section-title">Договор (основание)</div>
-      <div class="pc-grid-2">
-        <div class="pc-field">
-          <label>Номер договора <span class="pc-req">*</span></label>
-          <input type="text" id="pc-contract-num" class="pc-input" placeholder="TA25-000054">
-        </div>
-        <div class="pc-field">
-          <label>Дата договора <span class="pc-req">*</span></label>
-          <input type="text" id="pc-contract-date" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
-        </div>
-      </div>
-    </div>
-
-    <!-- Раздел: Период проекта -->
-    <div class="pc-section">
-      <div class="pc-section-title">Период проекта</div>
-      <div class="pc-grid-2">
-        <div class="pc-field">
-          <label>Начало <span class="pc-req">*</span></label>
-          <input type="text" id="pc-proj-from" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
-        </div>
-        <div class="pc-field">
-          <label>Окончание <span class="pc-opt">(не обязательно)</span></label>
-          <input type="text" id="pc-proj-to" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
-        </div>
-      </div>
-    </div>
-
-    <!-- Раздел: Период обследования -->
-    <div class="pc-section">
-      <div class="pc-section-title">Период обследования</div>
-      <div class="pc-grid-2">
-        <div class="pc-field">
-          <label>Начало <span class="pc-req">*</span></label>
-          <input type="text" id="pc-survey-from" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
-        </div>
-        <div class="pc-field">
-          <label>Окончание <span class="pc-opt">(не обязательно)</span></label>
-          <input type="text" id="pc-survey-to" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
-        </div>
-      </div>
-    </div>
-
-    <!-- Раздел: О компании Заказчика -->
-    <div class="pc-section">
-      <div class="pc-section-title">О компании Заказчика</div>
-      <div class="pc-field">
-        <label>Юридический адрес <span class="pc-req">*</span></label>
-        <textarea id="pc-customer-address" class="pc-input" rows="2" placeholder="Самаркандская область, Нуробадский район..."></textarea>
-      </div>
-      <div class="pc-field" style="max-width:240px">
-        <label>Численность персонала (чел.) <span class="pc-req">*</span></label>
-        <input type="number" id="pc-customer-headcount" class="pc-input" placeholder="77" min="1" step="1">
-      </div>
-      <div class="pc-field">
-        <label>Описание предприятия <span class="pc-req">*</span></label>
-        <textarea id="pc-customer-description" class="pc-input" rows="6" placeholder="Чем компания занимается, для какого рынка работает, ключевые направления, стратегия. 3-4 абзаца текста."></textarea>
-      </div>
-      <div class="pc-field">
-        <label>Орг.структура (XLSX) <span class="pc-opt">(на перспективу — пока заглушка)</span></label>
-        <button class="btn btn-secondary" disabled style="opacity:.6;cursor:not-allowed" title="Функция в разработке">📎 Загрузить файл</button>
-      </div>
-    </div>
-
-    <!-- Раздел: Команда -->
-    <div class="pc-section">
-      <div class="pc-section-title">Команда проекта</div>
-      <div style="font-size:12px;color:#64748b;margin-bottom:12px">
-        Минимум 1 человек с каждой стороны. У каждого должны быть отмечены роли (☑ куратор, ☑ руководитель, ☑ подписант). С каждой стороны должно быть минимум по одному куратору, руководителю и подписанту.
-      </div>
-      <div class="pc-grid-2">
-        <!-- Команда заказчика -->
-        <div class="pc-team-block">
-          <div class="pc-team-title">Заказчик</div>
-          <div id="pc-customer-team-list" class="pc-team-list"></div>
-          <div class="pc-team-add">
-            <input type="text" id="pc-new-customer-fio" class="pc-input" placeholder="ФИО (Иванов И.И.)">
-            <input type="text" id="pc-new-customer-pos" class="pc-input" placeholder="Должность">
-            <button class="btn btn-secondary" onclick="pcAddTeamMember('customer')" style="font-size:12px">+ Добавить</button>
+      <!-- Раздел: Основное -->
+      <div class="pc-section">
+        <div class="pc-section-title">Основное</div>
+        <div class="pc-grid-2">
+          <div class="pc-field">
+            <label>Полное название проекта <span class="pc-req">*</span></label>
+            <input type="text" id="pc-name" class="pc-input" placeholder="Автоматизация учёта в Cemix Uzbekistan">
+          </div>
+          <div class="pc-field">
+            <label>Краткое название <span class="pc-req">*</span></label>
+            <input type="text" id="pc-short-name" class="pc-input" placeholder="Cemix Uzbekistan">
+          </div>
+          <div class="pc-field">
+            <label>Город <span class="pc-req">*</span></label>
+            <input type="text" id="pc-city" class="pc-input" placeholder="Ташкент">
           </div>
         </div>
-        <!-- Команда исполнителя -->
-        <div class="pc-team-block">
-          <div class="pc-team-title">Исполнитель</div>
-          <div id="pc-executor-team-list" class="pc-team-list"></div>
-          <div class="pc-team-add">
-            <input type="text" id="pc-new-executor-fio" class="pc-input" placeholder="ФИО (Петров П.П.)">
-            <input type="text" id="pc-new-executor-pos" class="pc-input" placeholder="Должность">
-            <button class="btn btn-secondary" onclick="pcAddTeamMember('executor')" style="font-size:12px">+ Добавить</button>
+      </div>
+
+      <!-- Раздел: Стороны -->
+      <div class="pc-section">
+        <div class="pc-section-title">Стороны</div>
+        <div class="pc-grid-2">
+          <div class="pc-field">
+            <label>Заказчик (организация) <span class="pc-req">*</span></label>
+            <input type="text" id="pc-customer-org" class="pc-input" placeholder="ИП ООО «CEMIX»">
+          </div>
+          <div class="pc-field">
+            <label>Исполнитель (организация) <span class="pc-req">*</span></label>
+            <input type="text" id="pc-executor-org" class="pc-input" placeholder="ИП ООО «1С-РАРУС»">
           </div>
         </div>
+      </div>
+
+      <!-- Раздел: Договор -->
+      <div class="pc-section">
+        <div class="pc-section-title">Договор (основание)</div>
+        <div class="pc-grid-2">
+          <div class="pc-field">
+            <label>Номер договора <span class="pc-req">*</span></label>
+            <input type="text" id="pc-contract-num" class="pc-input" placeholder="TA25-000054">
+          </div>
+          <div class="pc-field">
+            <label>Дата договора <span class="pc-req">*</span></label>
+            <input type="text" id="pc-contract-date" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Раздел: Период проекта -->
+      <div class="pc-section">
+        <div class="pc-section-title">Период проекта</div>
+        <div class="pc-grid-2">
+          <div class="pc-field">
+            <label>Начало <span class="pc-req">*</span></label>
+            <input type="text" id="pc-proj-from" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
+          </div>
+          <div class="pc-field">
+            <label>Окончание <span class="pc-opt">(не обязательно)</span></label>
+            <input type="text" id="pc-proj-to" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Раздел: Период обследования -->
+      <div class="pc-section">
+        <div class="pc-section-title">Период обследования</div>
+        <div class="pc-grid-2">
+          <div class="pc-field">
+            <label>Начало <span class="pc-req">*</span></label>
+            <input type="text" id="pc-survey-from" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
+          </div>
+          <div class="pc-field">
+            <label>Окончание <span class="pc-opt">(не обязательно)</span></label>
+            <input type="text" id="pc-survey-to" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
+          </div>
+        </div>
+      </div>
+
+      <!-- Раздел: О компании Заказчика -->
+      <div class="pc-section">
+        <div class="pc-section-title">О компании Заказчика</div>
+        <div class="pc-field">
+          <label>Юридический адрес <span class="pc-req">*</span></label>
+          <textarea id="pc-customer-address" class="pc-input" rows="2" placeholder="Самаркандская область, Нуробадский район..."></textarea>
+        </div>
+        <div class="pc-field" style="max-width:240px">
+          <label>Численность персонала (чел.) <span class="pc-req">*</span></label>
+          <input type="number" id="pc-customer-headcount" class="pc-input" placeholder="77" min="1" step="1">
+        </div>
+        <div class="pc-field">
+          <label>Описание предприятия <span class="pc-req">*</span></label>
+          <textarea id="pc-customer-description" class="pc-input" rows="6" placeholder="Чем компания занимается, для какого рынка работает, ключевые направления, стратегия. 3-4 абзаца текста."></textarea>
+        </div>
+        <div class="pc-field">
+          <label>Орг.структура (XLSX) <span class="pc-opt">(на перспективу — пока заглушка)</span></label>
+          <button class="btn btn-secondary" disabled style="opacity:.6;cursor:not-allowed" title="Функция в разработке">📎 Загрузить файл</button>
+        </div>
+      </div>
+
+      <!-- Раздел: Команда -->
+      <div class="pc-section">
+        <div class="pc-section-title">Команда проекта</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:12px">
+          Минимум 1 человек с каждой стороны. У каждого должны быть отмечены роли (☑ куратор, ☑ руководитель, ☑ подписант). С каждой стороны должно быть минимум по одному куратору, руководителю и подписанту.
+        </div>
+        <div class="pc-grid-2">
+          <!-- Команда заказчика -->
+          <div class="pc-team-block">
+            <div class="pc-team-title">Заказчик</div>
+            <div id="pc-customer-team-list" class="pc-team-list"></div>
+            <div class="pc-team-add">
+              <input type="text" id="pc-new-customer-fio" class="pc-input" placeholder="ФИО (Иванов И.И.)">
+              <input type="text" id="pc-new-customer-pos" class="pc-input" placeholder="Должность">
+              <button class="btn btn-secondary" onclick="pcAddTeamMember('customer')" style="font-size:12px">+ Добавить</button>
+            </div>
+          </div>
+          <!-- Команда исполнителя -->
+          <div class="pc-team-block">
+            <div class="pc-team-title">Исполнитель</div>
+            <div id="pc-executor-team-list" class="pc-team-list"></div>
+            <div class="pc-team-add">
+              <input type="text" id="pc-new-executor-fio" class="pc-input" placeholder="ФИО (Петров П.П.)">
+              <input type="text" id="pc-new-executor-pos" class="pc-input" placeholder="Должность">
+              <button class="btn btn-secondary" onclick="pcAddTeamMember('executor')" style="font-size:12px">+ Добавить</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Карточка-заглушка для остальных справочников (участники / должности / области) -->
+    <div class="card nsi-card-page" id="nsi-stub-card" data-card="stub" style="display:none">
+      <div class="card-title">
+        <div class="card-title-icon icon-blue" id="nsi-stub-icon">⚙️</div>
+        <span id="nsi-stub-title">Карточка элемента</span>
+      </div>
+      <div style="padding:30px 20px;text-align:center;color:#94a3b8;background:#fafafa;border-radius:9px;font-size:14px">
+        <div style="font-size:36px;margin-bottom:12px;opacity:.6">🚧</div>
+        <div style="font-weight:600;color:#64748b;margin-bottom:6px" id="nsi-stub-name">—</div>
+        <div>Карточка элемента в разработке.<br>Пока редактирование доступно через список.</div>
       </div>
     </div>
   </div>
 
 </div>
+
 
 </div><!-- /main -->
 
@@ -1550,22 +1730,24 @@ function saveSettings() {
 
 // ── TABS ─────────────────────────────────────────────
 function showTab(name, el) {
-  // F-Report-3: если уходим с НСИ при открытой карточке проекта — закрываем её мягко
-  if (name !== 'nsi' && editingProjectId) {
-    // Не вызываем closeProjectCard (он спросит подтверждение) — просто скрываем
-    // и сбрасываем state. Несохранённые изменения теряются.
-    const orig = getNSI().projects.find(p => p.id === editingProjectId);
-    if (orig && !orig.name) {
-      // Пустой только что созданный — удаляем чтоб не было мусора
-      const nsi = getNSI();
-      nsi.projects = nsi.projects.filter(p => p.id !== editingProjectId);
-      saveNSI(nsi);
+  // F-NSI-Hierarchy: если уходим с НСИ — сбрасываем уровень обратно на main
+  // (если была открыта карточка проекта с пустым именем — удаляем мусор)
+  if (name !== 'nsi') {
+    if (editingProjectId) {
+      const orig = getNSI().projects.find(p => p.id === editingProjectId);
+      if (orig && !orig.name) {
+        const nsi = getNSI();
+        nsi.projects = nsi.projects.filter(p => p.id !== editingProjectId);
+        saveNSI(nsi);
+      }
+      editingProjectId = null;
+      pcDraft = null;
     }
-    const card = document.getElementById('project-card');
-    if (card) card.style.display = 'none';
-    pcToggleNSISections(true);
-    editingProjectId = null;
-    pcDraft = null;
+    if (typeof nsiState !== 'undefined') {
+      nsiState.level = 'main';
+      nsiState.dict = null;
+      nsiState.cardId = null;
+    }
   }
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -7681,9 +7863,10 @@ function openProjectCard(id) {
     });
   });
 
-  // Скрыть все карточки НСИ кроме карточки проекта
-  pcToggleNSISections(false);
-  document.getElementById('project-card').style.display = 'block';
+  // F-NSI-Hierarchy: переход на уровень card
+  nsiState.level = 'card';
+  nsiState.dict = 'projects';
+  nsiState.cardId = id;
   document.getElementById('pc-error-summary').style.display = 'none';
 
   // Заполнить поля формы
@@ -7705,21 +7888,12 @@ function openProjectCard(id) {
 
   pcRenderTeam('customer');
   pcRenderTeam('executor');
-  document.getElementById('project-card').scrollIntoView({behavior:'smooth', block:'start'});
+  // Запускаем рендер уровня (он покажет правильную карточку и breadcrumb)
+  renderNSI();
+  document.getElementById('page-nsi').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
-// Скрыть/показать остальные секции НСИ при открытии/закрытии карточки
-function pcToggleNSISections(visible) {
-  const display = visible ? '' : 'none';
-  // Все .card на странице NSI кроме project-card
-  const page = document.getElementById('page-nsi');
-  if (!page) return;
-  page.querySelectorAll('.card').forEach(c => {
-    if (c.id !== 'project-card') c.style.display = display;
-  });
-}
-
-// Закрыть карточку — вернуться к списку НСИ. Несохранённые изменения теряются.
+// Закрыть карточку — вернуться на уровень list. Несохранённые изменения теряются.
 function closeProjectCard() {
   // Если в draft есть несохранённые изменения — спросим
   if (editingProjectId && pcDraft) {
@@ -7735,10 +7909,12 @@ function closeProjectCard() {
       saveNSI(nsi);
     }
   }
-  document.getElementById('project-card').style.display = 'none';
-  pcToggleNSISections(true);
   editingProjectId = null;
   pcDraft = null;
+  // F-NSI-Hierarchy: возврат на уровень list для проектов
+  nsiState.level = 'list';
+  nsiState.dict = 'projects';
+  nsiState.cardId = null;
   renderNSI();
   updateProjectSelect();
   // Также обновим список проектов в Отчёте если был выбран
@@ -7941,26 +8117,180 @@ function pcShowToast(text) {
   setTimeout(() => { t.style.opacity = '0'; }, 2000);
 }
 
+// ── F-NSI-Hierarchy: 3-уровневая навигация ───────────────
+// Состояние навигации по справочникам.
+// level: 'main' (плитки) | 'list' (список элементов) | 'card' (карточка)
+// dict: ключ выбранного справочника (projects/participants/positions/areas)
+// cardId: id выбранного элемента для уровня card
+let nsiState = {
+  level: 'main',
+  dict: null,
+  cardId: null
+};
+
+// Метаданные справочников (иконка, название, цвет)
+const NSI_DICTS = {
+  projects:     { name: 'Проекты',                  icon: '🗂️', iconBg: 'icon-amber'  },
+  participants: { name: 'Участники',                icon: '👤', iconBg: 'icon-blue'   },
+  positions:    { name: 'Должности',                icon: '📋', iconBg: 'icon-purple' },
+  areas:        { name: 'Функциональные области',   icon: '📐', iconBg: 'icon-green'  }
+};
+
+// Перейти на уровень list для конкретного справочника
+function nsiOpenList(dict) {
+  if (!NSI_DICTS[dict]) return;
+  nsiState.level = 'list';
+  nsiState.dict = dict;
+  nsiState.cardId = null;
+  renderNSI();
+  document.getElementById('page-nsi').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// Перейти на уровень card-заглушку (для участников/должностей/областей)
+// elementId — id элемента; type — тип справочника
+function nsiOpenStubCard(dict, elementId, displayName) {
+  if (!NSI_DICTS[dict]) return;
+  nsiState.level = 'card';
+  nsiState.dict = dict;
+  nsiState.cardId = elementId;
+  // Заполнить заголовок stub-карточки
+  const meta = NSI_DICTS[dict];
+  document.getElementById('nsi-stub-title').textContent = `${meta.name} — карточка элемента`;
+  document.getElementById('nsi-stub-name').textContent = displayName || '—';
+  document.getElementById('nsi-stub-icon').textContent = meta.icon;
+  document.getElementById('nsi-stub-icon').className = 'card-title-icon ' + meta.iconBg;
+  renderNSI();
+  document.getElementById('page-nsi').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// Кнопка «Назад» в breadcrumb — поднимает на 1 уровень вверх
+function nsiGoBack() {
+  if (nsiState.level === 'card') {
+    // Из карточки — на уровень list. Для проектов нужна спец-логика (несохранённые правки)
+    if (nsiState.dict === 'projects' && editingProjectId) {
+      closeProjectCard(); // у неё своя проверка несохранённых изменений
+      return;
+    }
+    nsiState.level = 'list';
+    nsiState.cardId = null;
+  } else if (nsiState.level === 'list') {
+    // Из списка — на главную
+    nsiState.level = 'main';
+    nsiState.dict = null;
+  }
+  renderNSI();
+}
+
+// Главная функция-роутер: рендерит нужный уровень + breadcrumb + содержимое
 function renderNSI() {
+  const main = document.getElementById('nsi-level-main');
+  const list = document.getElementById('nsi-level-list');
+  const card = document.getElementById('nsi-level-card');
+  const breadcrumb = document.getElementById('nsi-breadcrumb');
+  if (!main || !list || !card || !breadcrumb) return;
+
+  // Показываем нужный уровень
+  main.style.display = (nsiState.level === 'main')  ? '' : 'none';
+  list.style.display = (nsiState.level === 'list')  ? '' : 'none';
+  card.style.display = (nsiState.level === 'card')  ? '' : 'none';
+  breadcrumb.style.display = (nsiState.level === 'main') ? 'none' : '';
+
+  // Breadcrumb
+  if (nsiState.level !== 'main') {
+    const trail = document.getElementById('nsi-breadcrumb-trail');
+    const dictMeta = NSI_DICTS[nsiState.dict];
+    let html = `<b>НСИ</b>`;
+    if (dictMeta) html += ` &rsaquo; <b>${escHtml(dictMeta.name)}</b>`;
+    if (nsiState.level === 'card') {
+      // Узнаём имя элемента
+      let cardName = '';
+      if (nsiState.dict === 'projects' && pcDraft) {
+        cardName = pcDraft.name || 'Новый проект';
+      } else {
+        cardName = document.getElementById('nsi-stub-name')?.textContent || '';
+      }
+      if (cardName) html += ` &rsaquo; <b>${escHtml(cardName)}</b>`;
+    }
+    trail.innerHTML = html;
+  }
+
+  // Уровень main: обновить счётчики
+  if (nsiState.level === 'main') {
+    const nsi = getNSI();
+    const counts = {
+      projects:     (nsi.projects || []).length,
+      participants: (nsi.participants || []).length,
+      positions:    (nsi.positions || []).length,
+      areas:        (nsi.functionalAreas || []).length
+    };
+    ['a', 'b', 'c'].forEach(variant => {
+      Object.entries(counts).forEach(([dict, count]) => {
+        const el = document.getElementById(`nsi-count-${variant}-${dict}`);
+        if (el) {
+          if (variant === 'a' || variant === 'c') {
+            el.textContent = count === 0 ? 'пусто' : `${count} ${pluralCount(count)}`;
+          } else {
+            el.textContent = count;
+          }
+        }
+      });
+    });
+    return;
+  }
+
+  // Уровень list: показать только нужную list-карточку и заполнить её
+  if (nsiState.level === 'list') {
+    document.querySelectorAll('#nsi-level-list .nsi-list-card').forEach(c => {
+      c.style.display = (c.dataset.dict === nsiState.dict) ? '' : 'none';
+    });
+    renderNSILists();
+    return;
+  }
+
+  // Уровень card: для проектов показать project-card, для остальных — stub
+  if (nsiState.level === 'card') {
+    document.querySelectorAll('#nsi-level-card .nsi-card-page').forEach(c => {
+      const cardType = c.dataset.card;
+      const matches = (nsiState.dict === 'projects' && cardType === 'project') ||
+                       (nsiState.dict !== 'projects' && cardType === 'stub');
+      c.style.display = matches ? '' : 'none';
+    });
+    return;
+  }
+}
+
+// Утилита: склонение слова в зависимости от числа
+function pluralCount(n) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'элемент';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'элемента';
+  return 'элементов';
+}
+
+// Рендерит содержимое списков (выполнялось раньше внутри renderNSI)
+function renderNSILists() {
   const nsi = getNSI();
+
   const posList = document.getElementById('positions-list');
   if (posList) posList.innerHTML = nsi.positions.length ? nsi.positions.map((pos,i)=>
-    `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px">
-      <span>${escHtml(pos)}</span><button class="protocol-del" onclick="deletePosition(${i})">×</button></div>`).join('')
+    `<div class="nsi-row" onclick="nsiOpenStubCard('positions', ${i}, ${JSON.stringify(pos)})">
+      <span class="nsi-row-text">${escHtml(pos)}</span>
+      <button class="protocol-del" onclick="event.stopPropagation();deletePosition(${i})">×</button></div>`).join('')
     : '<div style="font-size:12px;color:#94a3b8">Нет должностей</div>';
 
   const partList = document.getElementById('participants-list');
   if (partList) partList.innerHTML = nsi.participants.length ? nsi.participants.map(p=>
-    `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px">
-      <span>${escHtml(p.name)}</span><button class="protocol-del" onclick="deleteParticipant(${p.id})">×</button></div>`).join('')
+    `<div class="nsi-row" onclick="nsiOpenStubCard('participants', ${p.id}, ${JSON.stringify(p.name)})">
+      <span class="nsi-row-text">${escHtml(p.name)}</span>
+      <button class="protocol-del" onclick="event.stopPropagation();deleteParticipant(${p.id})">×</button></div>`).join('')
     : '<div style="font-size:12px;color:#94a3b8">Нет участников</div>';
 
   const projList = document.getElementById('projects-list');
   if (projList) projList.innerHTML = nsi.projects.length ? nsi.projects.map(proj => {
     const ec=proj.executor?.length||0, cc=proj.customer?.length||0;
     const displayName = proj.name || '<em style="color:#94a3b8">(без названия)</em>';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fafc;border-radius:9px;margin-bottom:7px;cursor:pointer;border:1px solid #e2e8f0" onclick="openProjectCard(${proj.id})">
-      <div><div style="font-size:14px;font-weight:600">${displayName.startsWith('<') ? displayName : escHtml(displayName)}</div>
+    return `<div class="nsi-row nsi-row-proj" onclick="openProjectCard(${proj.id})">
+      <div class="nsi-row-text"><div style="font-size:14px;font-weight:600">${displayName.startsWith('<') ? displayName : escHtml(displayName)}</div>
       <div style="font-size:12px;color:#64748b">Заказчик: ${cc} · Исполнитель: ${ec}</div></div>
       <div style="display:flex;gap:6px;align-items:center"><span style="font-size:12px;color:#3b82f6">Открыть →</span>
       <button class="protocol-del" onclick="event.stopPropagation();deleteProject(${proj.id})">×</button></div></div>`;
@@ -7970,17 +8300,17 @@ function renderNSI() {
   if (areaList) {
     const areas = nsi.functionalAreas || [];
     areaList.innerHTML = areas.length ? areas.map(a =>
-      `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px">
+      `<div class="nsi-row" onclick="nsiOpenStubCard('areas', ${a.id}, ${JSON.stringify(a.name)})">
         <div style="display:flex;align-items:center;gap:12px;flex:1">
           <span style="display:inline-block;background:#10b981;color:#fff;padding:3px 10px;border-radius:5px;font-weight:700;font-size:12px;letter-spacing:.5px;font-family:monospace;min-width:34px;text-align:center">${escHtml(a.prefix)}</span>
           <span>${escHtml(a.name)}</span>
         </div>
-        <button class="protocol-del" onclick="deleteFunctionalArea(${a.id})">×</button>
+        <button class="protocol-del" onclick="event.stopPropagation();deleteFunctionalArea(${a.id})">×</button>
       </div>`
     ).join('') : '<div style="font-size:12px;color:#94a3b8">Нет функциональных областей</div>';
   }
 
-  // Карточка проекта рендерится через pcRenderTeam независимо от renderNSI
+  // Карточка проекта рендерится через pcRenderTeam независимо от renderNSILists
 }
 
 function updateProjectSelect() {
