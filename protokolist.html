@@ -118,6 +118,14 @@ body[data-busy-op="generating"] #step-3{opacity:1!important;filter:none!importan
 .step-card-status{margin-left:auto;font-size:12px;color:#64748b;font-weight:500}
 .step-card.step-done .step-card-status{color:#059669;font-weight:600}
 .step-card.step-next .step-card-status{color:#1d4ed8;font-weight:600}
+/* === Кнопка Стоп (отмена текущей операции этапа) === */
+.step-stop-btn{margin-left:8px;background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;border-radius:7px;padding:5px 11px;font-size:12px;font-weight:500;cursor:pointer;display:none;font-family:inherit;transition:all .15s;white-space:nowrap}
+.step-stop-btn:hover{background:#fecaca;border-color:#f87171}
+.step-stop-btn:active{transform:scale(.97)}
+/* Стоп виден только когда соответствующий шаг сейчас активен */
+body[data-busy-op="uploading"] #step-1 .step-stop-btn,
+body[data-busy-op="transcribing"] #step-2 .step-stop-btn,
+body[data-busy-op="generating"] #step-3 .step-stop-btn{display:inline-flex;align-items:center;gap:4px}
 .step-card-body{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .step-card-hint{font-size:12px;color:#64748b;margin-top:12px;line-height:1.5}
 .step-card.step-next .step-card-hint{color:#1d4ed8;font-weight:500}
@@ -130,7 +138,7 @@ body[data-busy-op="generating"] #step-3{opacity:1!important;filter:none!importan
 .step-0-icon{font-size:18px}
 .step-0-title{font-size:15px;font-weight:600;color:#1e293b;margin:0}
 .step-0-options{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}
-.step-0-checkbox{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#475569;border:1px solid #cbd5e1;border-radius:9px;padding:9px 14px;background:#fff;margin:0;transition:all .15s;text-transform:none;letter-spacing:0;font-weight:400;min-width:240px;flex:0 1 auto}
+.step-0-checkbox{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#475569;border:1px solid #cbd5e1;border-radius:9px;padding:0 14px;background:#fff;margin:0;transition:all .15s;text-transform:none;letter-spacing:0;font-weight:400;min-width:240px;flex:0 1 auto;height:56px;box-sizing:border-box}
 .step-0-checkbox:hover{border-color:#94a3b8;background:#f8fafc}
 .step-0-checkbox input[type=checkbox]{width:15px;height:15px;cursor:pointer;margin:0;flex-shrink:0}
 .step-0-checkbox:has(input:checked){border-color:#3b82f6;background:#eff6ff;color:#1d4ed8}
@@ -385,6 +393,7 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
       <span class="step-card-num">1</span>
       <h2 class="step-card-title">Загрузка</h2>
       <span class="step-card-status" id="step-1-status">ожидание файла</span>
+      <button class="step-stop-btn op-stop-btn" type="button" onclick="cancelCurrentOp(1)" title="Отменить загрузку и удалить данные этой попытки">🛑 Стоп</button>
     </div>
 
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
@@ -456,6 +465,7 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
       <h2 class="step-card-title">Транскрипция</h2>
       <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
         <span class="step-card-status" id="step-2-status"></span>
+        <button class="step-stop-btn op-stop-btn" type="button" onclick="cancelCurrentOp(2)" title="Отменить транскрипцию и удалить промежуточные данные">🛑 Стоп</button>
         <button class="protocol-del" id="btn-reset-transcript" onclick="resetTranscriptForRerun()"
           title="Удалить транскрипцию и вернуть Шаг 2 к исходному состоянию"
           style="display:none">×</button>
@@ -487,6 +497,7 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
       <span class="step-card-num">3</span>
       <h2 class="step-card-title">Протокол</h2>
       <span class="step-card-status" id="step-3-status"></span>
+      <button class="step-stop-btn op-stop-btn" type="button" onclick="cancelCurrentOp(3)" title="Отменить генерацию и не сохранять протокол">🛑 Стоп</button>
     </div>
 
     <div class="step3-grid">
@@ -823,8 +834,9 @@ const BUSY_LOCK_SELECTORS = [
 function setBusy(op) {
   _busyOp = op;
   document.body.dataset.busyOp = op || '';
-  // Блокируем всё, что попало в селекторы
+  // Блокируем всё, что попало в селекторы — КРОМЕ кнопок Стоп (они нужны кликабельны)
   document.querySelectorAll(BUSY_LOCK_SELECTORS).forEach(el => {
+    if (el.classList.contains('op-stop-btn')) return;
     el.dataset.prevDisabled = el.disabled ? '1' : '0';
     el.disabled = true;
     el.classList.add('busy-locked');
@@ -994,6 +1006,290 @@ function maybeAutoStartGeneration() {
     console.log('[auto] auto-trigger generateProtocol');
     generateProtocol();
   }, 300);
+}
+
+// ── F3-Stop: ОТМЕНА ТЕКУЩЕЙ ОПЕРАЦИИ С ОТКАТОМ К СНАПШОТУ ────────────
+// Snapshot — снимок состояния хранилища ДО начала операции. При отмене
+// мы возвращаем хранилище к снимку: удаляем то, что попытка только что
+// добавила, но не трогаем то что было до неё. «Не копим мусор от прерванных
+// попыток».
+let _opAbortController = null;   // контроллер прерывания текущих fetch/XHR
+let _cancelRequested  = false;   // флаг — выставляется кнопкой Стоп
+let _opSnapshot       = null;    // { kind: 'upload'|'transcribe'|'generate', ... }
+
+// Извлекает имя файла Google File API из uri вида
+// https://generativelanguage.googleapis.com/v1beta/files/abc-xyz
+function _extractFileName(uri) {
+  if (!uri) return null;
+  const m = uri.match(/\/files\/([^/?]+)/);
+  return m ? m[1] : null;
+}
+
+// Удалить файл с Google File API (бесплатно, чтобы не копить мусор после отмен)
+async function deleteFileFromGemini(uri) {
+  const name = _extractFileName(uri);
+  if (!name) return;
+  const key = getKey();
+  if (!key) return;
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/files/${encodeURIComponent(name)}?key=${encodeURIComponent(key)}`,
+      { method: 'DELETE' }
+    );
+    if (!r.ok) {
+      console.warn('[cancel] Google delete failed', r.status, name);
+    } else {
+      console.log('[cancel] Google file deleted:', name);
+    }
+  } catch (e) {
+    console.warn('[cancel] Google delete error:', e.message);
+  }
+}
+
+// Создаёт snapshot ДО начала загрузки. Используется в startFileUpload().
+async function makeUploadSnapshot(file) {
+  const fileKey = makeFileKey(file);
+  const existingSession = findSession(file);
+  const prevPartsCount = (existingSession && existingSession.parts) ? existingSession.parts.length : 0;
+  const prevSessionExists = !!existingSession;
+  let prevHadAudio = false;
+  try {
+    const cached = await getAudioBlob(fileKey);
+    prevHadAudio = !!(cached && cached.blob);
+  } catch (e) { /* нет аудио — ок */ }
+  return {
+    kind: 'upload',
+    fileKey,
+    prevPartsCount,
+    prevSessionExists,
+    prevHadAudio
+  };
+}
+
+// Откат загрузки до состояния snapshot'а:
+//  - удаляет с Google File API только те части, которые были загружены В ЭТОЙ попытке
+//  - очищает sessions[fileKey].parts от новых записей; если сессии не было до старта — удаляет её целиком
+//  - если до старта аудио не было в IDB — удаляет его
+async function revertUploadSnapshot(snap) {
+  if (!snap || snap.kind !== 'upload') return;
+  console.log('[cancel] revert upload, snapshot:', snap);
+
+  // 1. Из текущей сессии удалить новые части и попытаться удалить их с Google
+  try {
+    const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+    const ix = sessions.findIndex(s => s.fileKey === snap.fileKey);
+    if (ix >= 0) {
+      const session = sessions[ix];
+      const parts = (session.parts || []);
+      const newParts = parts.slice(snap.prevPartsCount);
+      // Удаление файлов на Google API параллельно
+      await Promise.all(newParts.map(p => deleteFileFromGemini(p && (p.uri || p.fileUri))));
+      if (snap.prevSessionExists) {
+        // Сохраняем старые части — обрезаем массив до prevPartsCount
+        session.parts = parts.slice(0, snap.prevPartsCount);
+        // Если в этой попытке записали транскрипцию — сбрасываем (она от прерванной попытки)
+        // На самом деле transcript записывает только Шаг 2 — для Шага 1 не трогаем.
+        sessions[ix] = session;
+      } else {
+        // Сессии не было до старта — удалить целиком
+        sessions.splice(ix, 1);
+      }
+      localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+    }
+  } catch (e) {
+    console.warn('[cancel] sessions revert error:', e);
+  }
+
+  // Также почистить и текущий загружаемый файл (uploadedFile) если он не был успешно зафиксирован
+  if (uploadedFile && uploadedFile.uri) {
+    // Если эта uri добавилась в этой попытке (т.е. не было сессии до или массив parts вырос)
+    // надёжно: пытаемся удалить и игнорируем 404
+    await deleteFileFromGemini(uploadedFile.uri);
+  }
+
+  // 2. Аудио в IDB — если до старта не было, удалить
+  if (!snap.prevHadAudio && snap.fileKey) {
+    try { await deleteAudioBlob(snap.fileKey); } catch (e) {}
+  }
+
+  // 3. Cleanup state в памяти
+  uploadedFile = null;
+  uploadedParts = [];
+  currentRawFile = null;
+  currentFileKey = null;
+  currentMediaInfo = { durationSec: 0, numChunks: 0 };
+  currentTranscriptText = '';
+  uploadState = 'idle';
+}
+
+// Snapshot транскрипции — сохраняет существующий текст транскрипции и raw в IDB.
+async function makeTranscriptionSnapshot() {
+  let prevRaw = null;
+  if (currentFileKey) {
+    try {
+      const r = await idbGetTranscript(currentFileKey);
+      if (r) prevRaw = r;
+    } catch (e) {}
+  }
+  return {
+    kind: 'transcribe',
+    fileKey: currentFileKey,
+    prevText: currentTranscriptText || '',
+    prevRaw: prevRaw // {raw, savedAt, sizeBytes} или null
+  };
+}
+
+// Откат транскрипции — восстанавливает прежний текст и raw в IDB.
+async function revertTranscriptionSnapshot(snap) {
+  if (!snap || snap.kind !== 'transcribe') return;
+  console.log('[cancel] revert transcription, snapshot:', snap);
+
+  currentTranscriptText = snap.prevText || '';
+
+  // Восстановить raw в IDB (или удалить, если не было)
+  if (snap.fileKey) {
+    if (snap.prevRaw && snap.prevRaw.raw) {
+      try { await idbSaveTranscript(snap.fileKey, snap.prevRaw.raw); } catch (e) {}
+    } else {
+      try { await idbDeleteTranscript(snap.fileKey); } catch (e) {}
+    }
+  }
+
+  // Восстановить session.transcript
+  if (snap.fileKey) {
+    try {
+      const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+      const ix = sessions.findIndex(s => s.fileKey === snap.fileKey);
+      if (ix >= 0) {
+        if (snap.prevText) sessions[ix].transcript = snap.prevText;
+        else delete sessions[ix].transcript;
+        localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+      }
+    } catch (e) {}
+  }
+
+  // Whisper-прогресс — фрагменты транскрипции от прерванной попытки чистим
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('whisper_progress_'))
+      .forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
+
+  // State зависит от того, было ли что-то до попытки
+  uploadState = currentTranscriptText ? 'transcribed' : 'ready';
+}
+
+// Snapshot генерации — фиксируем количество протоколов и слепок requirements проекта.
+function makeGenerationSnapshot() {
+  let protocolsCount = 0;
+  try { protocolsCount = (JSON.parse(localStorage.getItem('protocols') || '[]')).length; } catch (e) {}
+  // Сохраняем backup всех ключей requirements_* (на случай если генерация уже добавила)
+  const reqBackup = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('requirements_')) {
+      reqBackup[k] = localStorage.getItem(k);
+    }
+  }
+  return {
+    kind: 'generate',
+    prevProtocolsCount: protocolsCount,
+    reqBackup
+  };
+}
+
+// Откат генерации — удаляет протоколы и требования, добавленные в этой попытке.
+function revertGenerationSnapshot(snap) {
+  if (!snap || snap.kind !== 'generate') return;
+  console.log('[cancel] revert generation, snapshot:', snap);
+
+  // Удалить новые протоколы
+  try {
+    const protocols = JSON.parse(localStorage.getItem('protocols') || '[]');
+    if (protocols.length > snap.prevProtocolsCount) {
+      protocols.splice(snap.prevProtocolsCount);
+      localStorage.setItem('protocols', JSON.stringify(protocols));
+    }
+  } catch (e) { console.warn('[cancel] protocols revert error:', e); }
+
+  // Восстановить requirements_* из backup
+  try {
+    // Удалить ключи, которые появились после snapshot'а
+    const currentReqKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('requirements_')) currentReqKeys.push(k);
+    }
+    currentReqKeys.forEach(k => {
+      if (!(k in snap.reqBackup)) localStorage.removeItem(k);
+      else localStorage.setItem(k, snap.reqBackup[k]);
+    });
+    // Восстановить ключи, которые были в backup но сейчас отсутствуют (маловероятно)
+    Object.keys(snap.reqBackup).forEach(k => {
+      if (currentReqKeys.indexOf(k) === -1) {
+        localStorage.setItem(k, snap.reqBackup[k]);
+      }
+    });
+  } catch (e) { console.warn('[cancel] requirements revert error:', e); }
+
+  // State генерации не меняем — оно остаётся 'transcribed' (юзер может перегенерировать)
+}
+
+// Главная точка отмены — вызывается из кнопки Стоп каждого шага.
+// stepNum: 1 = upload, 2 = transcribe, 3 = generate
+async function cancelCurrentOp(stepNum) {
+  if (!_busyOp) return;
+  const opNames = { 'uploading': 'загрузку', 'transcribing': 'транскрипцию', 'generating': 'генерацию' };
+  const opName = opNames[_busyOp] || 'операцию';
+  if (!confirm(`Прервать ${opName}? Все данные этой попытки будут удалены, чтобы не копился мусор. Прежнее состояние сохранится.`)) {
+    return;
+  }
+  console.log('[cancel] requested for step', stepNum, 'busy=', _busyOp);
+
+  // 1. Запрос на отмену — флаг + abort активных fetch/XHR
+  _cancelRequested = true;
+  if (_opAbortController) {
+    try { _opAbortController.abort(); } catch (e) {}
+  }
+
+  // 2. Снимок — операция сама в catch вызовет revert*Snapshot. Здесь ничего больше делать не нужно —
+  //    catch-блоки внутри startFileUpload / startTranscription / generateProtocol сделают cleanup.
+  //    Если по какой-то причине catch не отработал (например, очень длинный sub-step без точек проверки),
+  //    UI юзера может «зависнуть» — проверим через 5 сек и форсированно сбросим состояние.
+
+  const snapshotForFallback = _opSnapshot;  // зафиксировать копию: основной catch может уже сбросить _opSnapshot
+  setTimeout(async () => {
+    if (_busyOp) {
+      console.warn('[cancel] timeout — forcing cleanup');
+      // Форсированный revert — предполагаем что catch не сработает
+      try {
+        if (snapshotForFallback) {
+          if (snapshotForFallback.kind === 'upload')      await revertUploadSnapshot(snapshotForFallback);
+          if (snapshotForFallback.kind === 'transcribe')  await revertTranscriptionSnapshot(snapshotForFallback);
+          if (snapshotForFallback.kind === 'generate')    revertGenerationSnapshot(snapshotForFallback);
+        }
+      } catch (e) {}
+      _opSnapshot = null;
+      _opAbortController = null;
+      _cancelRequested = false;
+      clearBusy();
+      // Сбросить UI к idle
+      setStepState(1, 'next', 'жду файл');
+      setStepHint(1, 'Загрузи видео или аудио в область выше.');
+      setStepState(2, 'disabled', '');
+      setStepState(3, 'disabled', '');
+      setUploadUI('idle');
+    }
+  }, 5000);
+}
+
+// Хелпер для проверки в длинных циклах: если юзер нажал Стоп — бросает AbortError
+function _checkCancelled() {
+  if (_cancelRequested) {
+    const e = new Error('Отменено пользователем');
+    e.name = 'AbortError';
+    throw e;
+  }
 }
 
 // ── SETTINGS ─────────────────────────────────────────
@@ -1609,6 +1905,11 @@ async function startFileUpload(file) {
   currentRawFile = file;
   currentFileKey = makeFileKey(file);
 
+  // F3-Stop: snapshot ДО начала загрузки + сброс флагов отмены
+  _cancelRequested = false;
+  _opAbortController = new AbortController();
+  _opSnapshot = await makeUploadSnapshot(file);
+
   // Сброс панели шагов — начинаем с «Шаг 1 в процессе»
   setStepState(1, 'active', 'загрузка...');
   setStepState(2, 'disabled', '');
@@ -1800,11 +2101,33 @@ async function startFileUpload(file) {
     // F3: Авто-режим — автоматически переходим к Шагу 2 (транскрипция)
     maybeAutoStartTranscription();
 
+    // F3-Stop: успех — снапшот больше не нужен
+    _opSnapshot = null;
+    _opAbortController = null;
+
   } catch (e) {
+    // F3-Stop: отдельная ветка для отмены пользователем
+    if (e && (e.name === 'AbortError' || _cancelRequested)) {
+      console.log('[cancel] upload cancelled, reverting snapshot');
+      const snap = _opSnapshot;  // зафиксировать до обнуления
+      try { await revertUploadSnapshot(snap); } catch (re) { console.warn('[cancel] revert error:', re); }
+      _opSnapshot = null;
+      _opAbortController = null;
+      _cancelRequested = false;
+      clearBusy();
+      setUploadUI('idle');
+      setStepState(1, 'next', 'жду файл');
+      setStepHint(1, 'Загрузка отменена. Можно загрузить файл заново.');
+      setStepState(2, 'disabled', '');
+      setStepState(3, 'disabled', '');
+      return;
+    }
     uploadState = 'error';
     clearBusy();
     setUploadUI('error', { msg: e.message });
     setStepState(1, 'active', '❌ ошибка');
+    _opSnapshot = null;
+    _opAbortController = null;
   }
 }
 
@@ -1920,6 +2243,11 @@ async function startTranscription() {
   markStepStart(2);   // хронометраж Шага 2
   setBusy('transcribing');
 
+  // F3-Stop: snapshot ДО начала транскрипции + сброс флагов отмены
+  _cancelRequested = false;
+  _opAbortController = new AbortController();
+  _opSnapshot = await makeTranscriptionSnapshot();
+
   try {
     // ── Step A: Whisper raw transcription ──
     const whisperRaw = await transcribeWithWhisper(fileForWhisper);
@@ -1991,11 +2319,36 @@ async function startTranscription() {
       if (resetX) resetX.style.display = '';
     }
   } catch(e) {
+    // F3-Stop: ветка отмены пользователем
+    if (e && (e.name === 'AbortError' || _cancelRequested)) {
+      console.log('[cancel] transcription cancelled, reverting snapshot');
+      const snap = _opSnapshot;  // зафиксировать до обнуления
+      try { await revertTranscriptionSnapshot(snap); } catch (re) { console.warn('[cancel] revert error:', re); }
+      _opSnapshot = null;
+      _opAbortController = null;
+      _cancelRequested = false;
+      clearBusy();
+      // Возврат UI в предыдущее состояние (до начала)
+      if (snap && snap.prevText) {
+        setStepState(2, 'done', '✓ есть');
+        setStepHint(2, 'Транскрипция отменена — восстановлен прежний результат.');
+      } else {
+        setStepState(2, 'next', '');
+        setStepHint(2, 'Транскрипция отменена. Можно запустить заново.');
+      }
+      if (tBtn) {
+        tBtn.disabled = false;
+        tBtn.textContent = '🎙️ Транскрибировать';
+      }
+      return;
+    }
     uploadState = 'ready';
     setStepState(2, 'next', '❌ ошибка — можно повторить');
     setStepHint(2, `⚠️ Ошибка транскрипции: ${e.message.slice(0,80)}. Попробуй ещё раз.`);
     const statusEl = document.getElementById('protocol-status');
     if (statusEl) statusEl.innerHTML = `<div style="color:#dc2626;margin-top:8px">❌ Транскрипция: ${e.message}</div>`;
+    _opSnapshot = null;
+    _opAbortController = null;
   } finally {
     clearBusy();
   }
@@ -2006,6 +2359,12 @@ async function startTranscription() {
     tBtn.textContent = '🎙️ Транскрибировать';
   } else if (tBtn) {
     tBtn.textContent = '🎙️ Транскрибировать';
+  }
+
+  // F3-Stop: успех — снапшот больше не нужен
+  if (uploadState === 'transcribed') {
+    _opSnapshot = null;
+    _opAbortController = null;
   }
 
   // F3: Авто-режим — автоматически переходим к Шагу 3 (генерация протокола)
@@ -2749,6 +3108,19 @@ async function uploadFileToGemini(file, onProgress) {
       }
     };
     xhr.onerror = () => reject(new Error('Сетевая ошибка'));
+    xhr.onabort = () => {
+      const err = new Error('Отменено пользователем');
+      err.name = 'AbortError';
+      reject(err);
+    };
+    // F3-Stop: подключаем глобальный AbortController к XHR
+    if (typeof _opAbortController !== 'undefined' && _opAbortController) {
+      const onAbort = () => { try { xhr.abort(); } catch (e) {} };
+      _opAbortController.signal.addEventListener('abort', onAbort);
+      // Очистка слушателя при завершении
+      const cleanup = () => { try { _opAbortController.signal.removeEventListener('abort', onAbort); } catch (e) {} };
+      xhr.addEventListener('loadend', cleanup);
+    }
     xhr.send(file);
   });
 
@@ -2765,8 +3137,27 @@ async function callGemini(parts, _attempt = 0) {
   const key = getKey();
   if (!key) throw new Error('Не указан Gemini API Key');
 
+  // F3-Stop: ранний выход если уже запросили отмену
+  if (typeof _cancelRequested !== 'undefined' && _cancelRequested) {
+    const e = new Error('Отменено пользователем');
+    e.name = 'AbortError';
+    throw e;
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
+
+  // F3-Stop: если глобальный _opAbortController сейчас активен — его abort должен прервать и этот fetch
+  let _globalAbortHandler = null;
+  if (typeof _opAbortController !== 'undefined' && _opAbortController) {
+    _globalAbortHandler = () => { try { controller.abort(); } catch (e) {} };
+    _opAbortController.signal.addEventListener('abort', _globalAbortHandler);
+  }
+  const _cleanupGlobalAbort = () => {
+    if (_globalAbortHandler && typeof _opAbortController !== 'undefined' && _opAbortController) {
+      try { _opAbortController.signal.removeEventListener('abort', _globalAbortHandler); } catch (e) {}
+    }
+  };
 
   let res;
   try {
@@ -2784,7 +3175,14 @@ async function callGemini(parts, _attempt = 0) {
     );
   } catch (fetchErr) {
     clearTimeout(timeoutId);
-    // AbortError или сетевая ошибка — ретраим как временную
+    _cleanupGlobalAbort();
+    // F3-Stop: если abort пришёл от пользовательской отмены — пробрасываем как AbortError
+    if (fetchErr.name === 'AbortError' && typeof _cancelRequested !== 'undefined' && _cancelRequested) {
+      const e = new Error('Отменено пользователем');
+      e.name = 'AbortError';
+      throw e;
+    }
+    // AbortError по таймауту или сетевая ошибка — ретраим как временную
     const isAbort = fetchErr.name === 'AbortError';
     const reason = isAbort
       ? `Запрос к Gemini завис (> ${Math.round(GEMINI_TIMEOUT_MS/60000)} мин)`
@@ -2796,6 +3194,7 @@ async function callGemini(parts, _attempt = 0) {
     throw new Error(reason + ' — несколько попыток подряд неудачны');
   }
   clearTimeout(timeoutId);
+  _cleanupGlobalAbort();
 
   if (res.ok) {
     const d = await res.json();
@@ -3397,6 +3796,12 @@ async function generateProtocol() {
 
   try {
     setBusy('generating');
+
+    // F3-Stop: snapshot ДО начала генерации + сброс флагов отмены
+    _cancelRequested = false;
+    _opAbortController = new AbortController();
+    _opSnapshot = makeGenerationSnapshot();
+
     let protocolText = '';
 
     if (manualText) {
@@ -3603,7 +4008,27 @@ async function generateProtocol() {
     try { saveProtocol({ silent: true }); } catch(e) { console.warn('autosave failed', e); }
     showStatus('protocol-status', 'success', 'Готово! Протокол сохранён автоматически — ищи его в «Отчёт об обследовании» и «Реестре требований».');
 
+    // F3-Stop: успех — снапшот больше не нужен
+    _opSnapshot = null;
+    _opAbortController = null;
+
   } catch (e) {
+    // F3-Stop: ветка отмены пользователем
+    if (e && (e.name === 'AbortError' || _cancelRequested)) {
+      console.log('[cancel] generation cancelled, reverting snapshot');
+      const snap = _opSnapshot;  // зафиксировать до обнуления
+      try { revertGenerationSnapshot(snap); } catch (re) { console.warn('[cancel] revert error:', re); }
+      _opSnapshot = null;
+      _opAbortController = null;
+      _cancelRequested = false;
+      hideAP();
+      btn.disabled = false;
+      clearBusy();
+      setStepState(3, 'next', 'отменено');
+      setStepHint(3, 'Генерация отменена. Можно нажать «Создать протокол» ещё раз.');
+      showStatus('protocol-status', 'warn', '⚠️ Генерация отменена пользователем. Никакие данные не сохранены.');
+      return;
+    }
     hideAP();
     if (e.fileGone) {
       // Файл на Google умер — чистим dead session и просим юзера перезагрузить.
@@ -6030,6 +6455,7 @@ async function transcribeWithWhisper(file) {
     // Pause between chunks to avoid Groq audio-seconds-per-minute rate limit
     if (i > 0) {
       for (let w = 65; w > 0; w--) {
+        if (typeof _checkCancelled === 'function') _checkCancelled();
         whisperProgressUI(
           `⏳ Пауза ${w} сек перед частью ${i+1}/${numChunks}...`,
           `${startMin}–${endMin} мин`, pct,
@@ -6038,6 +6464,8 @@ async function transcribeWithWhisper(file) {
         await sleep(1000);
       }
     }
+
+    if (typeof _checkCancelled === 'function') _checkCancelled();
 
     const start = Math.floor(i*secPerChunk*sr);
     const end = Math.min(Math.floor((i+1)*secPerChunk*sr), channelData.length);
@@ -6056,16 +6484,21 @@ async function transcribeWithWhisper(file) {
     formData.append('response_format','verbose_json');
     formData.append('timestamp_granularities[]','segment');
 
+    // F3-Stop: используем глобальный AbortController если он есть
+    const abortSignal = (typeof _opAbortController !== 'undefined' && _opAbortController) ? _opAbortController.signal : undefined;
+
     let res, retries = 0;
     while (true) {
       res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions',{
-        method:'POST', headers:{'Authorization':'Bearer '+key}, body:formData
+        method:'POST', headers:{'Authorization':'Bearer '+key}, body:formData,
+        signal: abortSignal
       });
       if (res.status !== 429 || retries >= 5) break;
       retries++;
       const retryAfter = parseInt(res.headers.get('retry-after') || '65');
       const waitSec = Math.max(retryAfter, 65);
       for (let w = waitSec; w > 0; w--) {
+        if (typeof _checkCancelled === 'function') _checkCancelled();
         whisperProgressUI(
           `⏳ Лимит Groq, жду ${w} сек (попытка ${retries}/5)...`,
           `Часть ${i+1}`, pct, '429 rate limit — автоповтор'
