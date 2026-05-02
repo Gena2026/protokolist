@@ -195,9 +195,8 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
 .nsi-back-btn{font-size:13px;padding:6px 12px}
 .nsi-breadcrumb-trail{font-size:13px;color:#64748b;flex:1}
 .nsi-breadcrumb-trail b{color:#1e293b;font-weight:600}
-.nsi-variant-label{font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px dashed #e2e8f0}
 
-/* Вариант A — квадратные плитки */
+/* Плитки справочников (Уровень 1) */
 .nsi-tiles-a{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 @media (max-width:900px){.nsi-tiles-a{grid-template-columns:repeat(2,1fr)}}
 .nsi-tile-a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 16px;background:#fafafa;border:1px solid #e2e8f0;border-radius:12px;cursor:pointer;transition:.15s;text-align:center;min-height:140px}
@@ -206,32 +205,32 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
 .nsi-tile-a-name{font-size:14px;font-weight:600;color:#1e293b;line-height:1.3}
 .nsi-tile-a-count{font-size:11px;color:#94a3b8;font-weight:500}
 
-/* Вариант B — кнопки-строки (стиль macOS Settings) */
-.nsi-tiles-b{display:flex;flex-direction:column;gap:6px}
-.nsi-tile-b{display:flex;align-items:center;gap:14px;padding:12px 14px;background:#fafafa;border:1px solid #e2e8f0;border-radius:10px;cursor:pointer;transition:.15s}
-.nsi-tile-b:hover{background:#fff;border-color:#3b82f6;box-shadow:0 2px 8px rgba(59,130,246,.08)}
-.nsi-tile-b-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
-.nsi-tile-b-text{flex:1;min-width:0}
-.nsi-tile-b-name{font-size:14px;font-weight:600;color:#1e293b;line-height:1.3}
-.nsi-tile-b-sub{font-size:12px;color:#64748b;line-height:1.3;margin-top:2px}
-.nsi-tile-b-count{font-size:12px;color:#64748b;font-weight:500;background:#fff;padding:3px 9px;border-radius:6px;border:1px solid #e2e8f0;min-width:28px;text-align:center}
-.nsi-tile-b-chev{color:#cbd5e1;font-size:22px;font-weight:300;line-height:1}
-
-/* Вариант C — компактный список */
-.nsi-tiles-c{display:flex;flex-direction:column;gap:0;border:1px solid #e2e8f0;border-radius:9px;overflow:hidden}
-.nsi-tile-c{display:flex;align-items:center;gap:12px;padding:11px 14px;background:#fff;cursor:pointer;transition:.15s;border-bottom:1px solid #f1f5f9;text-decoration:none;color:inherit}
-.nsi-tile-c:last-child{border-bottom:none}
-.nsi-tile-c:hover{background:#f8fafc}
-.nsi-tile-c-icon{font-size:16px;width:24px;text-align:center;flex-shrink:0}
-.nsi-tile-c-name{flex:1;font-size:13px;color:#1e293b}
-.nsi-tile-c-count{font-size:11px;color:#94a3b8;font-weight:500}
-
 /* Строки в списке элементов справочника (Уровень 2) — кликабельны для перехода в карточку */
 .nsi-row{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;background:#f8fafc;border-radius:8px;margin-bottom:5px;font-size:13px;cursor:pointer;border:1px solid transparent;transition:.15s}
 .nsi-row:hover{background:#eff6ff;border-color:#bfdbfe}
 .nsi-row-text{flex:1;min-width:0}
 .nsi-row-proj{padding:10px 14px;border-radius:9px;border:1px solid #e2e8f0;margin-bottom:7px}
 .nsi-row-proj:hover{border-color:#3b82f6;background:#fff}
+
+/* Шапка списка справочника (Уровень 2): заголовок + кнопка добавления */
+.nsi-list-header{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px dashed #e2e8f0;flex-wrap:wrap}
+
+/* Плитки проектов на Уровне 2 — как Вариант A с логотипом */
+.nsi-proj-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+.nsi-proj-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:10px;padding:20px 14px 16px;background:#fafafa;border:1px solid #e2e8f0;border-radius:12px;cursor:pointer;transition:.15s;text-align:center;min-height:170px}
+.nsi-proj-tile:hover{background:#fff;border-color:#3b82f6;box-shadow:0 4px 12px rgba(59,130,246,.1);transform:translateY(-2px)}
+.nsi-proj-tile-logo{width:64px;height:64px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;color:#475569;flex-shrink:0;overflow:hidden;background-size:cover;background-position:center}
+.nsi-proj-tile-name{font-size:14px;font-weight:600;color:#1e293b;line-height:1.3;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.nsi-proj-tile-sub{font-size:11px;color:#94a3b8;font-weight:500;margin-top:auto}
+.nsi-proj-tile-del{position:absolute;top:8px;right:8px;opacity:0;transition:opacity .15s}
+.nsi-proj-tile:hover .nsi-proj-tile-del{opacity:1}
+
+/* Логотип в карточке проекта */
+.pc-logo-block{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+.pc-logo-preview{width:120px;height:120px;border-radius:12px;border:2px dashed #cbd5e1;background:#fafafa;display:flex;align-items:center;justify-content:center;font-size:14px;color:#94a3b8;overflow:hidden;flex-shrink:0;position:relative;background-size:cover;background-position:center}
+.pc-logo-preview.has-image{border-style:solid;border-color:#3b82f6}
+.pc-logo-controls{display:flex;flex-direction:column;gap:8px;flex:1;min-width:200px}
+.pc-logo-info{font-size:12px;color:#64748b;line-height:1.4}
 
 /* === F-Report-3: Карточка проекта === */
 .pc-section{margin-bottom:22px;padding-bottom:18px;border-bottom:1px dashed #e2e8f0}
@@ -845,8 +844,6 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <div class="card-title"><div class="card-title-icon icon-blue">⚙️</div>Справочники</div>
       <p style="font-size:13px;color:#64748b;margin:0 0 18px">Выбери справочник чтобы открыть список его элементов.</p>
 
-      <!-- Вариант A — крупные квадратные плитки в сетке -->
-      <div class="nsi-variant-label">Вариант A — Квадратные плитки</div>
       <div class="nsi-tiles-a">
         <div class="nsi-tile-a" onclick="nsiOpenList('projects')">
           <div class="nsi-tile-a-icon" style="background:#fef3c7">🗂️</div>
@@ -870,118 +867,46 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
         </div>
       </div>
     </div>
-
-    <div class="card">
-      <!-- Вариант B — большие кнопки-строки -->
-      <div class="nsi-variant-label">Вариант B — Кнопки-строки (стиль macOS Settings)</div>
-      <div class="nsi-tiles-b">
-        <div class="nsi-tile-b" onclick="nsiOpenList('projects')">
-          <div class="nsi-tile-b-icon" style="background:#fef3c7">🗂️</div>
-          <div class="nsi-tile-b-text">
-            <div class="nsi-tile-b-name">Проекты</div>
-            <div class="nsi-tile-b-sub">Карточки клиентов и команды</div>
-          </div>
-          <div class="nsi-tile-b-count" id="nsi-count-b-projects">0</div>
-          <div class="nsi-tile-b-chev">›</div>
-        </div>
-        <div class="nsi-tile-b" onclick="nsiOpenList('participants')">
-          <div class="nsi-tile-b-icon" style="background:#dbeafe">👤</div>
-          <div class="nsi-tile-b-text">
-            <div class="nsi-tile-b-name">Участники</div>
-            <div class="nsi-tile-b-sub">Сотрудники и контактные лица</div>
-          </div>
-          <div class="nsi-tile-b-count" id="nsi-count-b-participants">0</div>
-          <div class="nsi-tile-b-chev">›</div>
-        </div>
-        <div class="nsi-tile-b" onclick="nsiOpenList('positions')">
-          <div class="nsi-tile-b-icon" style="background:#ede9fe">📋</div>
-          <div class="nsi-tile-b-text">
-            <div class="nsi-tile-b-name">Должности</div>
-            <div class="nsi-tile-b-sub">Список должностей для команды</div>
-          </div>
-          <div class="nsi-tile-b-count" id="nsi-count-b-positions">0</div>
-          <div class="nsi-tile-b-chev">›</div>
-        </div>
-        <div class="nsi-tile-b" onclick="nsiOpenList('areas')">
-          <div class="nsi-tile-b-icon" style="background:#d1fae5">📐</div>
-          <div class="nsi-tile-b-text">
-            <div class="nsi-tile-b-name">Функциональные области</div>
-            <div class="nsi-tile-b-sub">Бизнес-блоки для протоколов</div>
-          </div>
-          <div class="nsi-tile-b-count" id="nsi-count-b-areas">0</div>
-          <div class="nsi-tile-b-chev">›</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <!-- Вариант C — компактный список ссылок (минимализм) -->
-      <div class="nsi-variant-label">Вариант C — Компактный список (минимализм)</div>
-      <div class="nsi-tiles-c">
-        <a class="nsi-tile-c" onclick="nsiOpenList('projects')">
-          <span class="nsi-tile-c-icon">🗂️</span>
-          <span class="nsi-tile-c-name">Проекты</span>
-          <span class="nsi-tile-c-count" id="nsi-count-c-projects">0</span>
-        </a>
-        <a class="nsi-tile-c" onclick="nsiOpenList('participants')">
-          <span class="nsi-tile-c-icon">👤</span>
-          <span class="nsi-tile-c-name">Участники</span>
-          <span class="nsi-tile-c-count" id="nsi-count-c-participants">0</span>
-        </a>
-        <a class="nsi-tile-c" onclick="nsiOpenList('positions')">
-          <span class="nsi-tile-c-icon">📋</span>
-          <span class="nsi-tile-c-name">Должности</span>
-          <span class="nsi-tile-c-count" id="nsi-count-c-positions">0</span>
-        </a>
-        <a class="nsi-tile-c" onclick="nsiOpenList('areas')">
-          <span class="nsi-tile-c-icon">📐</span>
-          <span class="nsi-tile-c-name">Функциональные области</span>
-          <span class="nsi-tile-c-count" id="nsi-count-c-areas">0</span>
-        </a>
-      </div>
-      <p style="font-size:12px;color:#94a3b8;margin:14px 0 0;font-style:italic">Скажи какой вариант оставить — остальные удалю.</p>
-    </div>
   </div>
 
   <!-- ═══ УРОВЕНЬ 2: СПИСОК ЭЛЕМЕНТОВ СПРАВОЧНИКА ═══ -->
   <div id="nsi-level-list" style="display:none">
 
     <!-- POSITIONS list -->
+    <!-- POSITIONS list -->
     <div class="card nsi-list-card" data-dict="positions" style="display:none">
-      <div class="card-title"><div class="card-title-icon icon-purple">📋</div>Должности</div>
-      <div id="positions-list" style="margin-bottom:12px"></div>
-      <div style="display:flex;gap:8px">
-        <input type="text" id="new-position" placeholder="Название должности" style="flex:1">
-        <button class="btn btn-primary" onclick="addPosition()">+ Добавить</button>
+      <div class="nsi-list-header">
+        <div class="card-title" style="margin:0"><div class="card-title-icon icon-purple">📋</div>Должности</div>
+        <button class="btn btn-primary" onclick="nsiOpenNewElementCard('positions')">+ Добавить</button>
       </div>
+      <div id="positions-list"></div>
     </div>
 
     <!-- PARTICIPANTS list -->
     <div class="card nsi-list-card" data-dict="participants" style="display:none">
-      <div class="card-title"><div class="card-title-icon icon-blue">👤</div>Участники</div>
-      <div id="participants-list" style="margin-bottom:12px"></div>
-      <div style="display:flex;gap:8px">
-        <input type="text" id="new-participant" placeholder="ФИО участника" style="flex:1">
-        <button class="btn btn-primary" onclick="addParticipant()">+ Добавить</button>
+      <div class="nsi-list-header">
+        <div class="card-title" style="margin:0"><div class="card-title-icon icon-blue">👤</div>Участники</div>
+        <button class="btn btn-primary" onclick="nsiOpenNewElementCard('participants')">+ Добавить</button>
       </div>
+      <div id="participants-list"></div>
     </div>
 
     <!-- PROJECTS list -->
     <div class="card nsi-list-card" id="projects-card" data-dict="projects" style="display:none">
-      <div class="card-title"><div class="card-title-icon icon-amber">🗂️</div>Проекты</div>
-      <div id="projects-list" style="margin-bottom:12px"></div>
-      <button class="btn btn-primary" onclick="createProjectAndOpen()" style="width:100%">+ Создать проект</button>
+      <div class="nsi-list-header">
+        <div class="card-title" style="margin:0"><div class="card-title-icon icon-amber">🗂️</div>Проекты</div>
+        <button class="btn btn-primary" onclick="createProjectAndOpen()">+ Добавить</button>
+      </div>
+      <div id="projects-list"></div>
     </div>
 
     <!-- FUNCTIONAL AREAS list -->
     <div class="card nsi-list-card" data-dict="areas" style="display:none">
-      <div class="card-title"><div class="card-title-icon icon-green">📐</div>Функциональные области</div>
-      <div id="functional-areas-list" style="margin-bottom:12px"></div>
-      <div style="display:flex;gap:8px">
-        <input type="text" id="new-area-name" placeholder="Название (напр., Планирование)" style="flex:1">
-        <input type="text" id="new-area-prefix" placeholder="Префикс" maxlength="2" style="width:120px;text-transform:uppercase;font-family:monospace;letter-spacing:.5px;text-align:center">
-        <button class="btn btn-primary" onclick="addFunctionalArea()">+ Добавить</button>
+      <div class="nsi-list-header">
+        <div class="card-title" style="margin:0"><div class="card-title-icon icon-green">📐</div>Функциональные области</div>
+        <button class="btn btn-primary" onclick="nsiOpenNewElementCard('areas')">+ Добавить</button>
       </div>
+      <div id="functional-areas-list"></div>
     </div>
   </div>
 
@@ -1003,21 +928,35 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 
       <div id="pc-error-summary" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px"></div>
 
+      <!-- Раздел: Логотип -->
+      <div class="pc-section">
+        <div class="pc-section-title">Логотип компании заказчика</div>
+        <div class="pc-logo-block">
+          <div class="pc-logo-preview" id="pc-logo-preview">Нет логотипа</div>
+          <div class="pc-logo-controls">
+            <input type="file" id="pc-logo-file" accept="image/png,image/jpeg,image/svg+xml,image/webp,image/gif" style="display:none" onchange="onPcLogoFileChange(this)">
+            <button class="btn btn-secondary" type="button" onclick="document.getElementById('pc-logo-file').click()">📎 Загрузить логотип</button>
+            <button class="btn btn-secondary" type="button" id="pc-logo-remove-btn" onclick="onPcLogoRemove()" style="display:none">🗑 Удалить логотип</button>
+            <div class="pc-logo-info">PNG, JPG, SVG, WebP, GIF · максимум 1 МБ.<br>Логотип будет использоваться в шапке/колонтитуле отчётов и протоколов.</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Раздел: Основное -->
       <div class="pc-section">
         <div class="pc-section-title">Основное</div>
         <div class="pc-grid-2">
           <div class="pc-field">
             <label>Полное название проекта <span class="pc-req">*</span></label>
-            <input type="text" id="pc-name" class="pc-input" placeholder="Автоматизация учёта в Cemix Uzbekistan">
+            <input type="text" id="pc-name" class="pc-input" placeholder="Автоматизация учёта в Рога и Копыта">
           </div>
           <div class="pc-field">
             <label>Краткое название <span class="pc-req">*</span></label>
-            <input type="text" id="pc-short-name" class="pc-input" placeholder="Cemix Uzbekistan">
+            <input type="text" id="pc-short-name" class="pc-input" placeholder="Рога и Копыта">
           </div>
           <div class="pc-field">
             <label>Город <span class="pc-req">*</span></label>
-            <input type="text" id="pc-city" class="pc-input" placeholder="Ташкент">
+            <input type="text" id="pc-city" class="pc-input" placeholder="Москва">
           </div>
         </div>
       </div>
@@ -1028,7 +967,7 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
         <div class="pc-grid-2">
           <div class="pc-field">
             <label>Заказчик (организация) <span class="pc-req">*</span></label>
-            <input type="text" id="pc-customer-org" class="pc-input" placeholder="ИП ООО «CEMIX»">
+            <input type="text" id="pc-customer-org" class="pc-input" placeholder="ООО «Рога и Копыта»">
           </div>
           <div class="pc-field">
             <label>Исполнитель (организация) <span class="pc-req">*</span></label>
@@ -1087,7 +1026,7 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
         <div class="pc-section-title">О компании Заказчика</div>
         <div class="pc-field">
           <label>Юридический адрес <span class="pc-req">*</span></label>
-          <textarea id="pc-customer-address" class="pc-input" rows="2" placeholder="Самаркандская область, Нуробадский район..."></textarea>
+          <textarea id="pc-customer-address" class="pc-input" rows="2" placeholder="г. Москва, Пресненская наб., 12, БЦ «Башня Федерация», офис 305"></textarea>
         </div>
         <div class="pc-field" style="max-width:240px">
           <label>Численность персонала (чел.) <span class="pc-req">*</span></label>
@@ -1095,7 +1034,7 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
         </div>
         <div class="pc-field">
           <label>Описание предприятия <span class="pc-req">*</span></label>
-          <textarea id="pc-customer-description" class="pc-input" rows="6" placeholder="Чем компания занимается, для какого рынка работает, ключевые направления, стратегия. 3-4 абзаца текста."></textarea>
+          <textarea id="pc-customer-description" class="pc-input" rows="6" placeholder="ООО «Рога и Копыта» — производственная компания, специализирующаяся на ... Основные направления деятельности: ... Целевой рынок: ... 3-4 абзаца текста."></textarea>
         </div>
         <div class="pc-field">
           <label>Орг.структура (XLSX) <span class="pc-opt">(на перспективу — пока заглушка)</span></label>
@@ -1134,17 +1073,20 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       </div>
     </div>
 
-    <!-- Карточка-заглушка для остальных справочников (участники / должности / области) -->
-    <div class="card nsi-card-page" id="nsi-stub-card" data-card="stub" style="display:none">
-      <div class="card-title">
-        <div class="card-title-icon icon-blue" id="nsi-stub-icon">⚙️</div>
-        <span id="nsi-stub-title">Карточка элемента</span>
+    <!-- Мини-карточка для участников / должностей / областей (содержимое генерируется JS-ом) -->
+    <div class="card nsi-card-page" id="nsi-mc-card" data-card="mini" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+        <div class="card-title" style="margin:0">
+          <div class="card-title-icon icon-blue" id="nsi-mc-icon">⚙️</div>
+          <span id="nsi-mc-title">Карточка элемента</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-success" onclick="saveMiniCard(false)">💾 Сохранить</button>
+          <button class="btn btn-success" onclick="saveMiniCard(true)">💾 Сохранить и закрыть</button>
+        </div>
       </div>
-      <div style="padding:30px 20px;text-align:center;color:#94a3b8;background:#fafafa;border-radius:9px;font-size:14px">
-        <div style="font-size:36px;margin-bottom:12px;opacity:.6">🚧</div>
-        <div style="font-weight:600;color:#64748b;margin-bottom:6px" id="nsi-stub-name">—</div>
-        <div>Карточка элемента в разработке.<br>Пока редактирование доступно через список.</div>
-      </div>
+      <div id="nsi-mc-error" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px"></div>
+      <div id="nsi-mc-fields"></div>
     </div>
   </div>
 
@@ -3079,9 +3021,10 @@ async function loadFFmpeg() {
 //   value = { blob: Blob, fileName: string, savedAt: timestamp, sizeBytes: number }
 
 const AUDIO_DB_NAME = 'protokolist_audio_cache';
-const AUDIO_DB_VERSION = 2; // v1: audio_blobs only; v2: + transcripts store
+const AUDIO_DB_VERSION = 3; // v1: audio_blobs only; v2: + transcripts; v3: + logos
 const AUDIO_STORE = 'audio_blobs';
 const TRANSCRIPT_STORE = 'transcripts';
+const LOGOS_STORE = 'logos';
 
 let _audioDbPromise = null;
 function openAudioDB() {
@@ -3095,6 +3038,9 @@ function openAudioDB() {
       }
       if (!db.objectStoreNames.contains(TRANSCRIPT_STORE)) {
         db.createObjectStore(TRANSCRIPT_STORE);
+      }
+      if (!db.objectStoreNames.contains(LOGOS_STORE)) {
+        db.createObjectStore(LOGOS_STORE);
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -3259,6 +3205,95 @@ async function idbTranscriptsSize() {
     });
   } catch (e) {
     return 0;
+  }
+}
+
+// ── F-NSI-Hierarchy: ЛОГОТИПЫ ПРОЕКТОВ В IDB ─────────────
+// Ключ — projectId (число), значение — { blob, mimeType, filename, savedAt }
+// Размер ограничен 1 МБ — больше не имеет смысла для логотипа в документе.
+const LOGO_MAX_BYTES = 1024 * 1024; // 1 MB
+const LOGO_ALLOWED_MIMES = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp', 'image/gif'];
+
+async function saveLogo(projectId, blob, filename) {
+  if (!projectId || !blob) return false;
+  if (!LOGO_ALLOWED_MIMES.includes(blob.type)) {
+    throw new Error('Поддерживаются только PNG, JPG, SVG, WebP, GIF');
+  }
+  if (blob.size > LOGO_MAX_BYTES) {
+    throw new Error(`Файл слишком большой (${Math.round(blob.size / 1024)} КБ). Максимум — 1024 КБ.`);
+  }
+  const db = await openAudioDB();
+  return await new Promise((resolve, reject) => {
+    const tx = db.transaction(LOGOS_STORE, 'readwrite');
+    const store = tx.objectStore(LOGOS_STORE);
+    const data = { blob, mimeType: blob.type, filename: filename || 'logo', savedAt: Date.now() };
+    const req = store.put(data, projectId);
+    req.onsuccess = () => resolve(true);
+    req.onerror  = () => reject(req.error || new Error('IDB save failed'));
+  });
+}
+
+async function getLogo(projectId) {
+  if (!projectId) return null;
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(LOGOS_STORE, 'readonly');
+      const req = tx.objectStore(LOGOS_STORE).get(projectId);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror  = () => resolve(null);
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+async function deleteLogo(projectId) {
+  if (!projectId) return;
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(LOGOS_STORE, 'readwrite');
+      const req = tx.objectStore(LOGOS_STORE).delete(projectId);
+      req.onsuccess = () => resolve(true);
+      req.onerror  = () => resolve(false);
+    });
+  } catch (e) { /* noop */ }
+}
+
+async function idbListLogoKeys() {
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(LOGOS_STORE, 'readonly');
+      const req = tx.objectStore(LOGOS_STORE).getAllKeys();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror  = () => resolve([]);
+    });
+  } catch (e) {
+    return [];
+  }
+}
+
+// Кэш Object URL'ов: чтобы не создавать новый url каждый раз и не утекали ресурсы.
+// Ключ — projectId, значение — { url, mimeType }. revokeObjectURL вызывается при удалении/обновлении.
+const _logoUrlCache = new Map();
+
+async function getLogoUrl(projectId) {
+  const cached = _logoUrlCache.get(projectId);
+  if (cached) return cached.url;
+  const data = await getLogo(projectId);
+  if (!data || !data.blob) return null;
+  const url = URL.createObjectURL(data.blob);
+  _logoUrlCache.set(projectId, { url, mimeType: data.mimeType });
+  return url;
+}
+
+function revokeCachedLogoUrl(projectId) {
+  const cached = _logoUrlCache.get(projectId);
+  if (cached) {
+    URL.revokeObjectURL(cached.url);
+    _logoUrlCache.delete(projectId);
   }
 }
 
@@ -7571,6 +7606,15 @@ async function adminDeleteEverything() {
   const repPrev = document.getElementById('report-preview');
   if (repPrev) repPrev.textContent = '';
 
+  // F-NSI-Hierarchy: дополнительно — очистка логотипов проектов из IDB
+  try {
+    const logoKeys = await idbListLogoKeys();
+    for (const k of logoKeys) {
+      revokeCachedLogoUrl(k);
+      await deleteLogo(k);
+    }
+  } catch (_) {}
+
   // Шаг 6: финальный refresh UI
   setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 6/6: обновление интерфейса...</div>');
   // Refresh UI всех вкладок
@@ -7731,62 +7775,200 @@ function isValidDateStr(s) {
   return dt.getDate() === d && dt.getMonth() === mo - 1 && dt.getFullYear() === y;
 }
 
-function addPosition() {
-  const name = document.getElementById('new-position').value.trim();
-  if (!name) return;
-  const nsi = getNSI();
-  if (nsi.positions.includes(name)) return;
-  nsi.positions.push(name); saveNSI(nsi);
-  document.getElementById('new-position').value = ''; renderNSI();
-}
 function deletePosition(idx) { const nsi=getNSI(); nsi.positions.splice(idx,1); saveNSI(nsi); renderNSI(); }
 
-function addParticipant() {
-  const name = document.getElementById('new-participant').value.trim();
-  if (!name) return;
-  const nsi = getNSI();
-  if (nsi.participants.find(p=>p.name===name)) return;
-  nsi.participants.push({id:Date.now(),name}); saveNSI(nsi);
-  document.getElementById('new-participant').value = ''; renderNSI();
-}
 function deleteParticipant(id) { const nsi=getNSI(); nsi.participants=nsi.participants.filter(p=>p.id!==id); saveNSI(nsi); renderNSI(); }
 
 // addProject (старая версия с инпутом) удалён — теперь создание через createProjectAndOpen
-function deleteProject(id) {
+async function deleteProject(id) {
   if (!confirm('Удалить проект?')) return;
-  const nsi=getNSI(); nsi.projects=nsi.projects.filter(p=>p.id!==id); saveNSI(nsi); renderNSI(); updateProjectSelect();
+  const nsi=getNSI(); nsi.projects=nsi.projects.filter(p=>p.id!==id); saveNSI(nsi);
+  // Каскадно удаляем логотип проекта из IDB
+  try {
+    revokeCachedLogoUrl(id);
+    await deleteLogo(id);
+  } catch (e) { /* noop */ }
+  renderNSI(); updateProjectSelect();
   if (typeof populateReportProjectSelect === 'function') populateReportProjectSelect();
 }
 
-// ── Функциональные области ──────────────────────────
-function addFunctionalArea() {
-  const nameEl = document.getElementById('new-area-name');
-  const prefEl = document.getElementById('new-area-prefix');
-  const name   = nameEl.value.trim();
-  const prefix = prefEl.value.trim().toUpperCase();
-  if (!name)   { alert('Введите название области'); return; }
-  if (!/^[А-ЯЁ]{2}$/.test(prefix)) {
-    alert('Префикс должен состоять из ровно 2 заглавных русских букв.\nПримеры: ПЛ, ЗА, ДО, СК.');
-    return;
-  }
-  const nsi = getNSI();
-  if (!Array.isArray(nsi.functionalAreas)) nsi.functionalAreas = [];
-  if (nsi.functionalAreas.find(a => a.name.toLowerCase() === name.toLowerCase())) {
-    alert('Область с таким названием уже существует'); return;
-  }
-  if (nsi.functionalAreas.find(a => a.prefix === prefix)) {
-    alert('Префикс «' + prefix + '» уже занят другой областью'); return;
-  }
-  nsi.functionalAreas.push({id: Date.now(), name, prefix});
-  saveNSI(nsi);
-  nameEl.value = ''; prefEl.value = '';
-  renderNSI();
-}
 function deleteFunctionalArea(id) {
   if (!confirm('Удалить функциональную область?')) return;
   const nsi = getNSI();
   nsi.functionalAreas = (nsi.functionalAreas || []).filter(a => a.id !== id);
   saveNSI(nsi);
+  renderNSI();
+}
+
+// ── F-NSI-Hierarchy: МИНИ-КАРТОЧКИ для участников/должностей/областей ──
+// Эти справочники не требуют полноценной формы. Делаем минимальную карточку:
+//   - participants: одно поле «ФИО»
+//   - positions:    одно поле «Название»
+//   - areas:        два поля «Название» + «Префикс (2 русские буквы)»
+// editingMcId: id редактируемого элемента (null = новый)
+// editingMcDict: какой справочник
+let editingMcId = null;
+let editingMcDict = null;
+
+// Открыть карточку нового элемента справочника
+function nsiOpenNewElementCard(dict) {
+  if (!NSI_DICTS[dict]) return;
+  if (dict === 'projects') { createProjectAndOpen(); return; }
+  editingMcId = null; // новый
+  editingMcDict = dict;
+  nsiState.level = 'card';
+  nsiState.dict = dict;
+  nsiState.cardId = null;
+  pcRenderMiniCard(dict, null);
+  renderNSI();
+  document.getElementById('page-nsi').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// Открыть мини-карточку существующего элемента
+function nsiOpenElementCard(dict, id) {
+  if (!NSI_DICTS[dict]) return;
+  if (dict === 'projects') { openProjectCard(id); return; }
+  editingMcId = id;
+  editingMcDict = dict;
+  nsiState.level = 'card';
+  nsiState.dict = dict;
+  nsiState.cardId = id;
+  pcRenderMiniCard(dict, id);
+  renderNSI();
+  document.getElementById('page-nsi').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// Рендерит контент мини-карточки в #nsi-mc-card
+function pcRenderMiniCard(dict, id) {
+  const meta = NSI_DICTS[dict];
+  const titleEl = document.getElementById('nsi-mc-title');
+  const iconEl = document.getElementById('nsi-mc-icon');
+  const fieldsEl = document.getElementById('nsi-mc-fields');
+  const errEl = document.getElementById('nsi-mc-error');
+  if (!titleEl || !fieldsEl) return;
+  errEl.style.display = 'none';
+  errEl.textContent = '';
+  iconEl.textContent = meta.icon;
+  iconEl.className = 'card-title-icon ' + meta.iconBg;
+
+  const nsi = getNSI();
+  let html = '';
+  let isNew = id === null || id === undefined;
+
+  if (dict === 'positions') {
+    titleEl.textContent = isNew ? 'Новая должность' : 'Редактирование должности';
+    const value = isNew ? '' : (nsi.positions[id] || '');
+    html = `
+      <div class="pc-field">
+        <label>Название должности <span class="pc-req">*</span></label>
+        <input type="text" id="mc-positions-name" class="pc-input" placeholder="Финансовый директор" value="${escHtml(value)}">
+      </div>`;
+  } else if (dict === 'participants') {
+    const p = isNew ? null : nsi.participants.find(x => x.id === id);
+    titleEl.textContent = isNew ? 'Новый участник' : 'Редактирование участника';
+    const value = p ? p.name : '';
+    html = `
+      <div class="pc-field">
+        <label>ФИО участника <span class="pc-req">*</span></label>
+        <input type="text" id="mc-participants-name" class="pc-input" placeholder="Иванов И.И." value="${escHtml(value)}">
+      </div>`;
+  } else if (dict === 'areas') {
+    const a = isNew ? null : (nsi.functionalAreas || []).find(x => x.id === id);
+    titleEl.textContent = isNew ? 'Новая функциональная область' : 'Редактирование области';
+    html = `
+      <div class="pc-field">
+        <label>Название <span class="pc-req">*</span></label>
+        <input type="text" id="mc-areas-name" class="pc-input" placeholder="Планирование" value="${a ? escHtml(a.name) : ''}">
+      </div>
+      <div class="pc-field" style="max-width:240px">
+        <label>Префикс (2 русские буквы) <span class="pc-req">*</span></label>
+        <input type="text" id="mc-areas-prefix" class="pc-input" maxlength="2" style="text-transform:uppercase;font-family:monospace;letter-spacing:.5px;text-align:center" placeholder="ПЛ" value="${a ? escHtml(a.prefix) : ''}">
+      </div>`;
+  }
+  fieldsEl.innerHTML = html;
+}
+
+// Сохранить мини-карточку
+function saveMiniCard(closeAfter) {
+  const dict = editingMcDict;
+  if (!dict) return;
+  const errEl = document.getElementById('nsi-mc-error');
+  errEl.style.display = 'none';
+  const showErr = (msg) => { errEl.textContent = msg; errEl.style.display = ''; };
+  const nsi = getNSI();
+  const isNew = editingMcId === null;
+
+  if (dict === 'positions') {
+    const name = document.getElementById('mc-positions-name').value.trim();
+    if (!name) return showErr('Введи название должности');
+    if (isNew) {
+      if (nsi.positions.includes(name)) return showErr('Такая должность уже есть');
+      nsi.positions.push(name);
+    } else {
+      if (nsi.positions[editingMcId] !== name && nsi.positions.includes(name)) {
+        return showErr('Такая должность уже есть');
+      }
+      nsi.positions[editingMcId] = name;
+    }
+    saveNSI(nsi);
+  } else if (dict === 'participants') {
+    const name = document.getElementById('mc-participants-name').value.trim();
+    if (!name) return showErr('Введи ФИО');
+    const dup = nsi.participants.find(p => p.name === name && p.id !== editingMcId);
+    if (dup) return showErr('Такой участник уже есть');
+    if (isNew) {
+      nsi.participants.push({id: Date.now(), name});
+    } else {
+      const p = nsi.participants.find(x => x.id === editingMcId);
+      if (p) p.name = name;
+    }
+    saveNSI(nsi);
+  } else if (dict === 'areas') {
+    const name = document.getElementById('mc-areas-name').value.trim();
+    const prefix = document.getElementById('mc-areas-prefix').value.trim().toUpperCase();
+    if (!name) return showErr('Введи название области');
+    if (!/^[А-ЯЁ]{2}$/.test(prefix)) return showErr('Префикс должен состоять из ровно 2 заглавных русских букв (например: ПЛ, ЗА, ДО, СК)');
+    if (!Array.isArray(nsi.functionalAreas)) nsi.functionalAreas = [];
+    const dupName = nsi.functionalAreas.find(a => a.name.toLowerCase() === name.toLowerCase() && a.id !== editingMcId);
+    if (dupName) return showErr('Область с таким названием уже существует');
+    const dupPrefix = nsi.functionalAreas.find(a => a.prefix === prefix && a.id !== editingMcId);
+    if (dupPrefix) return showErr('Префикс «' + prefix + '» уже занят другой областью');
+    if (isNew) {
+      nsi.functionalAreas.push({id: Date.now(), name, prefix});
+    } else {
+      const a = nsi.functionalAreas.find(x => x.id === editingMcId);
+      if (a) { a.name = name; a.prefix = prefix; }
+    }
+    saveNSI(nsi);
+  }
+
+  pcShowToast('✓ Сохранено');
+  if (closeAfter) {
+    closeMiniCard();
+  } else if (isNew) {
+    // Перевели в режим редактирования (получили реальный id)
+    let newId = null;
+    if (dict === 'positions') newId = (getNSI().positions.length - 1);
+    else if (dict === 'participants') {
+      const arr = getNSI().participants;
+      newId = arr[arr.length - 1].id;
+    } else if (dict === 'areas') {
+      const arr = getNSI().functionalAreas;
+      newId = arr[arr.length - 1].id;
+    }
+    editingMcId = newId;
+    pcRenderMiniCard(dict, newId);
+  }
+}
+
+// Закрыть мини-карточку — возврат на уровень list
+function closeMiniCard() {
+  const dict = editingMcDict;
+  editingMcId = null;
+  editingMcDict = null;
+  nsiState.level = 'list';
+  nsiState.dict = dict;
+  nsiState.cardId = null;
   renderNSI();
 }
 
@@ -7888,6 +8070,8 @@ function openProjectCard(id) {
 
   pcRenderTeam('customer');
   pcRenderTeam('executor');
+  // F-NSI-Hierarchy: показать логотип (если есть)
+  pcRenderLogoPreview();
   // Запускаем рендер уровня (он покажет правильную карточку и breadcrumb)
   renderNSI();
   document.getElementById('page-nsi').scrollIntoView({behavior:'smooth', block:'start'});
@@ -8117,6 +8301,85 @@ function pcShowToast(text) {
   setTimeout(() => { t.style.opacity = '0'; }, 2000);
 }
 
+// ── F-NSI-Hierarchy: ЛОГОТИП в карточке проекта ──
+// Превью обновляется при открытии карточки (pcRenderLogoPreview),
+// при загрузке файла (onPcLogoFileChange) и при удалении (onPcLogoRemove).
+async function pcRenderLogoPreview() {
+  if (!editingProjectId) return;
+  const preview = document.getElementById('pc-logo-preview');
+  const removeBtn = document.getElementById('pc-logo-remove-btn');
+  if (!preview) return;
+  try {
+    const url = await getLogoUrl(editingProjectId);
+    if (url) {
+      preview.classList.add('has-image');
+      preview.style.backgroundImage = `url("${url}")`;
+      preview.textContent = '';
+      if (removeBtn) removeBtn.style.display = '';
+    } else {
+      preview.classList.remove('has-image');
+      preview.style.backgroundImage = '';
+      preview.textContent = 'Нет логотипа';
+      if (removeBtn) removeBtn.style.display = 'none';
+    }
+  } catch (e) {
+    preview.classList.remove('has-image');
+    preview.style.backgroundImage = '';
+    preview.textContent = 'Нет логотипа';
+    if (removeBtn) removeBtn.style.display = 'none';
+  }
+}
+
+// Обработчик выбора файла из <input type="file">
+async function onPcLogoFileChange(input) {
+  const file = input.files && input.files[0];
+  if (!file || !editingProjectId) return;
+  try {
+    revokeCachedLogoUrl(editingProjectId); // очистить старый URL чтобы новый блоб подтянулся
+    await saveLogo(editingProjectId, file, file.name);
+    await pcRenderLogoPreview();
+    // Также обновим плитку в списке проектов (если плитка уже на экране где-то)
+    const tile = document.getElementById(`proj-logo-${editingProjectId}`);
+    if (tile) {
+      const url = await getLogoUrl(editingProjectId);
+      if (url) {
+        tile.style.background = '';
+        tile.style.backgroundImage = `url("${url}")`;
+        tile.style.backgroundSize = 'cover';
+        tile.style.backgroundPosition = 'center';
+        tile.textContent = '';
+      }
+    }
+    pcShowToast('✓ Логотип загружен');
+  } catch (e) {
+    alert('Не удалось загрузить логотип: ' + e.message);
+  } finally {
+    input.value = ''; // сбросить чтобы можно было загрузить тот же файл повторно
+  }
+}
+
+// Удалить логотип
+async function onPcLogoRemove() {
+  if (!editingProjectId) return;
+  if (!confirm('Удалить логотип?')) return;
+  try {
+    revokeCachedLogoUrl(editingProjectId);
+    await deleteLogo(editingProjectId);
+    await pcRenderLogoPreview();
+    // Обновим плитку — вернётся буква
+    const tile = document.getElementById(`proj-logo-${editingProjectId}`);
+    if (tile && pcDraft) {
+      tile.style.backgroundImage = '';
+      const colors = ['#fef3c7','#dbeafe','#ede9fe','#d1fae5','#fce7f3','#e0e7ff','#fed7aa','#cffafe'];
+      tile.style.background = colors[editingProjectId % colors.length];
+      tile.textContent = (pcDraft.name || '?').trim().charAt(0).toUpperCase();
+    }
+    pcShowToast('✓ Логотип удалён');
+  } catch (e) {
+    alert('Не удалось удалить логотип: ' + e.message);
+  }
+}
+
 // ── F-NSI-Hierarchy: 3-уровневая навигация ───────────────
 // Состояние навигации по справочникам.
 // level: 'main' (плитки) | 'list' (список элементов) | 'card' (карточка)
@@ -8142,23 +8405,6 @@ function nsiOpenList(dict) {
   nsiState.level = 'list';
   nsiState.dict = dict;
   nsiState.cardId = null;
-  renderNSI();
-  document.getElementById('page-nsi').scrollIntoView({behavior:'smooth', block:'start'});
-}
-
-// Перейти на уровень card-заглушку (для участников/должностей/областей)
-// elementId — id элемента; type — тип справочника
-function nsiOpenStubCard(dict, elementId, displayName) {
-  if (!NSI_DICTS[dict]) return;
-  nsiState.level = 'card';
-  nsiState.dict = dict;
-  nsiState.cardId = elementId;
-  // Заполнить заголовок stub-карточки
-  const meta = NSI_DICTS[dict];
-  document.getElementById('nsi-stub-title').textContent = `${meta.name} — карточка элемента`;
-  document.getElementById('nsi-stub-name').textContent = displayName || '—';
-  document.getElementById('nsi-stub-icon').textContent = meta.icon;
-  document.getElementById('nsi-stub-icon').className = 'card-title-icon ' + meta.iconBg;
   renderNSI();
   document.getElementById('page-nsi').scrollIntoView({behavior:'smooth', block:'start'});
 }
@@ -8206,8 +8452,14 @@ function renderNSI() {
       let cardName = '';
       if (nsiState.dict === 'projects' && pcDraft) {
         cardName = pcDraft.name || 'Новый проект';
-      } else {
-        cardName = document.getElementById('nsi-stub-name')?.textContent || '';
+      } else if (nsiState.dict && editingMcDict) {
+        // Мини-карточка: берём из текущего значения поля
+        const field = document.getElementById(`mc-${editingMcDict}-name`);
+        if (field && field.value.trim()) {
+          cardName = field.value.trim();
+        } else {
+          cardName = (editingMcId === null) ? 'Новый элемент' : '...';
+        }
       }
       if (cardName) html += ` &rsaquo; <b>${escHtml(cardName)}</b>`;
     }
@@ -8223,17 +8475,9 @@ function renderNSI() {
       positions:    (nsi.positions || []).length,
       areas:        (nsi.functionalAreas || []).length
     };
-    ['a', 'b', 'c'].forEach(variant => {
-      Object.entries(counts).forEach(([dict, count]) => {
-        const el = document.getElementById(`nsi-count-${variant}-${dict}`);
-        if (el) {
-          if (variant === 'a' || variant === 'c') {
-            el.textContent = count === 0 ? 'пусто' : `${count} ${pluralCount(count)}`;
-          } else {
-            el.textContent = count;
-          }
-        }
-      });
+    Object.entries(counts).forEach(([dict, count]) => {
+      const el = document.getElementById(`nsi-count-a-${dict}`);
+      if (el) el.textContent = count === 0 ? 'пусто' : `${count} ${pluralCount(count)}`;
     });
     return;
   }
@@ -8247,12 +8491,12 @@ function renderNSI() {
     return;
   }
 
-  // Уровень card: для проектов показать project-card, для остальных — stub
+  // Уровень card: для проектов показать project-card, для остальных — mini-card
   if (nsiState.level === 'card') {
     document.querySelectorAll('#nsi-level-card .nsi-card-page').forEach(c => {
       const cardType = c.dataset.card;
       const matches = (nsiState.dict === 'projects' && cardType === 'project') ||
-                       (nsiState.dict !== 'projects' && cardType === 'stub');
+                       (nsiState.dict !== 'projects' && cardType === 'mini');
       c.style.display = matches ? '' : 'none';
     });
     return;
@@ -8273,41 +8517,70 @@ function renderNSILists() {
 
   const posList = document.getElementById('positions-list');
   if (posList) posList.innerHTML = nsi.positions.length ? nsi.positions.map((pos,i)=>
-    `<div class="nsi-row" onclick="nsiOpenStubCard('positions', ${i}, ${JSON.stringify(pos)})">
+    `<div class="nsi-row" onclick="nsiOpenElementCard('positions', ${i})">
       <span class="nsi-row-text">${escHtml(pos)}</span>
       <button class="protocol-del" onclick="event.stopPropagation();deletePosition(${i})">×</button></div>`).join('')
-    : '<div style="font-size:12px;color:#94a3b8">Нет должностей</div>';
+    : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Пока нет элементов. Нажми «+ Добавить» сверху.</div>';
 
   const partList = document.getElementById('participants-list');
   if (partList) partList.innerHTML = nsi.participants.length ? nsi.participants.map(p=>
-    `<div class="nsi-row" onclick="nsiOpenStubCard('participants', ${p.id}, ${JSON.stringify(p.name)})">
+    `<div class="nsi-row" onclick="nsiOpenElementCard('participants', ${p.id})">
       <span class="nsi-row-text">${escHtml(p.name)}</span>
       <button class="protocol-del" onclick="event.stopPropagation();deleteParticipant(${p.id})">×</button></div>`).join('')
-    : '<div style="font-size:12px;color:#94a3b8">Нет участников</div>';
+    : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Пока нет элементов. Нажми «+ Добавить» сверху.</div>';
 
+  // F-NSI-Hierarchy: список проектов в виде плиток (как Уровень 1) с логотипами
   const projList = document.getElementById('projects-list');
-  if (projList) projList.innerHTML = nsi.projects.length ? nsi.projects.map(proj => {
-    const ec=proj.executor?.length||0, cc=proj.customer?.length||0;
-    const displayName = proj.name || '<em style="color:#94a3b8">(без названия)</em>';
-    return `<div class="nsi-row nsi-row-proj" onclick="openProjectCard(${proj.id})">
-      <div class="nsi-row-text"><div style="font-size:14px;font-weight:600">${displayName.startsWith('<') ? displayName : escHtml(displayName)}</div>
-      <div style="font-size:12px;color:#64748b">Заказчик: ${cc} · Исполнитель: ${ec}</div></div>
-      <div style="display:flex;gap:6px;align-items:center"><span style="font-size:12px;color:#3b82f6">Открыть →</span>
-      <button class="protocol-del" onclick="event.stopPropagation();deleteProject(${proj.id})">×</button></div></div>`;
-  }).join('') : '<div style="font-size:12px;color:#94a3b8">Нет проектов</div>';
+  if (projList) {
+    if (!nsi.projects.length) {
+      projList.innerHTML = '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Пока нет проектов. Нажми «+ Добавить» сверху.</div>';
+    } else {
+      projList.innerHTML = `<div class="nsi-proj-tiles">${nsi.projects.map(proj => {
+        const ec = proj.executor?.length || 0;
+        const cc = proj.customer?.length || 0;
+        const displayName = proj.name || '<em style="color:#94a3b8">(без названия)</em>';
+        const initial = (proj.name || '?').trim().charAt(0).toUpperCase();
+        // Префикс цвета на основе id (детерминированный)
+        const colors = ['#fef3c7','#dbeafe','#ede9fe','#d1fae5','#fce7f3','#e0e7ff','#fed7aa','#cffafe'];
+        const bg = colors[proj.id % colors.length];
+        return `<div class="nsi-proj-tile" onclick="openProjectCard(${proj.id})">
+          <div class="nsi-proj-tile-logo" style="background:${bg}" id="proj-logo-${proj.id}">${escHtml(initial)}</div>
+          <div class="nsi-proj-tile-name">${displayName.startsWith('<') ? displayName : escHtml(displayName)}</div>
+          <div class="nsi-proj-tile-sub">Заказчик: ${cc} · Исполнитель: ${ec}</div>
+          <button class="nsi-proj-tile-del protocol-del" onclick="event.stopPropagation();deleteProject(${proj.id})" title="Удалить">×</button>
+        </div>`;
+      }).join('')}</div>`;
+      // Подгрузить превью логотипов асинхронно (если есть)
+      nsi.projects.forEach(async proj => {
+        try {
+          const url = await getLogoUrl(proj.id);
+          if (url) {
+            const el = document.getElementById(`proj-logo-${proj.id}`);
+            if (el) {
+              el.style.background = '';
+              el.style.backgroundImage = `url("${url}")`;
+              el.style.backgroundSize = 'cover';
+              el.style.backgroundPosition = 'center';
+              el.textContent = '';
+            }
+          }
+        } catch (e) {}
+      });
+    }
+  }
 
   const areaList = document.getElementById('functional-areas-list');
   if (areaList) {
     const areas = nsi.functionalAreas || [];
     areaList.innerHTML = areas.length ? areas.map(a =>
-      `<div class="nsi-row" onclick="nsiOpenStubCard('areas', ${a.id}, ${JSON.stringify(a.name)})">
+      `<div class="nsi-row" onclick="nsiOpenElementCard('areas', ${a.id})">
         <div style="display:flex;align-items:center;gap:12px;flex:1">
           <span style="display:inline-block;background:#10b981;color:#fff;padding:3px 10px;border-radius:5px;font-weight:700;font-size:12px;letter-spacing:.5px;font-family:monospace;min-width:34px;text-align:center">${escHtml(a.prefix)}</span>
           <span>${escHtml(a.name)}</span>
         </div>
         <button class="protocol-del" onclick="event.stopPropagation();deleteFunctionalArea(${a.id})">×</button>
       </div>`
-    ).join('') : '<div style="font-size:12px;color:#94a3b8">Нет функциональных областей</div>';
+    ).join('') : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Пока нет элементов. Нажми «+ Добавить» сверху.</div>';
   }
 
   // Карточка проекта рендерится через pcRenderTeam независимо от renderNSILists
