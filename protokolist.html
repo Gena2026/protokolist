@@ -142,10 +142,10 @@ body[data-busy-op="generating"] #step-3 .step-stop-btn{display:inline-flex;align
 .step-0-checkbox:hover{border-color:#94a3b8;background:#f8fafc}
 .step-0-checkbox input[type=checkbox]{width:15px;height:15px;cursor:pointer;margin:0;flex-shrink:0}
 .step-0-checkbox:has(input:checked){border-color:#3b82f6;background:#eff6ff;color:#1d4ed8}
-.step-0-checkbox-emoji{font-size:16px;flex-shrink:0;line-height:1}
-.step-0-checkbox-text{display:flex;flex-direction:column;justify-content:center;gap:2px;line-height:1.2;flex:1}
-.step-0-checkbox-name{font-size:13px;font-weight:500;color:inherit;white-space:nowrap}
-.step-0-checkbox-hint{color:#94a3b8;font-size:11px;font-weight:400;white-space:nowrap}
+.step-0-checkbox-emoji{font-size:16px;flex-shrink:0;line-height:1;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px}
+.step-0-checkbox-text{display:flex;flex-direction:column;justify-content:center;gap:0;flex:1;height:36px}
+.step-0-checkbox-name{font-size:13px;font-weight:500;color:inherit;white-space:nowrap;line-height:18px;height:18px}
+.step-0-checkbox-hint{color:#94a3b8;font-size:11px;font-weight:400;white-space:nowrap;line-height:18px;height:18px}
 .step-0-checkbox:has(input:checked) .step-0-checkbox-hint{color:#60a5fa}
 /* Баннер «Заполни Шаг 3» — виден только при включённом Авто и пустом Шаге 3 */
 .step-0-warning{display:flex;align-items:center;gap:12px;margin-top:12px;padding:11px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:9px}
@@ -189,6 +189,40 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
 .area-chip-active .area-chip-prefix{background:#3b82f6}
 .step-card label:first-of-type{margin-top:14px}
 .cleanup-status-line{font-size:12px;color:#475569;margin-top:8px;line-height:1.4}
+
+/* === F-Report-3: Карточка проекта === */
+.pc-section{margin-bottom:22px;padding-bottom:18px;border-bottom:1px dashed #e2e8f0}
+.pc-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.pc-section-title{font-size:13px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #f1f5f9}
+.pc-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:720px){.pc-grid-2{grid-template-columns:1fr}}
+.pc-field{display:flex;flex-direction:column;margin-bottom:12px}
+.pc-field:last-child{margin-bottom:0}
+.pc-field label{display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+.pc-req{color:#dc2626;margin-left:4px}
+.pc-opt{color:#94a3b8;font-weight:400;text-transform:none;font-size:11px;letter-spacing:0;margin-left:4px}
+.pc-input{width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:9px 13px;font-size:14px;font-family:inherit;outline:none;background:#fafafa;color:#1e293b;box-sizing:border-box;transition:.15s}
+.pc-input:focus{border-color:#3b82f6;background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.pc-input.pc-error{border-color:#ef4444;background:#fef2f2}
+textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
+/* Команда */
+.pc-team-block{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:14px}
+.pc-team-title{font-size:13px;font-weight:700;color:#334155;margin-bottom:10px;text-transform:uppercase;letter-spacing:.4px}
+.pc-team-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.pc-team-list:empty + .pc-team-add{margin-top:0}
+.pc-team-list:empty::before{content:"Никого не добавлено";display:block;font-size:12px;color:#94a3b8;text-align:center;padding:14px;background:#fff;border:1px dashed #cbd5e1;border-radius:8px}
+.pc-team-member{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.pc-team-member-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pc-team-member-info{flex:1;min-width:0}
+.pc-team-member-fio{font-size:13px;font-weight:600;color:#1e293b;line-height:1.3;word-break:break-word}
+.pc-team-member-pos{font-size:11px;color:#64748b;line-height:1.3;word-break:break-word}
+.pc-team-member-roles{display:flex;gap:10px;flex-wrap:wrap;padding-top:6px;border-top:1px dashed #e2e8f0}
+.pc-team-role{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#475569;cursor:pointer;user-select:none}
+.pc-team-role input{cursor:pointer;width:13px;height:13px}
+.pc-team-add{display:grid;grid-template-columns:1fr 1fr auto;gap:6px}
+@media (max-width:520px){.pc-team-add{grid-template-columns:1fr}}
+.pc-team-add .pc-input{padding:7px 10px;font-size:12px}
+.pc-team-add .btn{font-size:12px;padding:7px 12px}
 
 /* TRANSCRIPT UPLOAD (альтернативный вход в Шаге 1) */
 .transcript-upload-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
@@ -723,13 +757,10 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
   </div>
 
   <!-- PROJECTS -->
-  <div class="card">
+  <div class="card" id="projects-card">
     <div class="card-title"><div class="card-title-icon icon-amber">🗂️</div>Проекты</div>
     <div id="projects-list" style="margin-bottom:12px"></div>
-    <div style="display:flex;gap:8px">
-      <input type="text" id="new-project" placeholder="Название проекта" style="flex:1">
-      <button class="btn btn-primary" onclick="addProject()">+ Создать проект</button>
-    </div>
+    <button class="btn btn-primary" onclick="createProjectAndOpen()" style="width:100%">+ Создать проект</button>
   </div>
 
   <!-- FUNCTIONAL AREAS -->
@@ -743,41 +774,150 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
     </div>
   </div>
 
-  <!-- PROJECT EDITOR -->
-  <div class="card" id="project-editor" style="display:none">
-    <div class="card-title"><div class="card-title-icon icon-green">✏️</div>
-      Редактирование проекта: <span id="editor-project-name" style="color:#3b82f6"></span>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-
-      <!-- Команда исполнителя -->
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Команда исполнителя</div>
-        <div id="executor-team-list" style="margin-bottom:10px"></div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <select id="executor-participant" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fafafa">
-            <option value="">— Участник —</option>
-          </select>
-          <select id="executor-position" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fafafa">
-            <option value="">— Должность —</option>
-          </select>
-          <button class="btn btn-secondary" onclick="addTeamMember('executor')" style="font-size:12px">+ Добавить в команду</button>
+  <!-- PROJECT CARD (F-Report-3) -->
+  <div class="card" id="project-card" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn btn-secondary" onclick="closeProjectCard()" style="font-size:13px">← Назад к НСИ</button>
+        <div class="card-title" style="margin:0">
+          <div class="card-title-icon icon-amber">📋</div>
+          <span id="pc-title">Карточка проекта</span>
         </div>
       </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-success" onclick="saveProjectCard(false)" id="pc-save-btn">💾 Сохранить</button>
+        <button class="btn btn-success" onclick="saveProjectCard(true)" id="pc-save-close-btn">💾 Сохранить и закрыть</button>
+      </div>
+    </div>
 
-      <!-- Команда заказчика -->
-      <div>
-        <div style="font-size:13px;font-weight:600;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Команда заказчика</div>
-        <div id="customer-team-list" style="margin-bottom:10px"></div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <select id="customer-participant" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fafafa">
-            <option value="">— Участник —</option>
-          </select>
-          <select id="customer-position" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;background:#fafafa">
-            <option value="">— Должность —</option>
-          </select>
-          <button class="btn btn-secondary" onclick="addTeamMember('customer')" style="font-size:12px">+ Добавить в команду</button>
+    <div id="pc-error-summary" style="display:none;background:#fef2f2;border:1px solid #fca5a5;color:#dc2626;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px"></div>
+
+    <!-- Раздел: Основное -->
+    <div class="pc-section">
+      <div class="pc-section-title">Основное</div>
+      <div class="pc-grid-2">
+        <div class="pc-field">
+          <label>Полное название проекта <span class="pc-req">*</span></label>
+          <input type="text" id="pc-name" class="pc-input" placeholder="Автоматизация учёта в Cemix Uzbekistan">
+        </div>
+        <div class="pc-field">
+          <label>Краткое название <span class="pc-req">*</span></label>
+          <input type="text" id="pc-short-name" class="pc-input" placeholder="Cemix Uzbekistan">
+        </div>
+        <div class="pc-field">
+          <label>Город <span class="pc-req">*</span></label>
+          <input type="text" id="pc-city" class="pc-input" placeholder="Ташкент">
+        </div>
+      </div>
+    </div>
+
+    <!-- Раздел: Стороны -->
+    <div class="pc-section">
+      <div class="pc-section-title">Стороны</div>
+      <div class="pc-grid-2">
+        <div class="pc-field">
+          <label>Заказчик (организация) <span class="pc-req">*</span></label>
+          <input type="text" id="pc-customer-org" class="pc-input" placeholder="ИП ООО «CEMIX»">
+        </div>
+        <div class="pc-field">
+          <label>Исполнитель (организация) <span class="pc-req">*</span></label>
+          <input type="text" id="pc-executor-org" class="pc-input" placeholder="ИП ООО «1С-РАРУС»">
+        </div>
+      </div>
+    </div>
+
+    <!-- Раздел: Договор -->
+    <div class="pc-section">
+      <div class="pc-section-title">Договор (основание)</div>
+      <div class="pc-grid-2">
+        <div class="pc-field">
+          <label>Номер договора <span class="pc-req">*</span></label>
+          <input type="text" id="pc-contract-num" class="pc-input" placeholder="TA25-000054">
+        </div>
+        <div class="pc-field">
+          <label>Дата договора <span class="pc-req">*</span></label>
+          <input type="text" id="pc-contract-date" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Раздел: Период проекта -->
+    <div class="pc-section">
+      <div class="pc-section-title">Период проекта</div>
+      <div class="pc-grid-2">
+        <div class="pc-field">
+          <label>Начало <span class="pc-req">*</span></label>
+          <input type="text" id="pc-proj-from" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
+        </div>
+        <div class="pc-field">
+          <label>Окончание <span class="pc-opt">(не обязательно)</span></label>
+          <input type="text" id="pc-proj-to" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Раздел: Период обследования -->
+    <div class="pc-section">
+      <div class="pc-section-title">Период обследования</div>
+      <div class="pc-grid-2">
+        <div class="pc-field">
+          <label>Начало <span class="pc-req">*</span></label>
+          <input type="text" id="pc-survey-from" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
+        </div>
+        <div class="pc-field">
+          <label>Окончание <span class="pc-opt">(не обязательно)</span></label>
+          <input type="text" id="pc-survey-to" class="pc-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Раздел: О компании Заказчика -->
+    <div class="pc-section">
+      <div class="pc-section-title">О компании Заказчика</div>
+      <div class="pc-field">
+        <label>Юридический адрес <span class="pc-req">*</span></label>
+        <textarea id="pc-customer-address" class="pc-input" rows="2" placeholder="Самаркандская область, Нуробадский район..."></textarea>
+      </div>
+      <div class="pc-field" style="max-width:240px">
+        <label>Численность персонала (чел.) <span class="pc-req">*</span></label>
+        <input type="number" id="pc-customer-headcount" class="pc-input" placeholder="77" min="1" step="1">
+      </div>
+      <div class="pc-field">
+        <label>Описание предприятия <span class="pc-req">*</span></label>
+        <textarea id="pc-customer-description" class="pc-input" rows="6" placeholder="Чем компания занимается, для какого рынка работает, ключевые направления, стратегия. 3-4 абзаца текста."></textarea>
+      </div>
+      <div class="pc-field">
+        <label>Орг.структура (XLSX) <span class="pc-opt">(на перспективу — пока заглушка)</span></label>
+        <button class="btn btn-secondary" disabled style="opacity:.6;cursor:not-allowed" title="Функция в разработке">📎 Загрузить файл</button>
+      </div>
+    </div>
+
+    <!-- Раздел: Команда -->
+    <div class="pc-section">
+      <div class="pc-section-title">Команда проекта</div>
+      <div style="font-size:12px;color:#64748b;margin-bottom:12px">
+        Минимум 1 человек с каждой стороны. У каждого должны быть отмечены роли (☑ куратор, ☑ руководитель, ☑ подписант). С каждой стороны должно быть минимум по одному куратору, руководителю и подписанту.
+      </div>
+      <div class="pc-grid-2">
+        <!-- Команда заказчика -->
+        <div class="pc-team-block">
+          <div class="pc-team-title">Заказчик</div>
+          <div id="pc-customer-team-list" class="pc-team-list"></div>
+          <div class="pc-team-add">
+            <input type="text" id="pc-new-customer-fio" class="pc-input" placeholder="ФИО (Иванов И.И.)">
+            <input type="text" id="pc-new-customer-pos" class="pc-input" placeholder="Должность">
+            <button class="btn btn-secondary" onclick="pcAddTeamMember('customer')" style="font-size:12px">+ Добавить</button>
+          </div>
+        </div>
+        <!-- Команда исполнителя -->
+        <div class="pc-team-block">
+          <div class="pc-team-title">Исполнитель</div>
+          <div id="pc-executor-team-list" class="pc-team-list"></div>
+          <div class="pc-team-add">
+            <input type="text" id="pc-new-executor-fio" class="pc-input" placeholder="ФИО (Петров П.П.)">
+            <input type="text" id="pc-new-executor-pos" class="pc-input" placeholder="Должность">
+            <button class="btn btn-secondary" onclick="pcAddTeamMember('executor')" style="font-size:12px">+ Добавить</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1364,6 +1504,23 @@ function saveSettings() {
 
 // ── TABS ─────────────────────────────────────────────
 function showTab(name, el) {
+  // F-Report-3: если уходим с НСИ при открытой карточке проекта — закрываем её мягко
+  if (name !== 'nsi' && editingProjectId) {
+    // Не вызываем closeProjectCard (он спросит подтверждение) — просто скрываем
+    // и сбрасываем state. Несохранённые изменения теряются.
+    const orig = getNSI().projects.find(p => p.id === editingProjectId);
+    if (orig && !orig.name) {
+      // Пустой только что созданный — удаляем чтоб не было мусора
+      const nsi = getNSI();
+      nsi.projects = nsi.projects.filter(p => p.id !== editingProjectId);
+      saveNSI(nsi);
+    }
+    const card = document.getElementById('project-card');
+    if (card) card.style.display = 'none';
+    pcToggleNSISections(true);
+    editingProjectId = null;
+    pcDraft = null;
+  }
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
@@ -6434,17 +6591,11 @@ function addParticipant() {
 }
 function deleteParticipant(id) { const nsi=getNSI(); nsi.participants=nsi.participants.filter(p=>p.id!==id); saveNSI(nsi); renderNSI(); }
 
-function addProject() {
-  const name = document.getElementById('new-project').value.trim();
-  if (!name) return;
-  const nsi = getNSI();
-  if (nsi.projects.find(p=>p.name===name)) return;
-  nsi.projects.push({id:Date.now(),name,executor:[],customer:[]}); saveNSI(nsi);
-  document.getElementById('new-project').value = ''; renderNSI(); updateProjectSelect();
-}
+// addProject (старая версия с инпутом) удалён — теперь создание через createProjectAndOpen
 function deleteProject(id) {
   if (!confirm('Удалить проект?')) return;
   const nsi=getNSI(); nsi.projects=nsi.projects.filter(p=>p.id!==id); saveNSI(nsi); renderNSI(); updateProjectSelect();
+  if (typeof populateReportProjectSelect === 'function') populateReportProjectSelect();
 }
 
 // ── Функциональные области ──────────────────────────
@@ -6479,54 +6630,337 @@ function deleteFunctionalArea(id) {
   renderNSI();
 }
 
+// ── F-Report-3: КАРТОЧКА ПРОЕКТА ───────────────────────
+// editingProjectId — id проекта который сейчас открыт в карточке (null = карточка закрыта)
 let editingProjectId = null;
-function openProjectEditor(id) {
+// pcDraft — данные «в полете» (ещё не сохранены). Команда хранится здесь до save.
+let pcDraft = null;
+
+// Создать новый проект и сразу открыть карточку. ID проекта присваивается сразу,
+// чтобы потом саму запись было удобно обновлять. Пустые поля валидация заметит при save.
+function createProjectAndOpen() {
+  const nsi = getNSI();
+  const newProj = pcMakeBlankProject();
+  nsi.projects.push(newProj);
+  saveNSI(nsi);
+  openProjectCard(newProj.id);
+}
+
+// Шаблон пустого проекта (новые поля F-Report-3)
+function pcMakeBlankProject() {
+  return {
+    id: Date.now(),
+    name: '',
+    shortName: '',
+    city: '',
+    customerOrg: '',
+    executorOrg: '',
+    contractNumber: '',
+    contractDate: '',
+    projectDateFrom: '',
+    projectDateTo: '',
+    surveyDateFrom: '',
+    surveyDateTo: '',
+    customerLegalAddress: '',
+    customerHeadcount: '',
+    customerDescription: '',
+    // Команда: каждый член { fio, position, isCurator, isLead, isApprover }
+    customer: [],
+    executor: []
+  };
+}
+
+// Открыть карточку проекта — скрывает все остальные секции НСИ и показывает карточку
+function openProjectCard(id) {
+  const nsi = getNSI();
+  const proj = nsi.projects.find(p => p.id === id);
+  if (!proj) return;
   editingProjectId = id;
+  // Подгружаем draft-копию (на случай если юзер захочет отменить — оригинал не пострадает)
+  pcDraft = JSON.parse(JSON.stringify(proj));
+  // Гарантируем наличие всех новых полей (миграция: старые проекты могут не иметь полей)
+  Object.assign(pcDraft, Object.assign(pcMakeBlankProject(), pcDraft));
+  // Команда — нормализуем структуру (старые проекты могли иметь {participantId, position})
+  ['customer', 'executor'].forEach(side => {
+    if (!Array.isArray(pcDraft[side])) pcDraft[side] = [];
+    pcDraft[side] = pcDraft[side].map(m => {
+      if (m.fio && m.position !== undefined) {
+        return {
+          fio: m.fio,
+          position: m.position || '',
+          isCurator: !!m.isCurator,
+          isLead: !!m.isLead,
+          isApprover: !!m.isApprover
+        };
+      }
+      // Старая схема — конвертируем
+      const p = nsi.participants.find(x => x.id === m.participantId);
+      return {
+        fio: p ? p.name : '',
+        position: m.position || '',
+        isCurator: false, isLead: false, isApprover: false
+      };
+    });
+  });
+
+  // Скрыть все карточки НСИ кроме карточки проекта
+  pcToggleNSISections(false);
+  document.getElementById('project-card').style.display = 'block';
+  document.getElementById('pc-error-summary').style.display = 'none';
+
+  // Заполнить поля формы
+  document.getElementById('pc-title').textContent = pcDraft.name ? `Карточка проекта: ${pcDraft.name}` : 'Новый проект';
+  document.getElementById('pc-name').value = pcDraft.name || '';
+  document.getElementById('pc-short-name').value = pcDraft.shortName || '';
+  document.getElementById('pc-city').value = pcDraft.city || '';
+  document.getElementById('pc-customer-org').value = pcDraft.customerOrg || '';
+  document.getElementById('pc-executor-org').value = pcDraft.executorOrg || '';
+  document.getElementById('pc-contract-num').value = pcDraft.contractNumber || '';
+  document.getElementById('pc-contract-date').value = pcDraft.contractDate || '';
+  document.getElementById('pc-proj-from').value = pcDraft.projectDateFrom || '';
+  document.getElementById('pc-proj-to').value = pcDraft.projectDateTo || '';
+  document.getElementById('pc-survey-from').value = pcDraft.surveyDateFrom || '';
+  document.getElementById('pc-survey-to').value = pcDraft.surveyDateTo || '';
+  document.getElementById('pc-customer-address').value = pcDraft.customerLegalAddress || '';
+  document.getElementById('pc-customer-headcount').value = pcDraft.customerHeadcount || '';
+  document.getElementById('pc-customer-description').value = pcDraft.customerDescription || '';
+
+  pcRenderTeam('customer');
+  pcRenderTeam('executor');
+  document.getElementById('project-card').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// Скрыть/показать остальные секции НСИ при открытии/закрытии карточки
+function pcToggleNSISections(visible) {
+  const display = visible ? '' : 'none';
+  // Все .card на странице NSI кроме project-card
+  const page = document.getElementById('page-nsi');
+  if (!page) return;
+  page.querySelectorAll('.card').forEach(c => {
+    if (c.id !== 'project-card') c.style.display = display;
+  });
+}
+
+// Закрыть карточку — вернуться к списку НСИ. Несохранённые изменения теряются.
+function closeProjectCard() {
+  // Если в draft есть несохранённые изменения — спросим
+  if (editingProjectId && pcDraft) {
+    const orig = getNSI().projects.find(p => p.id === editingProjectId);
+    if (orig && JSON.stringify(orig) !== JSON.stringify(pcDraft)) {
+      if (!confirm('Есть несохранённые изменения. Закрыть без сохранения?')) return;
+    }
+    // Если это только что созданный проект и юзер закрывает без сохранения — удалим его
+    // (чтобы не оставались мусорные пустые проекты в списке).
+    if (orig && !orig.name) {
+      const nsi = getNSI();
+      nsi.projects = nsi.projects.filter(p => p.id !== editingProjectId);
+      saveNSI(nsi);
+    }
+  }
+  document.getElementById('project-card').style.display = 'none';
+  pcToggleNSISections(true);
+  editingProjectId = null;
+  pcDraft = null;
+  renderNSI();
+  updateProjectSelect();
+  // Также обновим список проектов в Отчёте если был выбран
+  if (typeof populateReportProjectSelect === 'function') populateReportProjectSelect();
+}
+
+// Рендерит блок команды (заказчика или исполнителя) с чекбоксами ролей
+function pcRenderTeam(side) {
+  const list = document.getElementById(`pc-${side}-team-list`);
+  if (!list) return;
+  const team = pcDraft[side] || [];
+  if (!team.length) {
+    list.innerHTML = '';
+    return;
+  }
+  list.innerHTML = team.map((m, idx) => `
+    <div class="pc-team-member">
+      <div class="pc-team-member-head">
+        <div class="pc-team-member-info">
+          <div class="pc-team-member-fio">${escHtml(m.fio)}</div>
+          <div class="pc-team-member-pos">${escHtml(m.position)}</div>
+        </div>
+        <button class="protocol-del" onclick="pcRemoveTeamMember('${side}',${idx})" title="Удалить">×</button>
+      </div>
+      <div class="pc-team-member-roles">
+        <label class="pc-team-role">
+          <input type="checkbox" ${m.isCurator ? 'checked' : ''} onchange="pcToggleRole('${side}',${idx},'isCurator',this.checked)">
+          Куратор
+        </label>
+        <label class="pc-team-role">
+          <input type="checkbox" ${m.isLead ? 'checked' : ''} onchange="pcToggleRole('${side}',${idx},'isLead',this.checked)">
+          Руководитель
+        </label>
+        <label class="pc-team-role">
+          <input type="checkbox" ${m.isApprover ? 'checked' : ''} onchange="pcToggleRole('${side}',${idx},'isApprover',this.checked)">
+          Подписант «Утверждаю»
+        </label>
+      </div>
+    </div>
+  `).join('');
+}
+
+function pcAddTeamMember(side) {
+  if (!pcDraft) return;
+  const fio = document.getElementById(`pc-new-${side}-fio`).value.trim();
+  const pos = document.getElementById(`pc-new-${side}-pos`).value.trim();
+  if (!fio) { alert('Введи ФИО'); return; }
+  if (!pos) { alert('Введи должность'); return; }
+  if (pcDraft[side].find(m => m.fio.toLowerCase() === fio.toLowerCase())) {
+    alert('Этот человек уже добавлен в команду'); return;
+  }
+  pcDraft[side].push({
+    fio, position: pos,
+    isCurator: false, isLead: false, isApprover: false
+  });
+  document.getElementById(`pc-new-${side}-fio`).value = '';
+  document.getElementById(`pc-new-${side}-pos`).value = '';
+  pcRenderTeam(side);
+}
+
+function pcRemoveTeamMember(side, idx) {
+  if (!pcDraft) return;
+  if (!confirm('Удалить участника из команды?')) return;
+  pcDraft[side].splice(idx, 1);
+  pcRenderTeam(side);
+}
+
+function pcToggleRole(side, idx, role, checked) {
+  if (!pcDraft) return;
+  if (pcDraft[side][idx]) pcDraft[side][idx][role] = !!checked;
+}
+
+// Собрать draft-объект из формы
+function pcCollectDraft() {
+  if (!pcDraft) return null;
+  pcDraft.name = document.getElementById('pc-name').value.trim();
+  pcDraft.shortName = document.getElementById('pc-short-name').value.trim();
+  pcDraft.city = document.getElementById('pc-city').value.trim();
+  pcDraft.customerOrg = document.getElementById('pc-customer-org').value.trim();
+  pcDraft.executorOrg = document.getElementById('pc-executor-org').value.trim();
+  pcDraft.contractNumber = document.getElementById('pc-contract-num').value.trim();
+  pcDraft.contractDate = document.getElementById('pc-contract-date').value.trim();
+  pcDraft.projectDateFrom = document.getElementById('pc-proj-from').value.trim();
+  pcDraft.projectDateTo = document.getElementById('pc-proj-to').value.trim();
+  pcDraft.surveyDateFrom = document.getElementById('pc-survey-from').value.trim();
+  pcDraft.surveyDateTo = document.getElementById('pc-survey-to').value.trim();
+  pcDraft.customerLegalAddress = document.getElementById('pc-customer-address').value.trim();
+  pcDraft.customerHeadcount = document.getElementById('pc-customer-headcount').value.trim();
+  pcDraft.customerDescription = document.getElementById('pc-customer-description').value.trim();
+  // Команда уже актуальна в pcDraft (поддерживается через pcAddTeamMember/pcToggleRole)
+  return pcDraft;
+}
+
+// Валидация — возвращает массив ошибок [{fieldId?, message}] или [] если всё ок
+function pcValidate(draft) {
+  const errors = [];
+  const reqText = [
+    ['pc-name', draft.name, 'Полное название проекта'],
+    ['pc-short-name', draft.shortName, 'Краткое название'],
+    ['pc-city', draft.city, 'Город'],
+    ['pc-customer-org', draft.customerOrg, 'Заказчик (организация)'],
+    ['pc-executor-org', draft.executorOrg, 'Исполнитель (организация)'],
+    ['pc-contract-num', draft.contractNumber, 'Номер договора'],
+    ['pc-customer-address', draft.customerLegalAddress, 'Юридический адрес'],
+    ['pc-customer-description', draft.customerDescription, 'Описание предприятия']
+  ];
+  reqText.forEach(([id, val, label]) => {
+    if (!String(val || '').trim()) errors.push({fieldId: id, message: `Заполни поле «${label}»`});
+  });
+  // Численность — число > 0
+  const headcount = parseInt(draft.customerHeadcount);
+  if (!headcount || headcount < 1) {
+    errors.push({fieldId: 'pc-customer-headcount', message: 'Численность персонала должна быть положительным числом'});
+  }
+  // Даты — валидный формат, обязательные «От» — должны быть заполнены
+  const dates = [
+    ['pc-contract-date', draft.contractDate, 'Дата договора', true],
+    ['pc-proj-from', draft.projectDateFrom, 'Период проекта — Начало', true],
+    ['pc-proj-to', draft.projectDateTo, 'Период проекта — Окончание', false],
+    ['pc-survey-from', draft.surveyDateFrom, 'Период обследования — Начало', true],
+    ['pc-survey-to', draft.surveyDateTo, 'Период обследования — Окончание', false]
+  ];
+  dates.forEach(([id, val, label, required]) => {
+    const v = String(val || '').trim();
+    if (!v) {
+      if (required) errors.push({fieldId: id, message: `Заполни поле «${label}»`});
+    } else if (!isValidDateStr(v)) {
+      errors.push({fieldId: id, message: `Поле «${label}»: проверь формат ДД.ММ.ГГГГ и реальный календарь`});
+    }
+  });
+  // Команда — минимум 1 с каждой стороны + по 1 куратору/руководителю/подписанту
+  ['customer', 'executor'].forEach(side => {
+    const sideName = side === 'customer' ? 'Заказчика' : 'Исполнителя';
+    const team = draft[side] || [];
+    if (!team.length) {
+      errors.push({message: `Добавь хотя бы одного человека в команду ${sideName}`});
+      return;
+    }
+    if (!team.find(m => m.isCurator)) errors.push({message: `Команда ${sideName}: отметь хотя бы одного Куратора`});
+    if (!team.find(m => m.isLead)) errors.push({message: `Команда ${sideName}: отметь хотя бы одного Руководителя`});
+    if (!team.find(m => m.isApprover)) errors.push({message: `Команда ${sideName}: отметь хотя бы одного Подписанта «Утверждаю»`});
+  });
+  return errors;
+}
+
+// Сохранить — валидирует и пишет в localStorage. close=true — закрывает карточку после сохранения
+function saveProjectCard(close) {
+  if (!pcDraft || !editingProjectId) return;
+  const draft = pcCollectDraft();
+  // Сначала снимаем подсветку с прошлой валидации
+  document.querySelectorAll('#project-card .pc-error').forEach(el => el.classList.remove('pc-error'));
+  const errors = pcValidate(draft);
+  if (errors.length) {
+    // Подсветить поля
+    errors.forEach(e => {
+      if (e.fieldId) {
+        const el = document.getElementById(e.fieldId);
+        if (el) el.classList.add('pc-error');
+      }
+    });
+    // Показать сводку ошибок наверху
+    const sum = document.getElementById('pc-error-summary');
+    sum.innerHTML = '<strong>Не сохранено — есть ошибки:</strong><ul style="margin:6px 0 0 18px;padding:0">' +
+      errors.map(e => `<li>${escHtml(e.message)}</li>`).join('') + '</ul>';
+    sum.style.display = '';
+    sum.scrollIntoView({behavior:'smooth', block:'start'});
+    return;
+  }
+  // Записать в localStorage
   const nsi = getNSI();
-  const proj = nsi.projects.find(p=>p.id===id);
-  if (!proj) return;
-  document.getElementById('editor-project-name').textContent = proj.name;
-  document.getElementById('project-editor').style.display = 'block';
-  document.getElementById('project-editor').scrollIntoView({behavior:'smooth',block:'start'});
-  ['executor-participant','customer-participant'].forEach(selId => {
-    const sel = document.getElementById(selId);
-    sel.innerHTML = '<option value="">— Участник —</option>' +
-      nsi.participants.map(p=>`<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
-  });
-  ['executor-position','customer-position'].forEach(selId => {
-    const sel = document.getElementById(selId);
-    sel.innerHTML = '<option value="">— Должность —</option>' +
-      nsi.positions.map(pos=>`<option value="${escHtml(pos)}">${escHtml(pos)}</option>`).join('');
-  });
-  renderTeams(proj);
+  const ix = nsi.projects.findIndex(p => p.id === editingProjectId);
+  if (ix < 0) { alert('Проект не найден в БД'); return; }
+  nsi.projects[ix] = JSON.parse(JSON.stringify(draft));
+  saveNSI(nsi);
+  // Toast
+  pcShowToast('✓ Проект сохранён');
+  if (close) {
+    setTimeout(() => closeProjectCard(), 400);
+  } else {
+    // Обновить заголовок (если изменилось имя)
+    document.getElementById('pc-title').textContent = draft.name ? `Карточка проекта: ${draft.name}` : 'Новый проект';
+    document.getElementById('pc-error-summary').style.display = 'none';
+    // Обновить связанные select'ы где есть проекты
+    updateProjectSelect();
+    if (typeof populateReportProjectSelect === 'function') populateReportProjectSelect();
+  }
 }
-function renderTeams(proj) {
-  const nsi = getNSI();
-  ['executor','customer'].forEach(side => {
-    const list = document.getElementById(side+'-team-list');
-    const team = proj[side]||[];
-    if (!team.length) { list.innerHTML='<div style="font-size:12px;color:#94a3b8;padding:4px 0">Нет участников</div>'; return; }
-    list.innerHTML = team.map((m,i) => {
-      const p = nsi.participants.find(x=>x.id===m.participantId);
-      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#f8fafc;border-radius:7px;margin-bottom:5px;font-size:13px">
-        <div><div style="font-weight:600;color:#1e293b">${escHtml(p?.name||'?')}</div>
-        <div style="color:#64748b;font-size:12px">${escHtml(m.position)}</div></div>
-        <button class="protocol-del" onclick="removeTeamMember('${side}',${i})">×</button></div>`;
-    }).join('');
-  });
-}
-function addTeamMember(side) {
-  const pId = parseInt(document.getElementById(side+'-participant').value);
-  const pos = document.getElementById(side+'-position').value;
-  if (!pId||!pos) { alert('Выбери участника и должность'); return; }
-  const nsi=getNSI(); const proj=nsi.projects.find(p=>p.id===editingProjectId);
-  if (!proj) return;
-  if (proj[side].find(m=>m.participantId===pId)) { alert('Уже добавлен'); return; }
-  proj[side].push({participantId:pId,position:pos}); saveNSI(nsi); renderTeams(proj);
-}
-function removeTeamMember(side,idx) {
-  const nsi=getNSI(); const proj=nsi.projects.find(p=>p.id===editingProjectId);
-  if (!proj) return; proj[side].splice(idx,1); saveNSI(nsi); renderTeams(proj);
+
+// Простой toast в правом нижнем углу
+function pcShowToast(text) {
+  let t = document.getElementById('pc-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'pc-toast';
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#10b981;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:500;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:9999;transition:opacity .3s';
+    document.body.appendChild(t);
+  }
+  t.textContent = text;
+  t.style.opacity = '1';
+  setTimeout(() => { t.style.opacity = '0'; }, 2000);
 }
 
 function renderNSI() {
@@ -6546,10 +6980,11 @@ function renderNSI() {
   const projList = document.getElementById('projects-list');
   if (projList) projList.innerHTML = nsi.projects.length ? nsi.projects.map(proj => {
     const ec=proj.executor?.length||0, cc=proj.customer?.length||0;
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fafc;border-radius:9px;margin-bottom:7px;cursor:pointer;border:1px solid #e2e8f0" onclick="openProjectEditor(${proj.id})">
-      <div><div style="font-size:14px;font-weight:600">${escHtml(proj.name)}</div>
-      <div style="font-size:12px;color:#64748b">Исполнитель: ${ec} · Заказчик: ${cc}</div></div>
-      <div style="display:flex;gap:6px;align-items:center"><span style="font-size:12px;color:#3b82f6">Редактировать →</span>
+    const displayName = proj.name || '<em style="color:#94a3b8">(без названия)</em>';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fafc;border-radius:9px;margin-bottom:7px;cursor:pointer;border:1px solid #e2e8f0" onclick="openProjectCard(${proj.id})">
+      <div><div style="font-size:14px;font-weight:600">${displayName.startsWith('<') ? displayName : escHtml(displayName)}</div>
+      <div style="font-size:12px;color:#64748b">Заказчик: ${cc} · Исполнитель: ${ec}</div></div>
+      <div style="display:flex;gap:6px;align-items:center"><span style="font-size:12px;color:#3b82f6">Открыть →</span>
       <button class="protocol-del" onclick="event.stopPropagation();deleteProject(${proj.id})">×</button></div></div>`;
   }).join('') : '<div style="font-size:12px;color:#94a3b8">Нет проектов</div>';
 
@@ -6567,10 +7002,7 @@ function renderNSI() {
     ).join('') : '<div style="font-size:12px;color:#94a3b8">Нет функциональных областей</div>';
   }
 
-  if (editingProjectId) {
-    const proj = nsi.projects.find(p=>p.id===editingProjectId);
-    if (proj) renderTeams(proj);
-  }
+  // Карточка проекта рендерится через pcRenderTeam независимо от renderNSI
 }
 
 function updateProjectSelect() {
@@ -6589,8 +7021,15 @@ function getProjectTeamText() {
   const proj = nsi.projects.find(p=>p.id===projId);
   if (!proj) return '';
   const lines = [];
-  (proj.executor||[]).forEach(m=>{ const p=nsi.participants.find(x=>x.id===m.participantId); if(p) lines.push(`Команда исполнителя | ${m.position} | ${p.name}`); });
-  (proj.customer||[]).forEach(m=>{ const p=nsi.participants.find(x=>x.id===m.participantId); if(p) lines.push(`Команда заказчика | ${m.position} | ${p.name}`); });
+  // F-Report-3: новая структура — у каждого члена команды есть fio + position напрямую
+  (proj.executor||[]).forEach(m => {
+    const fio = m.fio || (nsi.participants.find(x => x.id === m.participantId)?.name); // fallback на старую схему
+    if (fio) lines.push(`Команда исполнителя | ${m.position || ''} | ${fio}`);
+  });
+  (proj.customer||[]).forEach(m => {
+    const fio = m.fio || (nsi.participants.find(x => x.id === m.participantId)?.name);
+    if (fio) lines.push(`Команда заказчика | ${m.position || ''} | ${fio}`);
+  });
   return lines.join('\n');
 }
 
