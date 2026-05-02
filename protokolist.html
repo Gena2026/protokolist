@@ -558,10 +558,27 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
 <div class="page" id="page-report">
   <div class="card">
     <div class="card-title"><div class="card-title-icon icon-amber">📄</div>Отчёт об обследовании</div>
-    <p style="font-size:13px;color:#64748b;margin-bottom:18px">Выбери протоколы — Gemini составит сводный отчёт</p>
+    <p style="font-size:13px;color:#64748b;margin-bottom:16px">Выбери проект и протоколы — Gemini составит сводный отчёт</p>
+
+    <div class="step3-grid" style="margin-bottom:14px">
+      <div class="step3-form">
+        <div class="step3-field">
+          <label>Проект <span style="color:#dc2626">*</span></label>
+          <select id="report-project" class="step3-input" onchange="onReportProjectChange()">
+            <option value="">— выбери проект —</option>
+          </select>
+        </div>
+        <div class="step3-field">
+          <label>Дата отчёта</label>
+          <input type="text" id="report-date" class="step3-input" placeholder="ДД.ММ.ГГГГ" maxlength="10" oninput="formatDateInput(this)">
+        </div>
+      </div>
+    </div>
+
     <div class="list-header">
       <span class="list-header-label">Протоколы</span>
-      <button class="btn btn-secondary" style="padding:5px 11px;font-size:12px" onclick="selectAll('rp')">Выбрать все</button>
+      <span id="report-counter" style="margin-left:auto;font-size:12px;color:#64748b">Выбрано: 0 из 0</span>
+      <button class="btn btn-secondary" style="padding:5px 11px;font-size:12px;margin-left:10px" onclick="toggleSelectAllReport()" id="report-select-all-btn">Выбрать все</button>
     </div>
     <div id="report-protocol-list"></div>
     <label style="margin-top:18px">Дополнительные инструкции (необязательно)</label>
@@ -1352,7 +1369,7 @@ function showTab(name, el) {
   el.classList.add('active');
   document.getElementById('page-' + name).classList.add('active');
   if (name === 'protocol') { updateProjectSelect(); renderFunctionalAreaChips(); suggestProtocolNumber(); }
-  if (name === 'report') renderList('report');
+  if (name === 'report') initReportTab();
   if (name === 'registry') renderRegistryTab();
   if (name === 'library') { renderLibrary(); refreshGoogleSpace(); updateStorageInfo(); }
   if (name === 'nsi') renderNSI();
@@ -4775,9 +4792,11 @@ async function exportRegistryXlsx() {
 
 function renderList(tab) {
   const isReport = tab === 'report';
-  const el = document.getElementById(isReport ? 'report-protocol-list' : 'registry-protocol-list');
+  // F-Report-1: для report-вкладки рендеринг через специальную функцию (фильтрация по проекту)
+  if (isReport) { renderReportList(); return; }
+  const el = document.getElementById('registry-protocol-list');
   if (!el) return; // E4: для tab='registry' элемента больше нет — старая логика выкл.
-  const prefix = isReport ? 'rp' : 'rg';
+  const prefix = 'rg';
   const list = getProtocols();
   if (!list.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div>Нет сохранённых протоколов.<br>Создай протокол на вкладке «Протокол встречи» — он добавится сюда автоматически.</div>`;
@@ -4791,8 +4810,119 @@ function renderList(tab) {
           <div class="protocol-title">${escHtml(p.title)}</div>
           <div class="protocol-date">${p.date}</div>
         </div>
-        ${isReport ? `<button class="protocol-del" onclick="event.stopPropagation();deleteProtocol(${p.id})" title="Удалить">×</button>` : ''}
       </div>`).join('');
+}
+
+// ── F-Report-1: ВКЛАДКА ОТЧЁТ ───────────────────────────
+const REPORT_PROJECT_LS_KEY = 'report_last_project_id';
+
+// Инициализация вкладки — вызывается из showTab('report')
+function initReportTab() {
+  populateReportProjectSelect();
+  // Восстанавливаем последний выбранный проект из localStorage
+  const saved = localStorage.getItem(REPORT_PROJECT_LS_KEY);
+  const sel = document.getElementById('report-project');
+  if (saved && sel) {
+    const exists = Array.from(sel.options).some(o => o.value === saved);
+    if (exists) sel.value = saved;
+  }
+  // Авто-заполнение даты сегодня (если поле пустое)
+  const dateInput = document.getElementById('report-date');
+  if (dateInput && !dateInput.value) dateInput.value = today();
+  renderReportList();
+}
+
+// Заполняем select проектами из НСИ
+function populateReportProjectSelect() {
+  const sel = document.getElementById('report-project');
+  if (!sel) return;
+  const nsi = getNSI();
+  const projects = nsi.projects || [];
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">— выбери проект —</option>' +
+    projects.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
+  if (currentVal) sel.value = currentVal;
+}
+
+// Колбэк смены проекта — запоминаем + перерисовываем список
+function onReportProjectChange() {
+  const sel = document.getElementById('report-project');
+  const val = sel ? sel.value : '';
+  if (val) localStorage.setItem(REPORT_PROJECT_LS_KEY, val);
+  else localStorage.removeItem(REPORT_PROJECT_LS_KEY);
+  renderReportList();
+}
+
+// Возвращает протоколы выбранного проекта (без projectId — не показываем)
+function getReportProtocols() {
+  const sel = document.getElementById('report-project');
+  const projectId = sel ? parseInt(sel.value) : 0;
+  if (!projectId) return [];
+  return getProtocols().filter(p => p.projectId === projectId);
+}
+
+// Рендеринг списка протоколов на вкладке Отчёт (фильтр по проекту)
+function renderReportList() {
+  const el = document.getElementById('report-protocol-list');
+  if (!el) return;
+  const sel = document.getElementById('report-project');
+  const projectId = sel ? parseInt(sel.value) : 0;
+
+  if (!projectId) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div>Сначала выбери проект сверху.<br>Список протоколов появится после выбора.</div>`;
+    updateReportCounter();
+    return;
+  }
+
+  const list = getReportProtocols();
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div>В этом проекте пока нет протоколов.<br>Создай протокол на вкладке «Протокол встречи» — он добавится сюда автоматически.</div>`;
+    updateReportCounter();
+    return;
+  }
+
+  el.innerHTML = list.map(p => `
+    <div class="protocol-item" onclick="document.getElementById('rp-${p.id}').click()">
+      <input type="checkbox" id="rp-${p.id}" value="${p.id}" onclick="event.stopPropagation()" onchange="updateReportCounter()">
+      <div class="protocol-meta">
+        <div class="protocol-title">${escHtml(p.title)}</div>
+        <div class="protocol-date">${p.date}</div>
+      </div>
+      <button class="protocol-del" onclick="event.stopPropagation();deleteProtocol(${p.id})" title="Удалить">×</button>
+    </div>`).join('');
+  updateReportCounter();
+}
+
+// Обновить counter «Выбрано: X из Y» и состояние кнопки «Выбрать все/Снять все»
+function updateReportCounter() {
+  const counter = document.getElementById('report-counter');
+  const btn = document.getElementById('report-select-all-btn');
+  if (!counter) return;
+  const all = document.querySelectorAll('input[id^="rp-"]');
+  const checked = document.querySelectorAll('input[id^="rp-"]:checked');
+  counter.textContent = `Выбрано: ${checked.length} из ${all.length}`;
+  if (btn) {
+    if (all.length === 0) {
+      btn.textContent = 'Выбрать все';
+      btn.disabled = true;
+    } else if (checked.length === all.length) {
+      btn.textContent = 'Снять все';
+      btn.disabled = false;
+    } else {
+      btn.textContent = 'Выбрать все';
+      btn.disabled = false;
+    }
+  }
+}
+
+// Кнопка-переключатель «Выбрать все / Снять все»
+function toggleSelectAllReport() {
+  const all = document.querySelectorAll('input[id^="rp-"]');
+  if (!all.length) return;
+  const checked = document.querySelectorAll('input[id^="rp-"]:checked');
+  const target = checked.length === all.length ? false : true;
+  all.forEach(c => c.checked = target);
+  updateReportCounter();
 }
 
 function deleteProtocol(id) {
@@ -4820,6 +4950,18 @@ const escHtml = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;'
 
 // ── GENERATE REPORT ───────────────────────────────────
 async function generateReport() {
+  // F-Report-1: валидация проекта
+  const projSel = document.getElementById('report-project');
+  const projectId = projSel ? parseInt(projSel.value) : 0;
+  if (!projectId) { showStatus('report-status', 'error', 'Сначала выбери проект'); return; }
+
+  // Валидация даты (если введена — должна быть валидной; пустая = сегодня)
+  const dateRaw = document.getElementById('report-date')?.value?.trim() || '';
+  if (dateRaw && !isValidDateStr(dateRaw)) {
+    showStatus('report-status', 'error', 'Проверь дату отчёта: формат ДД.ММ.ГГГГ');
+    return;
+  }
+
   const checked = [...document.querySelectorAll('input[id^="rp-"]:checked')].map(c => c.value);
   if (!checked.length) { showStatus('report-status', 'error', 'Выбери хотя бы один протокол'); return; }
   const sel = getProtocols().filter(p => checked.includes(String(p.id)));
