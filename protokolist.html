@@ -1561,6 +1561,7 @@ async function loadSessionToMainPage(sessionId) {
   currentTranscriptText = session.transcript || '';
   currentProtocolText = '';
   currentRequirementsText = '';
+  currentReportTheses = []; // F-Report-2a: тезисы — это per-protocol, при загрузке сессии сбрасываем
   uploadState = 'ready';
 
   // ── 2. Заполняем форму ──
@@ -3559,6 +3560,50 @@ function MERGE_THESES_PROMPT(thesesParts, title) {
 ${thesesParts.map((t, i) => `=== ТЕЗИСЫ ФРАГМЕНТА ${i + 1} ===\n${t}`).join('\n\n')}`;
 }
 
+// F-Report-2a: промпт для извлечения структурных тезисов под отчёт об обследовании.
+// На вход — полный протокол (готовый текст). На выход — JSON-массив тем,
+// каждая тема: { topic, areaName, asIs, toBe }, где asIs/toBe — 1-2 предложения.
+function REPORT_THESES_PROMPT(protocolText, selectedAreasText) {
+  return `Ты — IT-аналитик. Извлеки из готового протокола встречи СЖАТЫЕ ТЕЗИСЫ для отчёта об обследовании.
+
+ЗАДАЧА:
+В разделе «Тезисы интервью» протокола описаны темы — каждая с подзаголовком и подразделами «Как есть» (As Is) и «Как будет» (To Be).
+В отчёте об обследовании эти же темы должны быть отражены КРАТКО — 1–2 предложения на «Как есть» и 1–2 предложения на «Как будет».
+
+⚠️ ВАЖНО:
+— Сохрани ВСЕ темы что есть в протоколе. Не объединяй, не пропускай. Каждая тема — отдельный объект в JSON.
+— Сжимай 2–6 абзацев в 1–2 ёмких предложения. Сохраняй конкретику: названия систем, документов, ролей, статусов, ключевых правил.
+— НЕ пересказывай общими словами «обсуждалась схема работы». Конкретно: «Закупки оформляются через 1С: Документооборот; согласование с юристом, финдиректором и гендиректором.»
+— Если в протоколе под темой нет «Как будет» (только «Как есть» — нет TO-BE) — поле "toBe" верни пустой строкой "".
+— Если есть «Как будет» — обязательно отрази суть TO-BE в 1–2 предложениях.
+
+СПИСОК ФУНКЦИОНАЛЬНЫХ ОБЛАСТЕЙ ВСТРЕЧИ (выбраны заранее пользователем):
+${selectedAreasText || '[не указано]'}
+
+Каждой теме поставь в соответствие ОДНУ функ. область из списка выше — на основе содержания темы.
+Если в списке только одна область — все темы относятся к ней.
+
+ФОРМАТ ОТВЕТА: ТОЛЬКО валидный JSON-массив, без преамбулы, без markdown-обёртки, без \`\`\`json.
+Каждый элемент массива:
+{
+  "topic": "Название темы (как в протоколе, дословно)",
+  "areaName": "Название функциональной области из списка выше",
+  "asIs": "1–2 предложения о текущем состоянии",
+  "toBe": "1–2 предложения о целевом состоянии (или пустая строка если в протоколе не описано)"
+}
+
+ПРИМЕР правильного ответа:
+[
+  {"topic": "Подбор поставщиков", "areaName": "Закупки", "asIs": "Подбор поставщиков выполняется отделом закупок вне 1С через тендеры в Excel и переписку по email. Договор оформляется в 1С: Документооборот после согласования.", "toBe": "Перенести процесс согласования договоров в единую систему с автоматическим перезапуском после правок юриста."},
+  {"topic": "Приёмка товара", "areaName": "Склады", "asIs": "Приёмка ведётся вручную в Excel; кладовщик сверяет ТТН и инициирует расхождения по почте.", "toBe": ""}
+]
+
+Если в протоколе НЕТ структуры тезисов (тезисы пустые / в свободной форме / тема всего одна) — всё равно верни хотя бы один объект с темой «Общие сведения» и кратким описанием встречи.
+
+ПРОТОКОЛ ВСТРЕЧИ:
+${protocolText}`;
+}
+
 // Извлекает таблицу участников из всех частей и объединяет уникальных.
 function MERGE_PARTICIPANTS_PROMPT(protocolParts, title, teamText) {
   return `Извлеки из фрагментов протокола встречи «${title || 'без названия'}» всех участников и сформируй единую таблицу.
@@ -3751,6 +3796,79 @@ function replaceSectionInProtocol(protocolText, sectionHeader, newBody, nextSect
   return before + '\n' + body + '\n\n' + after;
 }
 
+// F-Report-2a: глобальная переменная под извлечённые тезисы для отчёта.
+// Заполняется в generateProtocol после успешной генерации основного протокола.
+let currentReportTheses = []; // [{topic, areaId, areaName, asIs, toBe}, ...]
+
+// Парсит JSON-ответ Gemini, обрабатывает кейс «обёрнут в ```json ... ```» и т.п.
+function _parseReportThesesJson(raw) {
+  if (!raw || typeof raw !== 'string') return [];
+  let s = raw.trim();
+  // Снимаем markdown-обёртку если есть (Gemini иногда оборачивает несмотря на запрет)
+  if (s.startsWith('```')) {
+    s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  }
+  // Иногда Gemini добавляет преамбулу — ищем первую `[` и последнюю `]`
+  const a = s.indexOf('[');
+  const b = s.lastIndexOf(']');
+  if (a >= 0 && b > a) s = s.slice(a, b + 1);
+  try {
+    const arr = JSON.parse(s);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(x => x && typeof x === 'object' && typeof x.topic === 'string');
+  } catch (e) {
+    console.warn('[report-theses] JSON parse failed:', e.message, 'raw[0..200]=', raw.slice(0, 200));
+    return [];
+  }
+}
+
+// Сопоставляет имя области (как назвал его Gemini) с её id из выбранных пользователем.
+// Возвращает null если не нашли точного совпадения (значит Gemini сочинил).
+function _resolveAreaIdForTheses(areaName, selectedAreas) {
+  if (!areaName || !selectedAreas || !selectedAreas.length) return null;
+  const norm = s => String(s || '').trim().toLowerCase();
+  const target = norm(areaName);
+  // Точное совпадение
+  let match = selectedAreas.find(a => norm(a.name) === target);
+  if (match) return match.id;
+  // Подстрока
+  match = selectedAreas.find(a => norm(a.name).includes(target) || target.includes(norm(a.name)));
+  if (match) return match.id;
+  return null;
+}
+
+// Главный извлекатель — вызывается после успешной генерации протокола.
+// Возвращает массив тезисов; никогда не падает (на ошибке вернёт []).
+async function extractReportTheses(protocolText, selectedAreas) {
+  if (!protocolText || !protocolText.trim()) return [];
+  const selectedAreasText = (selectedAreas || []).map(a => a.name).join(', ');
+  try {
+    const raw = await callGemini([{
+      text: REPORT_THESES_PROMPT(protocolText, selectedAreasText)
+    }]);
+    const items = _parseReportThesesJson(raw);
+    // Нормализация: добавляем areaId, чистим поля
+    const fallbackAreaId = (selectedAreas && selectedAreas.length === 1) ? selectedAreas[0].id : null;
+    const fallbackAreaName = (selectedAreas && selectedAreas.length === 1) ? selectedAreas[0].name : '';
+    return items.map(it => {
+      const areaId = _resolveAreaIdForTheses(it.areaName, selectedAreas) || fallbackAreaId;
+      const areaName = areaId
+        ? (selectedAreas.find(a => a.id === areaId)?.name || it.areaName || fallbackAreaName)
+        : (it.areaName || fallbackAreaName);
+      return {
+        topic:   String(it.topic || '').trim(),
+        areaId:  areaId,
+        areaName: areaName,
+        asIs:    String(it.asIs || '').trim(),
+        toBe:    String(it.toBe || '').trim()
+      };
+    }).filter(it => it.topic); // выбрасываем пустые
+  } catch (e) {
+    console.warn('[report-theses] extraction failed:', e.message);
+    return []; // fallback: пустой массив. На F-Report-4 это будет означать «протокол без тезисов отчёта»
+  }
+}
+
 // ── GENERATE PROTOCOL ─────────────────────────────────
 async function generateProtocol() {
   const manualText = document.getElementById('manual-transcript').value.trim();
@@ -3810,6 +3928,7 @@ async function generateProtocol() {
   markStepStart(3);   // хронометраж Шага 3
   // Don't reset currentTranscriptText here — Whisper may have already populated it in background
   currentRequirementsText = '';
+  currentReportTheses = []; // F-Report-2a: сброс перед новой генерацией
 
   try {
     setBusy('generating');
@@ -4015,6 +4134,19 @@ async function generateProtocol() {
       showAP('Готово', 99, '');
     }
 
+    // F-Report-2a: извлекаем структурные тезисы для будущего отчёта об обследовании.
+    // Никогда не блокирует сохранение — на ошибке вернёт [] и протокол всё равно сохранится.
+    _silentInfo('Извлекаю тезисы для отчёта...');
+    showAP('Тезисы для отчёта...', 95, 'Сжатый формат для отчёта об обследовании');
+    try {
+      currentReportTheses = await extractReportTheses(protocolText, selectedAreas);
+      console.log('[report-theses] extracted:', currentReportTheses.length, 'topics');
+    } catch (e) {
+      console.warn('[report-theses] failed (non-blocking):', e);
+      currentReportTheses = [];
+    }
+    showAP('Готово', 99, '');
+
     hideAP();
     setStepState(3, 'done', '✓ готово' + markStepDoneDuration(3));
     setStepHint(3, 'Скачай .docx ниже. Протокол уже автоматически сохранён в Отчёт об обследовании и Реестр требований.');
@@ -4107,7 +4239,10 @@ function saveProtocol(opts = {}) {
     // E2 поля:
     projectId,
     protocolNumber,
-    functionalAreaIds
+    functionalAreaIds,
+    // F-Report-2a: структурные тезисы для отчёта об обследовании.
+    // Массив { topic, areaId, areaName, asIs, toBe }. Может быть [] если извлечение не удалось.
+    reportTheses: Array.isArray(currentReportTheses) ? currentReportTheses : []
   };
   list.unshift(savedProtocol);
   localStorage.setItem('protocols', JSON.stringify(list));
@@ -6027,6 +6162,7 @@ async function adminDeleteAllProtocols() {
       localStorage.setItem('protocols', JSON.stringify([]));
       currentProtocolText = '';
       currentRequirementsText = '';
+      currentReportTheses = [];
       try { renderList && renderList('report'); } catch (_) {}
       try { renderList && renderList('registry'); } catch (_) {}
       return `Удалено протоколов: ${before}`;
@@ -6112,6 +6248,7 @@ async function adminDeleteEverything() {
   localStorage.setItem('protocols', JSON.stringify([]));
   currentProtocolText = '';
   currentRequirementsText = '';
+  currentReportTheses = [];
 
   // Шаг 4: отчёт об обследовании
   setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 4/4: отчёт об обследовании...</div>');
