@@ -4980,10 +4980,11 @@ function deleteReportFromLibrary(id) {
   try { renderLibrary(); } catch (_) {}
 }
 
-// Block 4: простой markdown → HTML рендерер для предпросмотра
+// Block 4: простой markdown → HTML рендерер для предпросмотра.
 // Поддерживает: # ## ### #### заголовки, **bold**, *italic*, `code`,
 // списки -/*/1., таблицы вида | a | b | с разделителем, --- (hr), параграфы.
-// Этого достаточно для протоколов и отчётов которые мы генерируем.
+// FIX (зависание на v2): жёсткая гарантия инкремента `i` на каждой итерации
+// + защита от patological backtracking в italic regex.
 function libRenderMarkdown(md) {
   if (!md) return '';
   const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -4991,19 +4992,32 @@ function libRenderMarkdown(md) {
   const out = [];
   let i = 0;
 
-  // Inline форматирование (внутри строки)
+  // Inline форматирование (внутри строки).
+  // FIX: italic regex с lookahead на регулярных строках с многими * мог уходить
+  // в catastrophic backtracking. Делаем без lookahead и более ограниченный класс.
   const inline = (s) => {
     let t = esc(s);
     // bold **x** — сначала, чтобы не съел * как italic
-    t = t.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
-    // italic *x* (не на стыках со словом)
-    t = t.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>');
+    t = t.replace(/\*\*([^*\n]{1,200})\*\*/g, '<strong>$1</strong>');
+    // italic *x* — простой нежадный, без lookahead, ограничение длины
+    t = t.replace(/(^|\s|\()\*([^\s*][^*\n]{0,200}?)\*/g, '$1<em>$2</em>');
     // inline `code`
-    t = t.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    t = t.replace(/`([^`\n]{1,400})`/g, '<code>$1</code>');
     return t;
   };
 
+  // Защита от зацикливания: на каждой итерации запоминаем i; если после всех
+  // веток он не изменился — принудительный i++ + сохранение строки как параграф.
+  let safety = 0;
+  const MAX_ITER = lines.length * 4 + 1000; // запас на случай мутаций i
+
   while (i < lines.length) {
+    if (++safety > MAX_ITER) {
+      console.warn('[libRenderMarkdown] safety limit hit at i=' + i);
+      out.push('<p style="color:#dc2626">[Прерван рендер: превышен лимит итераций]</p>');
+      break;
+    }
+    const startI = i;
     const line = lines[i];
 
     // Пустая
@@ -5025,7 +5039,7 @@ function libRenderMarkdown(md) {
     // Таблица: первая строка с | и | и разделитель |---|---|
     if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
       const headerCells = line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
-      i += 2; // пропускаем заголовок и разделитель
+      i += 2;
       const rows = [];
       while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
         const cells = lines[i].trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
@@ -5067,15 +5081,27 @@ function libRenderMarkdown(md) {
       continue;
     }
 
-    // Параграф (объединяем подряд идущие непустые строки)
-    const paragraph = [];
+    // Параграф — собираем подряд идущие непустые строки.
+    // FIX: проверяем что i реально продвинулся. Если строка матчит исключающий
+    // regex, но не была обработана выше (например битая таблица |x| без разделителя),
+    // — выводим её как обычный параграф вместо пропуска.
+    const paragraph = [line];
+    i++;
     while (i < lines.length && lines[i].trim() &&
-           !/^(#{1,4}\s|\s*[-*+]\s|\s*\d+\.\s|---|━{3,}|═{3,}|\s*\|.*\|)/.test(lines[i])) {
+           !/^(#{1,4}\s|\s*[-*+]\s|\s*\d+\.\s|---|━{3,}|═{3,})/.test(lines[i])) {
+      // Стоп на начале новой таблицы (только если есть разделитель ниже)
+      if (/^\s*\|.*\|\s*$/.test(lines[i]) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+        break;
+      }
       paragraph.push(lines[i]);
       i++;
     }
-    if (paragraph.length) {
-      out.push(`<p>${inline(paragraph.join(' '))}</p>`);
+    out.push(`<p>${inline(paragraph.join(' '))}</p>`);
+
+    // Гарантия инкремента — если по какой-то причине i не сдвинулся
+    if (i === startI) {
+      console.warn('[libRenderMarkdown] forced increment at i=' + i);
+      i++;
     }
   }
 
