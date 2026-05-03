@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Протоколист — ИИ-ассистент</title>
 <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js" onload="window.docxReady=true;console.log('docx loaded from unpkg')" onerror="loadDocxFallback()"></script>
+<script src="https://cdn.jsdelivr.net/gh/gitbrent/pptxgenjs@4.0.1/dist/pptxgen.bundle.js" onload="window.pptxReady=true;console.log('pptxgenjs loaded from jsdelivr')" onerror="loadPptxFallback()"></script>
 <script>
 function loadDocxFallback() {
   console.warn('unpkg failed, trying jsdelivr...');
@@ -12,6 +13,14 @@ function loadDocxFallback() {
   s.src = 'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js';
   s.onload = () => { window.docxReady = true; console.log('docx loaded from jsdelivr'); };
   s.onerror = () => { window.docxFailed = true; console.error('docx failed on both CDNs'); };
+  document.head.appendChild(s);
+}
+function loadPptxFallback() {
+  console.warn('pptxgenjs jsdelivr failed, trying unpkg...');
+  const s = document.createElement('script');
+  s.src = 'https://unpkg.com/pptxgenjs@4.0.1/dist/pptxgen.bundle.js';
+  s.onload = () => { window.pptxReady = true; console.log('pptxgenjs loaded from unpkg'); };
+  s.onerror = () => { window.pptxFailed = true; console.error('pptxgenjs failed on both CDNs'); };
   document.head.appendChild(s);
 }
 </script>
@@ -304,6 +313,8 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 .lib-badge-proj{display:inline-block;background:#f0f9ff;color:#0369a1;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;border:1px solid #bae6fd}
 .lib-audio-player{margin-top:6px;width:100%;max-width:520px}
 .lib-audio-player audio{width:100%;height:38px}
+/* Block 5: миниатюры слайдов в предпросмотре презентации */
+.lib-preview-slide{position:relative;aspect-ratio:16/9;border-radius:6px;overflow:hidden;padding:18px 22px;font-family:Arial,sans-serif;box-shadow:0 1px 3px rgba(0,0,0,.1)}
 
 /* Модалка предпросмотра */
 .lib-modal{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;animation:libModalIn .15s ease-out}
@@ -836,10 +847,44 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 <div class="page" id="page-presentation">
   <div class="card">
     <div class="card-title"><div class="card-title-icon icon-purple">🎬</div>Презентация</div>
-    <div class="empty-state" style="padding:48px 24px;text-align:center">
-      <div class="empty-state-icon" style="font-size:48px">🚧</div>
-      <div style="font-size:15px;color:#64748b;margin-top:12px;font-weight:500">Раздел в разработке</div>
-      <div style="font-size:13px;color:#94a3b8;margin-top:8px;line-height:1.5">Здесь скоро появится генерация презентации<br>по итогам обследования.</div>
+    <p style="font-size:13px;color:#64748b;margin-bottom:16px;line-height:1.5">
+      Презентация генерируется на основе одной из версий отчёта об обследовании.<br>
+      Сначала выбери проект, затем версию отчёта. Контент сжимается до ключевых пунктов и упаковывается в .pptx по фирменному стилю.
+    </p>
+
+    <div class="meeting-form" style="margin-bottom:14px">
+      <div class="form-row">
+        <label>ПРОЕКТ</label>
+        <select id="presentation-project" onchange="onPresentationProjectChange()">
+          <option value="">— выбери проект —</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label>ВЕРСИЯ ОТЧЁТА</label>
+        <select id="presentation-report" disabled>
+          <option value="">— сначала выбери проект —</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-create-presentation" onclick="generatePresentation()" disabled>
+        ✨ Создать презентацию
+      </button>
+    </div>
+
+    <div id="presentation-status"></div>
+    <div id="presentation-progress" style="display:none;margin-top:14px"></div>
+
+    <div id="presentation-result-card" style="display:none;margin-top:18px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
+      <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:10px">Готовая презентация</div>
+      <div id="presentation-result-info" style="font-size:13px;color:#64748b;line-height:1.6;margin-bottom:12px"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-success" onclick="downloadCurrentPresentation()">⬇️ Скачать .pptx</button>
+        <button class="btn btn-secondary" onclick="openCurrentPresentationPreview()">👁 Просмотр слайдов</button>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:10px">💡 Чтобы получить PDF — открой .pptx в PowerPoint или Google Slides и экспортируй в PDF.</div>
     </div>
   </div>
 </div>
@@ -849,12 +894,13 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
   <div class="card">
     <div class="card-title"><div class="card-title-icon icon-blue">📂</div>Библиотека файлов</div>
 
-    <!-- Block 4: подвкладки Видео / Аудио / Протоколы / Отчёты -->
+    <!-- Block 4: подвкладки Видео / Аудио / Протоколы / Отчёты / Презентации -->
     <div class="lib-subtabs">
       <button type="button" class="lib-subtab" data-subtab="videos" onclick="showLibSubtab('videos')">🎥 Видео <span class="lib-count" id="lib-count-videos">0</span></button>
       <button type="button" class="lib-subtab" data-subtab="audio" onclick="showLibSubtab('audio')">🎵 Аудио <span class="lib-count" id="lib-count-audio">0</span></button>
       <button type="button" class="lib-subtab" data-subtab="protocols" onclick="showLibSubtab('protocols')">📝 Протоколы <span class="lib-count" id="lib-count-protocols">0</span></button>
       <button type="button" class="lib-subtab" data-subtab="reports" onclick="showLibSubtab('reports')">📄 Отчёты <span class="lib-count" id="lib-count-reports">0</span></button>
+      <button type="button" class="lib-subtab" data-subtab="presentations" onclick="showLibSubtab('presentations')">🎬 Презентации <span class="lib-count" id="lib-count-presentations">0</span></button>
     </div>
 
     <div id="lib-pane-videos" class="lib-pane">
@@ -872,6 +918,10 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
     <div id="lib-pane-reports" class="lib-pane" style="display:none">
       <p style="font-size:13px;color:#64748b;margin-bottom:12px">Сгенерированные отчёты об обследовании. Каждая генерация создаёт новую версию для проекта.</p>
       <div id="lib-reports-list"></div>
+    </div>
+    <div id="lib-pane-presentations" class="lib-pane" style="display:none">
+      <p style="font-size:13px;color:#64748b;margin-bottom:12px">Сгенерированные презентации в формате .pptx. Открой в PowerPoint или Google Slides для редактирования и экспорта в PDF.</p>
+      <div id="lib-presentations-list"></div>
     </div>
 
     <div id="library-status"></div>
@@ -924,8 +974,11 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <button class="btn btn-secondary admin-btn" onclick="adminDeleteAllRequirements()" title="Чистит все ключи requirements_* в localStorage (требования всех проектов)">
         🗂️ Удалить все требования <span style="color:#94a3b8;font-size:12px">— реестр всех проектов</span>
       </button>
-      <button class="btn btn-secondary admin-btn" onclick="adminDeleteSurveyReport()" title="Очищает текущий показанный текст отчёта об обследовании (in-memory, F5 тоже его убьёт)">
-        📊 Удалить отчёт об обследовании <span style="color:#94a3b8;font-size:12px">— только текст агрегированного отчёта</span>
+      <button class="btn btn-secondary admin-btn" onclick="adminDeleteAllReports()" title="Чистит localStorage.reports (все версии отчётов всех проектов)">
+        📊 Удалить все отчёты об обследовании <span style="color:#94a3b8;font-size:12px">— все версии отчётов всех проектов</span>
+      </button>
+      <button class="btn btn-secondary admin-btn" onclick="adminDeleteAllPresentations()" title="Чистит localStorage.presentations (все версии презентаций всех проектов)">
+        🎬 Удалить все презентации <span style="color:#94a3b8;font-size:12px">— все версии презентаций всех проектов</span>
       </button>
     </div>
   </div>
@@ -933,7 +986,7 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
   <div class="card" style="border-color:#fecaca;background:#fffbfb">
     <div class="card-title" style="color:#991b1b"><div class="card-title-icon" style="background:#fee2e2;color:#dc2626">⚠️</div>Полный сброс пользовательских данных</div>
     <p style="font-size:13px;color:#7f1d1d;margin-bottom:14px">
-      Один клик = последовательно нажать все 6 кнопок выше. После — на дисках, серверах Google и в памяти браузера не остаётся <strong>ничего</strong> из созданных тобой данных.<br>
+      Один клик = последовательно нажать все 7 кнопок выше. После — на дисках, серверах Google и в памяти браузера не остаётся <strong>ничего</strong> из созданных тобой данных.<br>
       <strong>Не трогается:</strong> API-ключи (Gemini, Groq) и НСИ (команда, проекты — заполняешь руками).
     </p>
     <button class="btn" style="background:#dc2626;color:#fff;font-weight:600" onclick="adminDeleteEverything()">🔥 Удалить ВСЁ одним кликом</button>
@@ -1837,6 +1890,7 @@ function showTab(name, el) {
   if (name === 'report') initReportTab();
   if (name === 'registry') renderRegistryTab();
   if (name === 'library') { renderLibrary(); refreshGoogleSpace(); updateStorageInfo(); }
+  if (name === 'presentation') initPresentationTab();
   if (name === 'nsi') renderNSI();
   if (name === 'admin') renderAdmin();
 }
@@ -4980,6 +5034,456 @@ function deleteReportFromLibrary(id) {
   try { renderLibrary(); } catch (_) {}
 }
 
+// Block 5: хранение презентаций в localStorage['presentations']
+const getPresentations = () => JSON.parse(localStorage.getItem('presentations') || '[]');
+
+function savePresentationToLibrary(pres) {
+  if (!pres || !pres.projectId) return null;
+  const all = getPresentations();
+  const projVersions = all.filter(p => p.projectId === pres.projectId).map(p => p.version || 0);
+  const version = (projVersions.length ? Math.max(...projVersions) : 0) + 1;
+  const saved = { ...pres, version };
+  all.unshift(saved);
+  try {
+    localStorage.setItem('presentations', JSON.stringify(all));
+  } catch (e) {
+    console.warn('[presentations] localStorage переполнен', e);
+    while (all.length > 1) {
+      all.pop();
+      try { localStorage.setItem('presentations', JSON.stringify(all)); break; } catch (_) {}
+    }
+  }
+  return saved;
+}
+
+function deletePresentationFromLibrary(id) {
+  if (!confirm('Удалить эту версию презентации? Восстановить будет нельзя.')) return;
+  const list = getPresentations().filter(p => p.id !== id);
+  localStorage.setItem('presentations', JSON.stringify(list));
+  try { renderLibrary(); } catch (_) {}
+}
+
+// ── Block 5: Генерация .pptx по фирменному стилю ───
+// Цветовая палитра 1С-Рарус: тёмно-синий, оранжевый акцент, светло-бежевый.
+const PRES_COLORS = {
+  DARK: '292E44',     // тёмно-синий — фон Cover/Closing, sidebar TwoCol
+  ACCENT: 'E73F11',   // оранжевый акцент
+  LIGHT_BG: 'F6F6F8', // светло-серый фон большинства слайдов
+  CREAM: 'F5F1EB',    // светло-бежевый альтернативный фон
+  WHITE: 'FFFFFF',
+  TEXT_DARK: '292E44',
+  TEXT_GREY: '6B7280',
+  TEXT_LIGHT: 'D1D5DB'
+};
+const PRES_FONT = 'Arial';
+const PRES_W = 13.333; // 16:9 в дюймах (LAYOUT_WIDE)
+const PRES_H = 7.5;
+
+async function downloadPresentationPptx(presentation) {
+  if (!presentation) { alert('Нет данных презентации'); return; }
+  // Ждём библиотеку (как для docx)
+  if (!window.PptxGenJS && !window.pptxgen) {
+    let waited = 0;
+    while (!window.PptxGenJS && !window.pptxgen && waited < 15000) {
+      await sleep(300); waited += 300;
+    }
+  }
+  const PptxGen = window.PptxGenJS || window.pptxgen;
+  if (!PptxGen) {
+    if (window.pptxFailed) {
+      alert('Библиотека PptxGenJS не загрузилась. Проверь интернет и обнови страницу (Ctrl+Shift+R).');
+    } else {
+      alert('PptxGenJS ещё загружается. Попробуй через несколько секунд.');
+    }
+    return;
+  }
+
+  const pptx = new PptxGen();
+  pptx.layout = 'LAYOUT_WIDE'; // 13.333 x 7.5 in (16:9)
+  pptx.title = `${presentation.projectName} — Презентация v${presentation.version || ''}`;
+  pptx.author = '1С-Рарус (через Протоколист)';
+
+  // ── Хелпер: добавить футер «логотип + дата» к светлому слайду ──
+  const addLightSlideHeader = (slide) => {
+    // Маленький оранжевый акцент-уголок сверху слева
+    slide.addShape('rect', {
+      x: 0, y: 0, w: 0.6, h: 0.08,
+      fill: { color: PRES_COLORS.ACCENT }, line: { type: 'none' }
+    });
+    // Дата справа сверху
+    slide.addText(formatPresentationDate(presentation.reportDate || presentation.generatedAt), {
+      x: 11.0, y: 0.25, w: 2.1, h: 0.3,
+      fontSize: 11, fontFace: PRES_FONT, color: PRES_COLORS.TEXT_GREY,
+      align: 'right'
+    });
+  };
+
+  // ─────────────────────────────────────────
+  // СЛАЙД 1: COVER (тёмный, центральный заголовок, чипы-теги)
+  // ─────────────────────────────────────────
+  {
+    const slide = pptx.addSlide();
+    slide.background = { color: PRES_COLORS.DARK };
+    // Оранжевый аксент-полоска слева сверху
+    slide.addShape('rect', {
+      x: 0, y: 0, w: 0.4, h: 0.5,
+      fill: { color: PRES_COLORS.ACCENT }, line: { type: 'none' }
+    });
+    // Дата справа сверху
+    slide.addText(formatPresentationDate(presentation.reportDate || presentation.generatedAt), {
+      x: 10.5, y: 0.4, w: 2.5, h: 0.4,
+      fontSize: 12, fontFace: PRES_FONT, color: PRES_COLORS.TEXT_LIGHT, align: 'right'
+    });
+    // Тег-чипы (функциональные области) — до 3 штук в первой строке
+    const tagsRow = (presentation.areaNames || []).slice(0, 3);
+    let tagX = 0.7;
+    tagsRow.forEach((name, i) => {
+      const w = Math.min(3.0, 0.3 + name.length * 0.12);
+      const isFirst = (i === 0);
+      slide.addShape('rect', {
+        x: tagX, y: 2.2, w, h: 0.4,
+        fill: { color: isFirst ? PRES_COLORS.ACCENT : 'rgba(255,255,255,0.1)' },
+        line: isFirst ? { type: 'none' } : { color: 'FFFFFF', width: 1, transparency: 50 }
+      });
+      slide.addText(String(name).toUpperCase(), {
+        x: tagX, y: 2.2, w, h: 0.4,
+        fontSize: 11, fontFace: PRES_FONT, bold: true,
+        color: PRES_COLORS.WHITE, align: 'center', valign: 'middle'
+      });
+      tagX += w + 0.15;
+    });
+
+    // Главный заголовок
+    slide.addText(`Отчёт об обследовании\n${presentation.project.shortName || presentation.projectName}`, {
+      x: 0.7, y: 2.9, w: 11.0, h: 2.2,
+      fontSize: 44, fontFace: PRES_FONT, bold: true,
+      color: PRES_COLORS.WHITE, valign: 'top'
+    });
+    // Подзаголовок
+    slide.addText(`По итогам интервью с командой ${presentation.project.customerOrg || presentation.projectName}`, {
+      x: 0.7, y: 5.3, w: 9.5, h: 0.9,
+      fontSize: 16, fontFace: PRES_FONT,
+      color: PRES_COLORS.TEXT_LIGHT
+    });
+    // Слоган внизу
+    slide.addText('Анализ As-Is. Видение To-Be. Готовность к разработке.', {
+      x: 0.7, y: 6.8, w: 11.0, h: 0.5,
+      fontSize: 13, fontFace: PRES_FONT,
+      color: PRES_COLORS.TEXT_LIGHT, italic: true
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // СЛАЙД 2: ЦЕЛИ ОБСЛЕДОВАНИЯ (Bullets)
+  // ─────────────────────────────────────────
+  if (presentation.overview && presentation.overview.goals && presentation.overview.goals.items) {
+    addBulletsSlide(pptx, presentation, '— ВВОДНАЯ ЧАСТЬ',
+      presentation.overview.goals.title || 'Цели обследования',
+      presentation.overview.goals.items);
+  }
+
+  // ─────────────────────────────────────────
+  // СЛАЙД 3: ХОД ОБСЛЕДОВАНИЯ
+  // ─────────────────────────────────────────
+  if (presentation.overview && presentation.overview.survey) {
+    const sv = presentation.overview.survey;
+    addSurveySlide(pptx, presentation, sv);
+  }
+
+  // ─────────────────────────────────────────
+  // СЛАЙДЫ 4..N: ОБЛАСТИ — TwoCol As Is / To Be
+  // ─────────────────────────────────────────
+  (presentation.areaSlides || []).forEach((s, idx) => {
+    addTwoColumnSlide(pptx, presentation, s, idx + 1, presentation.areaSlides.length);
+  });
+
+  // ─────────────────────────────────────────
+  // СЛАЙД ПРЕДПОСЛЕДНИЙ: ЦЕЛИ ПРОЕКТА
+  // ─────────────────────────────────────────
+  if (presentation.overview && presentation.overview.projectGoals && presentation.overview.projectGoals.items) {
+    addBulletsSlide(pptx, presentation, '— ЦЕЛЕПОЛАГАНИЕ',
+      presentation.overview.projectGoals.title || 'Цели проекта',
+      presentation.overview.projectGoals.items);
+  }
+
+  // ─────────────────────────────────────────
+  // СЛАЙД ПОСЛЕДНИЙ: CLOSING
+  // ─────────────────────────────────────────
+  {
+    const slide = pptx.addSlide();
+    slide.background = { color: PRES_COLORS.DARK };
+    slide.addShape('rect', {
+      x: 0, y: 0, w: 0.4, h: 0.5,
+      fill: { color: PRES_COLORS.ACCENT }, line: { type: 'none' }
+    });
+    slide.addText('— ИТОГИ ОБСЛЕДОВАНИЯ', {
+      x: 0.7, y: 2.0, w: 9.0, h: 0.4,
+      fontSize: 12, fontFace: PRES_FONT, bold: true,
+      color: PRES_COLORS.ACCENT, charSpacing: 2
+    });
+    slide.addText('Готовы перейти\nк разработке', {
+      x: 0.7, y: 2.5, w: 11.0, h: 2.4,
+      fontSize: 50, fontFace: PRES_FONT, bold: true,
+      color: PRES_COLORS.WHITE, valign: 'top'
+    });
+    // KPI блок
+    const kpiData = [
+      { num: String((presentation.areaNames || []).length), label: 'функциональных\nобластей' },
+      { num: String((presentation.areaSlides || []).length || '—'), label: 'тематических\nблоков' },
+      { num: String((presentation.overview?.survey?.items?.length) || '—'), label: 'тем\nинтервью' }
+    ];
+    kpiData.forEach((k, i) => {
+      const x = 0.7 + i * 2.3;
+      slide.addText(k.num, {
+        x, y: 5.4, w: 1.5, h: 0.7,
+        fontSize: 38, fontFace: PRES_FONT, bold: true,
+        color: PRES_COLORS.ACCENT, valign: 'top'
+      });
+      slide.addText(k.label, {
+        x, y: 6.15, w: 2.0, h: 0.7,
+        fontSize: 11, fontFace: PRES_FONT,
+        color: PRES_COLORS.TEXT_LIGHT, valign: 'top'
+      });
+      // Разделитель между KPI
+      if (i < kpiData.length - 1) {
+        slide.addShape('line', {
+          x: x + 1.8, y: 5.5, w: 0, h: 1.0,
+          line: { color: PRES_COLORS.TEXT_LIGHT, width: 0.5, transparency: 50 }
+        });
+      }
+    });
+    // Подпись справа
+    if (presentation.curatorName) {
+      slide.addText(`Куратор проекта: ${presentation.curatorName}\n${presentation.curatorPosition || ''}`, {
+        x: 8.5, y: 6.5, w: 4.5, h: 0.8,
+        fontSize: 11, fontFace: PRES_FONT, italic: true,
+        color: PRES_COLORS.TEXT_LIGHT, align: 'right'
+      });
+    }
+  }
+
+  // ── Сохранение ──
+  const safeName = (presentation.projectName || 'презентация').replace(/[\\/:*?"<>|]+/g, '_');
+  const filename = `${safeName}_презентация_v${presentation.version || ''}.pptx`;
+  await pptx.writeFile({ fileName: filename });
+}
+
+// Шаблон слайда «Bullets» — заголовок + список пунктов на светлом фоне
+function addBulletsSlide(pptx, presentation, eyebrow, title, items) {
+  const slide = pptx.addSlide();
+  slide.background = { color: PRES_COLORS.LIGHT_BG };
+  // Топ-полоска
+  slide.addShape('rect', { x: 0, y: 0, w: PRES_W, h: 0.08,
+    fill: { color: PRES_COLORS.ACCENT }, line: { type: 'none' } });
+
+  slide.addText(formatPresentationDate(presentation.reportDate || presentation.generatedAt), {
+    x: 11.0, y: 0.25, w: 2.1, h: 0.3,
+    fontSize: 11, fontFace: PRES_FONT, color: PRES_COLORS.TEXT_GREY, align: 'right'
+  });
+  // Eyebrow
+  slide.addText(eyebrow, {
+    x: 0.7, y: 0.7, w: 9.0, h: 0.4,
+    fontSize: 11, fontFace: PRES_FONT, bold: true,
+    color: PRES_COLORS.ACCENT, charSpacing: 2
+  });
+  // Заголовок
+  slide.addText(title, {
+    x: 0.7, y: 1.1, w: 11.5, h: 1.0,
+    fontSize: 32, fontFace: PRES_FONT, bold: true,
+    color: PRES_COLORS.TEXT_DARK
+  });
+  // Список
+  const startY = 2.5;
+  const stepY = (items.length > 5) ? 0.75 : 0.85;
+  (items || []).slice(0, 7).forEach((item, i) => {
+    const y = startY + i * stepY;
+    // Цифра
+    slide.addText(String(i + 1).padStart(2, '0'), {
+      x: 0.7, y, w: 0.7, h: 0.4,
+      fontSize: 14, fontFace: PRES_FONT, bold: true,
+      color: PRES_COLORS.ACCENT
+    });
+    // Текст пункта
+    slide.addText(String(item || ''), {
+      x: 1.5, y, w: 11.0, h: stepY,
+      fontSize: 15, fontFace: PRES_FONT,
+      color: PRES_COLORS.TEXT_DARK, valign: 'top'
+    });
+  });
+}
+
+// Слайд «Ход обследования» — короткий текст + список тем
+function addSurveySlide(pptx, presentation, sv) {
+  const slide = pptx.addSlide();
+  slide.background = { color: PRES_COLORS.LIGHT_BG };
+  slide.addShape('rect', { x: 0, y: 0, w: PRES_W, h: 0.08,
+    fill: { color: PRES_COLORS.ACCENT }, line: { type: 'none' } });
+  slide.addText(formatPresentationDate(presentation.reportDate || presentation.generatedAt), {
+    x: 11.0, y: 0.25, w: 2.1, h: 0.3,
+    fontSize: 11, fontFace: PRES_FONT, color: PRES_COLORS.TEXT_GREY, align: 'right'
+  });
+  slide.addText('— МЕТОДОЛОГИЯ', {
+    x: 0.7, y: 0.7, w: 9.0, h: 0.4,
+    fontSize: 11, fontFace: PRES_FONT, bold: true,
+    color: PRES_COLORS.ACCENT, charSpacing: 2
+  });
+  slide.addText(sv.title || 'Ход обследования', {
+    x: 0.7, y: 1.1, w: 11.5, h: 0.9,
+    fontSize: 32, fontFace: PRES_FONT, bold: true,
+    color: PRES_COLORS.TEXT_DARK
+  });
+  if (sv.summary) {
+    slide.addText(sv.summary, {
+      x: 0.7, y: 2.1, w: 11.5, h: 1.2,
+      fontSize: 16, fontFace: PRES_FONT,
+      color: PRES_COLORS.TEXT_GREY, italic: true, valign: 'top'
+    });
+  }
+  // Подзаголовок
+  slide.addText('ТЕМАТИКИ ИНТЕРВЬЮ', {
+    x: 0.7, y: 3.5, w: 11.5, h: 0.4,
+    fontSize: 12, fontFace: PRES_FONT, bold: true,
+    color: PRES_COLORS.ACCENT, charSpacing: 1.5
+  });
+  // Линия
+  slide.addShape('line', {
+    x: 0.7, y: 3.95, w: 11.9, h: 0,
+    line: { color: PRES_COLORS.ACCENT, width: 1.5 }
+  });
+  // Темы — двумя колонками
+  const items = (sv.items || []).slice(0, 8);
+  const half = Math.ceil(items.length / 2);
+  items.forEach((item, i) => {
+    const col = i < half ? 0 : 1;
+    const row = i < half ? i : i - half;
+    slide.addText(`● ${item}`, {
+      x: 0.7 + col * 6.3, y: 4.2 + row * 0.55,
+      w: 6.0, h: 0.5,
+      fontSize: 14, fontFace: PRES_FONT,
+      color: PRES_COLORS.TEXT_DARK, valign: 'top'
+    });
+  });
+}
+
+// Шаблон «Two-Column» — слайд функциональной области с As Is | To Be
+function addTwoColumnSlide(pptx, presentation, slideData, idx, total) {
+  const slide = pptx.addSlide();
+  slide.background = { color: PRES_COLORS.LIGHT_BG };
+
+  // Sidebar тёмный слева (15% ширины)
+  const sidebarW = 2.5;
+  slide.addShape('rect', {
+    x: 0, y: 0, w: sidebarW, h: PRES_H,
+    fill: { color: PRES_COLORS.DARK }, line: { type: 'none' }
+  });
+  // Топ-полоска оранжевая на основной части
+  slide.addShape('rect', {
+    x: sidebarW, y: 0, w: PRES_W - sidebarW, h: 0.08,
+    fill: { color: PRES_COLORS.ACCENT }, line: { type: 'none' }
+  });
+  // Sidebar контент: «КЕЙС N» + название области
+  slide.addText('ОБЛАСТЬ', {
+    x: 0.3, y: 0.6, w: sidebarW - 0.6, h: 0.4,
+    fontSize: 11, fontFace: PRES_FONT, bold: true,
+    color: PRES_COLORS.ACCENT, charSpacing: 2
+  });
+  slide.addText(slideData.areaName || 'Функциональная область', {
+    x: 0.3, y: 1.0, w: sidebarW - 0.6, h: 1.5,
+    fontSize: 18, fontFace: PRES_FONT, bold: true,
+    color: PRES_COLORS.WHITE, valign: 'top'
+  });
+  // Прогресс-индикатор внизу sidebar
+  if (total > 1) {
+    slide.addText(`${idx} / ${total}`, {
+      x: 0.3, y: PRES_H - 0.8, w: sidebarW - 0.6, h: 0.4,
+      fontSize: 12, fontFace: PRES_FONT, bold: true,
+      color: PRES_COLORS.TEXT_LIGHT
+    });
+  }
+
+  // Основная часть: заголовок подтемы
+  slide.addText(slideData.title || 'Подтема', {
+    x: sidebarW + 0.4, y: 0.5, w: PRES_W - sidebarW - 0.6, h: 0.8,
+    fontSize: 24, fontFace: PRES_FONT, bold: true,
+    color: PRES_COLORS.TEXT_DARK
+  });
+
+  // Две колонки: As Is | To Be
+  const colW = (PRES_W - sidebarW - 0.8) / 2 - 0.1;
+  const col1X = sidebarW + 0.4;
+  const col2X = col1X + colW + 0.2;
+  const colsY = 1.6;
+
+  // Заголовки колонок
+  ['КАК СЕЙЧАС (AS IS)', 'КАК БУДЕТ (TO BE)'].forEach((header, i) => {
+    const x = i === 0 ? col1X : col2X;
+    slide.addText(header, {
+      x, y: colsY, w: colW, h: 0.4,
+      fontSize: 11, fontFace: PRES_FONT, bold: true,
+      color: PRES_COLORS.ACCENT, charSpacing: 1.5
+    });
+    // Подчёркивание
+    slide.addShape('line', {
+      x, y: colsY + 0.45, w: colW, h: 0,
+      line: { color: PRES_COLORS.ACCENT, width: 1.5 }
+    });
+  });
+
+  const renderItems = (items, x) => {
+    const startY = colsY + 0.7;
+    const stepY = 0.95;
+    (items || []).slice(0, 5).forEach((item, i) => {
+      const y = startY + i * stepY;
+      // Цифра 01/02/...
+      slide.addText(String(i + 1).padStart(2, '0'), {
+        x, y, w: 0.5, h: 0.4,
+        fontSize: 13, fontFace: PRES_FONT, bold: true,
+        color: PRES_COLORS.ACCENT
+      });
+      // Текст пункта
+      slide.addText(String(item || ''), {
+        x: x + 0.55, y, w: colW - 0.6, h: stepY,
+        fontSize: 12, fontFace: PRES_FONT,
+        color: PRES_COLORS.TEXT_DARK, valign: 'top'
+      });
+    });
+  };
+
+  renderItems(slideData.asIs, col1X);
+  renderItems(slideData.toBe, col2X);
+
+  // Если одна из колонок пустая — placeholder
+  if (!slideData.asIs || !slideData.asIs.length) {
+    slide.addText('— нет данных —', {
+      x: col1X, y: colsY + 1.0, w: colW, h: 0.4,
+      fontSize: 12, fontFace: PRES_FONT, italic: true,
+      color: PRES_COLORS.TEXT_GREY
+    });
+  }
+  if (!slideData.toBe || !slideData.toBe.length) {
+    slide.addText('— не определено —', {
+      x: col2X, y: colsY + 1.0, w: colW, h: 0.4,
+      fontSize: 12, fontFace: PRES_FONT, italic: true,
+      color: PRES_COLORS.TEXT_GREY
+    });
+  }
+}
+
+// Хелпер форматирования даты для презентации
+function formatPresentationDate(d) {
+  if (!d) return '';
+  if (typeof d === 'number') {
+    return new Date(d).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+  }
+  // Строка ДД.ММ.ГГГГ → «Месяц YYYY»
+  const m = String(d).match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (m) {
+    const months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    return `${months[parseInt(m[2])-1]} ${m[3]}`;
+  }
+  return String(d);
+}
+
 // Block 4: простой markdown → HTML рендерер для предпросмотра.
 // Поддерживает: # ## ### #### заголовки, **bold**, *italic*, `code`,
 // списки -/*/1., таблицы вида | a | b | с разделителем, --- (hr), параграфы.
@@ -6462,6 +6966,371 @@ function parseDate(s) {
 }
 
 // Превью отчёта текстом — для report-preview <div>
+// ══════════════════════════════════════════════════════
+// PRESENTATION — генерация .pptx из reportData
+// ══════════════════════════════════════════════════════
+
+// Текущая презентация (только что сгенерированная или открытая)
+let currentPresentation = null;
+
+// Промпт: сжимает один раздел отчёта в JSON со слайдами As Is / To Be.
+// Возвращает массив слайдов (1-2 слайда на раздел в зависимости от объёма).
+const PRESENTATION_AREA_PROMPT = (areaName, asIsText, reportThesesForArea) => {
+  const tobeText = (reportThesesForArea || [])
+    .filter(t => t.toBe && t.toBe.trim())
+    .map(t => `• ${t.topic ? '[' + t.topic + '] ' : ''}${t.toBe}`)
+    .join('\n');
+
+  return `Ты — эксперт по подготовке управленческих презентаций.
+Дано: материал по функциональной области "${areaName}" из отчёта об обследовании.
+
+═══ AS-IS (как сейчас) ═══
+${asIsText || '(нет данных)'}
+
+═══ TO-BE (как будет) ═══
+${tobeText || '(нет данных)'}
+
+ЗАДАЧА:
+Раздели материал на 1-2 слайда (если контент большой и в нём есть несколько логических подтем — раздели на 2 слайда).
+Каждый слайд = одна логическая подтема внутри области.
+Каждый слайд содержит две колонки: As Is (5 пунктов максимум) и To Be (5 пунктов максимум).
+Каждый пункт — короткая фраза 5-15 слов, не предложение целиком.
+Если в материале меньше 5 пунктов — не выдумывай, оставь сколько есть.
+Сохраняй конкретику: цифры, названия систем, конкретные процессы.
+
+ФОРМАТ ОТВЕТА — строго JSON массив (без markdown-разметки и пояснений вокруг):
+[
+  {
+    "title": "Краткий заголовок подтемы (3-7 слов)",
+    "asIs": ["пункт 1", "пункт 2", "пункт 3", "пункт 4", "пункт 5"],
+    "toBe": ["пункт 1", "пункт 2", "пункт 3"]
+  }
+]
+
+ВАЖНО:
+— Если в одной из колонок данных нет — массив пустой [], НО в нём всё равно должно быть до 5 пунктов когда есть.
+— Не используй markdown в пунктах (**жирный**, *курсив* — не надо).
+— Не повторяй заголовок области в title — пиши более конкретно про подтему.
+— Возвращай ТОЛЬКО JSON, без слов "вот результат" и подобного.`;
+};
+
+// Промпт для общих разделов (Цели обследования, Ход обследования, Цели проекта, Заключение).
+const PRESENTATION_OVERVIEW_PROMPT = (project, sectionIntro, sectionGoals, protocolsMeta, customerCurator) => {
+  const protList = (protocolsMeta || []).map(p =>
+    `— ${p.title} (${p.date})${p.areaName ? ' · ' + p.areaName : ''}`
+  ).join('\n');
+
+  return `Ты — эксперт по подготовке управленческих презентаций.
+Дано: материалы из отчёта об обследовании по проекту "${project.name}".
+
+═══ ВВЕДЕНИЕ ОТЧЁТА (1.1, 1.2, 1.3) ═══
+${sectionIntro || '(нет данных)'}
+
+═══ ЦЕЛИ ПРОЕКТА (3.1, 3.2, 3.3) ═══
+${sectionGoals || '(нет данных)'}
+
+═══ СПИСОК ПРОТОКОЛОВ ═══
+${protList || '(нет)'}
+
+═══ КЛЮЧЕВОЙ КУРАТОР ═══
+${customerCurator ? customerCurator.fio + ', ' + customerCurator.position : '(не указан)'}
+
+ЗАДАЧА: Подготовь данные для трёх слайдов:
+
+1. "goals" (Цели обследования) — 4-6 коротких пунктов, по одному на цель из раздела 1.1
+2. "survey" (Ход обследования) — 1-2 фразы общего описания + список тематик интервью (4-6 пунктов)
+3. "projectGoals" (Цели проекта) — 4-6 пунктов из раздела 3.1
+
+ФОРМАТ ОТВЕТА — строго JSON (без markdown-разметки и пояснений):
+{
+  "goals": {
+    "title": "Цели обследования",
+    "items": ["цель 1", "цель 2", "цель 3"]
+  },
+  "survey": {
+    "title": "Ход обследования",
+    "summary": "1-2 фразы общего описания",
+    "items": ["тема 1", "тема 2", "тема 3"]
+  },
+  "projectGoals": {
+    "title": "Цели проекта",
+    "items": ["цель 1", "цель 2"]
+  }
+}
+
+ВАЖНО:
+— Каждый пункт — 5-15 слов, без markdown.
+— Возвращай ТОЛЬКО JSON.
+— Если данных нет — пустой массив [].`;
+};
+
+// Парсер JSON ответа от Gemini (очищает markdown-обёртки)
+function parsePresentationJSON(raw, fallback) {
+  if (!raw) return fallback;
+  let s = raw.trim();
+  if (s.startsWith('```')) s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  const fa = s.indexOf('['), la = s.lastIndexOf(']');
+  const fo = s.indexOf('{'), lo = s.lastIndexOf('}');
+  // Определяем начинается ли с массива или объекта по первому символу
+  let candidate = s;
+  if (Array.isArray(fallback)) {
+    if (fa >= 0 && la > fa) candidate = s.slice(fa, la + 1);
+  } else {
+    if (fo >= 0 && lo > fo) candidate = s.slice(fo, lo + 1);
+  }
+  try {
+    return JSON.parse(candidate);
+  } catch (e) {
+    console.warn('[presentation] JSON parse failed:', e.message, 'raw:', raw.slice(0, 300));
+    return fallback;
+  }
+}
+
+// Инициализация формы вкладки Презентация
+function initPresentationTab() {
+  const projSelect = document.getElementById('presentation-project');
+  const repSelect = document.getElementById('presentation-report');
+  const btn = document.getElementById('btn-create-presentation');
+  if (!projSelect) return;
+
+  // Заполняем проекты с отчётами
+  const nsi = getNSI();
+  const reports = getReports();
+  const projsWithReports = (nsi.projects || []).filter(p =>
+    reports.some(r => r.projectId === p.id)
+  );
+
+  const prevProj = projSelect.value;
+  projSelect.innerHTML = '<option value="">— выбери проект —</option>' +
+    projsWithReports.map(p =>
+      `<option value="${p.id}">${escHtml(p.name || '(без названия)')}</option>`
+    ).join('');
+
+  if (!projsWithReports.length) {
+    projSelect.innerHTML = '<option value="">— нет проектов с отчётами —</option>';
+    repSelect.innerHTML = '<option value="">сначала сгенерируй отчёт об обследовании</option>';
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  // Восстанавливаем выбор если он остался валидным
+  if (prevProj && projsWithReports.some(p => String(p.id) === prevProj)) {
+    projSelect.value = prevProj;
+    onPresentationProjectChange();
+  } else {
+    repSelect.innerHTML = '<option value="">— сначала выбери проект —</option>';
+    repSelect.disabled = true;
+    if (btn) btn.disabled = true;
+  }
+}
+
+// Заполняет dropdown версий отчёта при смене проекта
+function onPresentationProjectChange() {
+  const projSelect = document.getElementById('presentation-project');
+  const repSelect = document.getElementById('presentation-report');
+  const btn = document.getElementById('btn-create-presentation');
+  if (!projSelect || !repSelect) return;
+
+  const projId = parseInt(projSelect.value || 0);
+  if (!projId) {
+    repSelect.innerHTML = '<option value="">— сначала выбери проект —</option>';
+    repSelect.disabled = true;
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  const reports = getReports().filter(r => r.projectId === projId);
+  // Сортируем по версии убыванию (последняя сверху)
+  reports.sort((a, b) => (b.version || 0) - (a.version || 0));
+
+  if (!reports.length) {
+    repSelect.innerHTML = '<option value="">— нет отчётов для этого проекта —</option>';
+    repSelect.disabled = true;
+    if (btn) btn.disabled = true;
+    return;
+  }
+
+  repSelect.innerHTML = reports.map(r => {
+    const dt = new Date(r.generatedAt);
+    const dtStr = dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+    return `<option value="${r.id}">v${r.version} · ${dtStr}</option>`;
+  }).join('');
+  repSelect.disabled = false;
+  if (btn) btn.disabled = false;
+}
+
+// Главная функция: генерирует презентацию из выбранного отчёта
+async function generatePresentation() {
+  const projSelect = document.getElementById('presentation-project');
+  const repSelect = document.getElementById('presentation-report');
+  const btn = document.getElementById('btn-create-presentation');
+  const statusEl = document.getElementById('presentation-status');
+  const progressEl = document.getElementById('presentation-progress');
+  const resultEl = document.getElementById('presentation-result-card');
+
+  const projId = parseInt(projSelect.value || 0);
+  const repId = parseInt(repSelect.value || 0);
+  if (!projId || !repId) { showStatus('presentation-status', 'error', 'Выбери проект и версию отчёта'); return; }
+
+  if (!getKey()) { showStatus('presentation-status', 'error', 'Не указан Gemini API Key (вкладка «API-ключи»)'); return; }
+
+  const report = getReports().find(r => r.id === repId);
+  if (!report) { showStatus('presentation-status', 'error', 'Отчёт не найден'); return; }
+
+  const rd = report.reportData;
+  if (!rd) { showStatus('presentation-status', 'error', 'У отчёта нет данных для презентации'); return; }
+
+  resultEl.style.display = 'none';
+  showStatus('presentation-status', 'info', '🤖 Готовлю запросы к Gemini...');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Генерация...'; }
+  progressEl.style.display = 'block';
+  progressEl.innerHTML = `
+    <div style="background:#f1f5f9;border-radius:8px;padding:14px">
+      <div id="pres-stage" style="font-size:13px;color:#1e293b;font-weight:500;margin-bottom:6px">Подготовка...</div>
+      <div style="background:#e2e8f0;height:8px;border-radius:4px;overflow:hidden">
+        <div id="pres-bar" style="background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;width:0;transition:.3s"></div>
+      </div>
+      <div id="pres-pct" style="font-size:11px;color:#64748b;margin-top:6px;text-align:right">0%</div>
+    </div>`;
+  const setProgress = (stage, pct) => {
+    const s = document.getElementById('pres-stage');
+    const b = document.getElementById('pres-bar');
+    const p = document.getElementById('pres-pct');
+    if (s) s.textContent = stage;
+    if (b) b.style.width = pct + '%';
+    if (p) p.textContent = Math.round(pct) + '%';
+  };
+
+  try {
+    // ── 1. Подготовка: команда, тезисы по областям ──
+    const nsi = getNSI();
+    const customerCurator = getProjectCurator(rd.project, 'customer', nsi);
+
+    // Группируем reportTheses по areaId — для подачи в промпты областей
+    const thesesByArea = {};
+    (rd.protocolsMeta || []).forEach(pm => {
+      // Ищем сохранённый протокол чтобы взять его reportTheses
+      const proto = getProtocols().find(p => p.id === pm.id);
+      if (proto && Array.isArray(proto.reportTheses)) {
+        proto.reportTheses.forEach(t => {
+          const aid = t.areaId || 0;
+          if (!thesesByArea[aid]) thesesByArea[aid] = [];
+          thesesByArea[aid].push(t);
+        });
+      }
+    });
+
+    // ── 2. Параллельные запросы: общие части + по каждой области ──
+    setProgress('Запрос общих разделов и обзора областей...', 5);
+
+    const overviewPromise = callGemini([{
+      text: PRESENTATION_OVERVIEW_PROMPT(rd.project, rd.sectionIntro, rd.sectionGoals, rd.protocolsMeta, customerCurator)
+    }]);
+
+    const areaPromises = (rd.areaSections || []).map(area =>
+      callGemini([{
+        text: PRESENTATION_AREA_PROMPT(area.areaName, area.text, thesesByArea[area.areaId] || [])
+      }]).then(raw => ({ areaId: area.areaId, areaName: area.areaName, raw }))
+        .catch(e => ({ areaId: area.areaId, areaName: area.areaName, raw: '[]', error: e.message }))
+    );
+
+    const totalRequests = 1 + areaPromises.length;
+    setProgress(`🤖 Жду ответов от Gemini (${totalRequests} запросов параллельно)...`, 15);
+
+    const [overviewRaw, ...areaResults] = await Promise.all([overviewPromise, ...areaPromises]);
+
+    setProgress('Парсинг ответов...', 75);
+
+    // ── 3. Парсинг ──
+    const overviewParsed = parsePresentationJSON(overviewRaw, {
+      goals: { title: 'Цели обследования', items: [] },
+      survey: { title: 'Ход обследования', summary: '', items: [] },
+      projectGoals: { title: 'Цели проекта', items: [] }
+    });
+
+    const areaSlides = [];
+    areaResults.forEach(r => {
+      const slides = parsePresentationJSON(r.raw, []);
+      if (Array.isArray(slides)) {
+        slides.forEach(s => {
+          areaSlides.push({
+            areaName: r.areaName,
+            title: String(s.title || r.areaName).slice(0, 90),
+            asIs: Array.isArray(s.asIs) ? s.asIs.slice(0, 5).map(x => String(x).slice(0, 200)) : [],
+            toBe: Array.isArray(s.toBe) ? s.toBe.slice(0, 5).map(x => String(x).slice(0, 200)) : []
+          });
+        });
+      }
+    });
+
+    setProgress('Сборка структуры презентации...', 88);
+
+    // ── 4. Финальная структура презентации ──
+    const presentation = {
+      id: Date.now(),
+      projectId: rd.project.id,
+      projectName: rd.project.name || '(без названия)',
+      generatedAt: Date.now(),
+      reportId: report.id,
+      reportVersion: report.version,
+      version: 0, // ниже выставим
+      // Контент
+      project: {
+        name: rd.project.name,
+        shortName: rd.project.shortName,
+        city: rd.project.city,
+        customerOrg: rd.project.customerOrg,
+        executorOrg: rd.project.executorOrg
+      },
+      reportDate: rd.reportDate,
+      areaNames: (rd.areaSections || []).map(a => a.areaName),
+      overview: overviewParsed,
+      areaSlides,
+      curatorName: customerCurator ? customerCurator.fio : '',
+      curatorPosition: customerCurator ? customerCurator.position : ''
+    };
+
+    // ── 5. Сохранение в библиотеку с версионированием по проекту ──
+    const saved = savePresentationToLibrary(presentation);
+    if (saved) presentation.version = saved.version;
+    currentPresentation = presentation;
+
+    setProgress('✅ Готово!', 100);
+    setTimeout(() => { progressEl.style.display = 'none'; }, 800);
+
+    const slideCount = 4 + areaSlides.length; // Cover + Goals + Survey + ProjectGoals/Closing + areas
+    showStatus('presentation-status', 'success',
+      `✅ Презентация готова (версия ${saved ? saved.version : '?'}, ~${slideCount} слайдов)`);
+
+    // Обновляем превью-карточку
+    const info = document.getElementById('presentation-result-info');
+    info.innerHTML = `
+      <div><strong>${escHtml(presentation.projectName)}</strong> · версия ${saved ? saved.version : '?'}</div>
+      <div>На основе отчёта v${report.version} от ${new Date(report.generatedAt).toLocaleDateString('ru-RU')}</div>
+      <div>Слайдов: примерно ${slideCount} (титул, цели, ход, ${areaSlides.length} по областям, заключение)</div>
+    `;
+    resultEl.style.display = 'block';
+    resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (e) {
+    console.error('[presentation] generation failed:', e);
+    showStatus('presentation-status', 'error', `Ошибка: ${e.message}`);
+    progressEl.style.display = 'none';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✨ Создать презентацию'; }
+  }
+}
+
+// Скачать текущую (только что сгенерированную) презентацию
+function downloadCurrentPresentation() {
+  if (!currentPresentation) { alert('Сначала создай презентацию'); return; }
+  downloadPresentationPptx(currentPresentation);
+}
+
+function openCurrentPresentationPreview() {
+  if (!currentPresentation) { alert('Сначала создай презентацию'); return; }
+  openLibPresentationPreview(currentPresentation.id);
+}
+
 function buildReportPreviewText(d) {
   const lines = [];
   lines.push(`ОТЧЁТ ОБ ОБСЛЕДОВАНИИ`);
@@ -7558,6 +8427,7 @@ function showLibSubtab(name) {
   else if (name === 'audio')     renderLibAudio();
   else if (name === 'protocols') renderLibProtocols();
   else if (name === 'reports')   renderLibReports();
+  else if (name === 'presentations') renderLibPresentations();
 }
 
 // Обновить счётчики на табах
@@ -7568,6 +8438,7 @@ function updateLibCounts() {
   set('lib-count-videos', sessions.length);
   set('lib-count-protocols', getProtocols().length);
   set('lib-count-reports', getReports().length);
+  set('lib-count-presentations', getPresentations().length);
   // Аудио — async подсчёт (количество сессий с аудио в IDB)
   (async () => {
     let count = 0;
@@ -7775,6 +8646,171 @@ function renderLibReports() {
         </div>
       </div>`;
   }).join('');
+}
+
+// Block 5: Презентации
+function renderLibPresentations() {
+  const el = document.getElementById('lib-presentations-list');
+  if (!el) return;
+  const presentations = getPresentations();
+  if (!presentations.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎬</div>Нет сгенерированных презентаций.<br>Перейди на вкладку «Презентация».</div>';
+    return;
+  }
+  el.innerHTML = presentations.map(p => {
+    const dt = new Date(p.generatedAt);
+    const dtStr = dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+    const slidesEstimate = 4 + (p.areaSlides ? p.areaSlides.length : 0);
+    return `
+      <div class="lib-row" id="lib-presentation-${p.id}">
+        <div class="lib-row-head">
+          <div class="lib-row-title">${escHtml(p.projectName)}</div>
+          <span class="lib-badge-version">v${p.version}</span>
+          <span class="lib-badge-proj">🎬 презентация</span>
+        </div>
+        <div class="lib-row-sub">
+          <span>📅 на основе отчёта v${p.reportVersion || '?'}</span>
+          <span>·</span>
+          <span>🕒 ${dtStr}</span>
+          <span>·</span>
+          <span>📊 ~${slidesEstimate} слайдов</span>
+        </div>
+        <div class="lib-row-actions">
+          <button class="btn btn-secondary" onclick="openLibPresentationPreview(${p.id})">👁 Просмотр слайдов</button>
+          <button class="btn btn-success" onclick="downloadPresentationFromLibrary(${p.id})">⬇️ Скачать .pptx</button>
+          <button class="btn btn-secondary" onclick="deletePresentationFromLibrary(${p.id})" title="Удалить эту версию" style="color:#dc2626">🗑 Удалить</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function downloadPresentationFromLibrary(id) {
+  const p = getPresentations().find(x => x.id === id);
+  if (!p) { alert('Презентация не найдена'); return; }
+  await downloadPresentationPptx(p);
+}
+
+// Предпросмотр презентации — миниатюры слайдов в HTML
+function openLibPresentationPreview(id) {
+  const p = getPresentations().find(x => x.id === id);
+  if (!p) { alert('Презентация не найдена'); return; }
+
+  // Палитра как в pptx-генерации
+  const C = { dark: '#292E44', accent: '#E73F11', bg: '#F6F6F8', white: '#FFFFFF', textGrey: '#6B7280', textLight: '#D1D5DB' };
+
+  const slides = [];
+
+  // 1. Cover
+  slides.push(`
+    <div class="lib-preview-slide" style="background:${C.dark};color:${C.white}">
+      <div style="position:absolute;left:0;top:0;width:6%;height:8px;background:${C.accent}"></div>
+      <div style="display:flex;gap:8px;margin-bottom:24px">
+        ${(p.areaNames || []).slice(0, 3).map((n, i) =>
+          `<span style="font-size:9px;font-weight:700;letter-spacing:1px;padding:5px 10px;background:${i===0?C.accent:'rgba(255,255,255,0.1)'};border-radius:3px">${escHtml(n.toUpperCase())}</span>`
+        ).join('')}
+      </div>
+      <div style="font-size:24px;font-weight:700;line-height:1.15;margin-bottom:14px">Отчёт об обследовании<br>${escHtml(p.project.shortName || p.projectName)}</div>
+      <div style="font-size:11px;color:${C.textLight};margin-bottom:8px">По итогам интервью с командой ${escHtml(p.project.customerOrg || p.projectName)}</div>
+      <div style="position:absolute;left:24px;bottom:18px;font-size:10px;color:${C.textLight};font-style:italic">Анализ As-Is. Видение To-Be. Готовность к разработке.</div>
+    </div>`);
+
+  // 2. Цели обследования
+  if (p.overview && p.overview.goals) {
+    slides.push(renderBulletsPreview('— ВВОДНАЯ ЧАСТЬ', p.overview.goals.title, p.overview.goals.items, C));
+  }
+  // 3. Ход
+  if (p.overview && p.overview.survey) {
+    const sv = p.overview.survey;
+    slides.push(`
+      <div class="lib-preview-slide" style="background:${C.bg};color:${C.dark}">
+        <div style="position:absolute;left:0;top:0;width:100%;height:4px;background:${C.accent}"></div>
+        <div style="font-size:9px;font-weight:700;color:${C.accent};letter-spacing:2px;margin-bottom:6px">— МЕТОДОЛОГИЯ</div>
+        <div style="font-size:20px;font-weight:700;margin-bottom:8px">${escHtml(sv.title || 'Ход обследования')}</div>
+        ${sv.summary ? `<div style="font-size:11px;color:${C.textGrey};font-style:italic;margin-bottom:14px">${escHtml(sv.summary)}</div>` : ''}
+        <div style="font-size:9px;font-weight:700;color:${C.accent};letter-spacing:1.5px;margin:14px 0 4px">ТЕМАТИКИ ИНТЕРВЬЮ</div>
+        <div style="border-top:1.5px solid ${C.accent};padding-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:5px 12px">
+          ${(sv.items || []).slice(0, 8).map(it => `<div style="font-size:11px">● ${escHtml(it)}</div>`).join('')}
+        </div>
+      </div>`);
+  }
+  // 4..N. Области
+  (p.areaSlides || []).forEach((s, idx) => {
+    slides.push(renderTwoColPreview(s, idx + 1, p.areaSlides.length, C));
+  });
+  // Цели проекта
+  if (p.overview && p.overview.projectGoals) {
+    slides.push(renderBulletsPreview('— ЦЕЛЕПОЛАГАНИЕ', p.overview.projectGoals.title, p.overview.projectGoals.items, C));
+  }
+  // Closing
+  slides.push(`
+    <div class="lib-preview-slide" style="background:${C.dark};color:${C.white}">
+      <div style="position:absolute;left:0;top:0;width:6%;height:8px;background:${C.accent}"></div>
+      <div style="font-size:9px;font-weight:700;color:${C.accent};letter-spacing:2px;margin-bottom:8px">— ИТОГИ ОБСЛЕДОВАНИЯ</div>
+      <div style="font-size:28px;font-weight:700;margin-bottom:24px;line-height:1.1">Готовы перейти<br>к разработке</div>
+      <div style="display:flex;gap:18px;margin-top:10px">
+        <div><div style="font-size:24px;font-weight:700;color:${C.accent}">${(p.areaNames || []).length}</div><div style="font-size:9px;color:${C.textLight}">функциональных<br>областей</div></div>
+        <div><div style="font-size:24px;font-weight:700;color:${C.accent}">${(p.areaSlides || []).length || '—'}</div><div style="font-size:9px;color:${C.textLight}">тематических<br>блоков</div></div>
+        <div><div style="font-size:24px;font-weight:700;color:${C.accent}">${(p.overview?.survey?.items?.length) || '—'}</div><div style="font-size:9px;color:${C.textLight}">тем<br>интервью</div></div>
+      </div>
+      ${p.curatorName ? `<div style="position:absolute;right:18px;bottom:14px;font-size:9px;color:${C.textLight};font-style:italic;text-align:right">Куратор: ${escHtml(p.curatorName)}<br>${escHtml(p.curatorPosition || '')}</div>` : ''}
+    </div>`);
+
+  // Сборка предпросмотра
+  const html = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px">
+      ${slides.map((s, i) => `
+        <div style="background:#f1f5f9;border-radius:10px;padding:6px">
+          <div style="font-size:10px;color:#64748b;padding:3px 6px;font-weight:600">Слайд ${i + 1}</div>
+          ${s}
+        </div>`).join('')}
+    </div>`;
+
+  const title = `${p.projectName} — презентация v${p.version}`;
+  openLibPreview(title, html, () => downloadPresentationFromLibrary(p.id));
+}
+
+function renderBulletsPreview(eyebrow, title, items, C) {
+  return `
+    <div class="lib-preview-slide" style="background:${C.bg};color:${C.dark}">
+      <div style="position:absolute;left:0;top:0;width:100%;height:4px;background:${C.accent}"></div>
+      <div style="font-size:9px;font-weight:700;color:${C.accent};letter-spacing:2px;margin-bottom:6px">${escHtml(eyebrow)}</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:14px">${escHtml(title || '')}</div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${(items || []).slice(0, 7).map((it, i) => `
+          <div style="display:flex;gap:8px;align-items:flex-start">
+            <span style="font-size:10px;font-weight:700;color:${C.accent};min-width:18px">${String(i + 1).padStart(2, '0')}</span>
+            <span style="font-size:11px;line-height:1.3">${escHtml(it)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+function renderTwoColPreview(s, idx, total, C) {
+  return `
+    <div class="lib-preview-slide" style="background:${C.bg};color:${C.dark};display:flex;padding:0;overflow:hidden">
+      <div style="background:${C.dark};color:${C.white};width:22%;padding:14px 12px;display:flex;flex-direction:column;justify-content:space-between">
+        <div>
+          <div style="font-size:8px;font-weight:700;color:${C.accent};letter-spacing:2px;margin-bottom:4px">ОБЛАСТЬ</div>
+          <div style="font-size:13px;font-weight:700;line-height:1.2">${escHtml(s.areaName || '')}</div>
+        </div>
+        ${total > 1 ? `<div style="font-size:10px;font-weight:700;color:${C.textLight}">${idx} / ${total}</div>` : ''}
+      </div>
+      <div style="flex:1;padding:14px 14px;position:relative">
+        <div style="position:absolute;left:0;top:0;width:100%;height:4px;background:${C.accent}"></div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:10px;line-height:1.2">${escHtml(s.title || '')}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          ${[['КАК СЕЙЧАС (AS IS)', s.asIs], ['КАК БУДЕТ (TO BE)', s.toBe]].map(([h, arr]) => `
+            <div>
+              <div style="font-size:8px;font-weight:700;color:${C.accent};letter-spacing:1.5px;border-bottom:1.5px solid ${C.accent};padding-bottom:3px;margin-bottom:6px">${h}</div>
+              ${(arr && arr.length) ? arr.slice(0, 5).map((it, i) => `
+                <div style="display:flex;gap:5px;font-size:9px;line-height:1.3;margin-bottom:5px">
+                  <span style="color:${C.accent};font-weight:700;min-width:14px">${String(i + 1).padStart(2, '0')}</span>
+                  <span>${escHtml(it)}</span>
+                </div>`).join('') : `<div style="font-size:9px;color:${C.textGrey};font-style:italic">— нет данных —</div>`}
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
 }
 
 async function deleteSession(id) {
@@ -8173,17 +9209,44 @@ async function adminDeleteAllRequirements() {
 }
 
 // ── Кнопка 5: отчёт об обследовании ──
-async function adminDeleteSurveyReport() {
-  await _adminAct('Очищаю отчёт об обследовании',
-    'УДАЛИТЬ ОТЧЁТ ОБ ОБСЛЕДОВАНИИ:\n\n' +
-    'Очистит сводный текст отчёта (in-memory). Исходные протоколы НЕ ТРОГАЮТСЯ.\n\n' +
+// ── Кнопка 5: все отчёты об обследовании ──
+async function adminDeleteAllReports() {
+  await _adminAct('Удаляю все отчёты',
+    'УДАЛИТЬ ВСЕ ОТЧЁТЫ ОБ ОБСЛЕДОВАНИИ:\n\n' +
+    '• Все версии отчётов всех проектов в localStorage.reports\n' +
+    '• Текущий показанный отчёт (in-memory)\n\n' +
+    'Протоколы, презентации и НСИ НЕ ТРОГАЮТСЯ.\n' +
     'Продолжить?',
     async () => {
+      const before = JSON.parse(localStorage.getItem('reports') || '[]').length;
+      localStorage.setItem('reports', JSON.stringify([]));
       currentReportText = '';
       reportData = null;
       const prev = document.getElementById('report-preview');
       if (prev) prev.textContent = '';
-      return 'Отчёт об обследовании очищен';
+      const card = document.getElementById('report-result-card');
+      if (card) card.style.display = 'none';
+      try { renderLibrary(); } catch (_) {}
+      return `Удалено отчётов: ${before}`;
+    });
+}
+
+// ── Кнопка 6: все презентации ──
+async function adminDeleteAllPresentations() {
+  await _adminAct('Удаляю все презентации',
+    'УДАЛИТЬ ВСЕ ПРЕЗЕНТАЦИИ:\n\n' +
+    '• Все версии презентаций всех проектов в localStorage.presentations\n' +
+    '• Текущая показанная презентация (in-memory)\n\n' +
+    'Отчёты, протоколы и НСИ НЕ ТРОГАЮТСЯ.\n' +
+    'Продолжить?',
+    async () => {
+      const before = JSON.parse(localStorage.getItem('presentations') || '[]').length;
+      localStorage.setItem('presentations', JSON.stringify([]));
+      currentPresentation = null;
+      const card = document.getElementById('presentation-result-card');
+      if (card) card.style.display = 'none';
+      try { renderLibrary(); } catch (_) {}
+      return `Удалено презентаций: ${before}`;
     });
 }
 
@@ -8195,7 +9258,8 @@ async function adminDeleteEverything() {
     '✗ Все аудио в IDB и Whisper-кэш\n' +
     '✗ Все готовые протоколы\n' +
     '✗ Реестр требований\n' +
-    '✗ Отчёт об обследовании\n\n' +
+    '✗ Все отчёты об обследовании\n' +
+    '✗ Все презентации\n\n' +
     '✓ API-ключи останутся\n' +
     '✓ НСИ останется\n\n' +
     'После — никаких следов в браузере, на дисках и на серверах Google.\n' +
@@ -8203,7 +9267,7 @@ async function adminDeleteEverything() {
 
   const status = document.getElementById('admin-status');
   const setS = (html) => { if (status) status.innerHTML = html; };
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 1/6: видео и сессии...</div>');
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 1/7: видео и сессии...</div>');
 
   // Шаг 1: Google + sessions + аудио сессий
   try {
@@ -8233,7 +9297,7 @@ async function adminDeleteEverything() {
   } catch (_) {}
 
   // Шаг 2: оставшийся аудио-кэш + Whisper
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 2/6: аудио-кэш и Whisper...</div>');
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 2/7: аудио-кэш и Whisper...</div>');
   try {
     const db = await openAudioDB();
     const allKeys = await new Promise((resolve) => {
@@ -8248,14 +9312,14 @@ async function adminDeleteEverything() {
   currentTranscriptText = '';
 
   // Шаг 3: протоколы
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 3/6: протоколы...</div>');
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 3/7: протоколы...</div>');
   localStorage.setItem('protocols', JSON.stringify([]));
   currentProtocolText = '';
   currentRequirementsText = '';
   currentReportTheses = [];
 
   // Шаг 4: требования
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 4/6: требования (все проекты)...</div>');
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 4/7: требования (все проекты)...</div>');
   try {
     const reqKeys = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -8269,14 +9333,22 @@ async function adminDeleteEverything() {
     }
   } catch (_) {}
 
-  // Шаг 5: отчёт об обследовании
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 5/6: отчёт об обследовании...</div>');
+  // Шаг 5: отчёты и презентации (localStorage + in-memory)
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 5/7: отчёты и презентации...</div>');
+  localStorage.setItem('reports', JSON.stringify([]));
+  localStorage.setItem('presentations', JSON.stringify([]));
   currentReportText = '';
   reportData = null;
+  currentPresentation = null;
   const repPrev = document.getElementById('report-preview');
   if (repPrev) repPrev.textContent = '';
+  const repCard = document.getElementById('report-result-card');
+  if (repCard) repCard.style.display = 'none';
+  const presCard = document.getElementById('presentation-result-card');
+  if (presCard) presCard.style.display = 'none';
 
   // F-NSI-Hierarchy: дополнительно — очистка логотипов проектов из IDB
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 6/7: логотипы проектов...</div>');
   try {
     const logoKeys = await idbListLogoKeys();
     for (const k of logoKeys) {
@@ -8285,8 +9357,8 @@ async function adminDeleteEverything() {
     }
   } catch (_) {}
 
-  // Шаг 6: финальный refresh UI
-  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 6/6: обновление интерфейса...</div>');
+  // Шаг 7: финальный refresh UI
+  setS('<div style="color:#64748b;font-size:13px">⏳ Шаг 7/7: обновление интерфейса...</div>');
   // Refresh UI всех вкладок
   try { renderLibrary(); } catch (_) {}
   try { renderList && renderList('report'); } catch (_) {}
