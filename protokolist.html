@@ -284,6 +284,58 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 .seg-btn:hover:not(.seg-btn-active){color:#334155;background:rgba(255,255,255,.4)}
 .seg-btn.seg-btn-active{background:#fff;color:#3b82f6;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 
+/* Block 4: подвкладки Библиотеки */
+.lib-subtabs{display:flex;gap:2px;margin-bottom:16px;border-bottom:2px solid #e2e8f0;flex-wrap:wrap}
+.lib-subtab{padding:10px 16px;background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-2px;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;transition:.15s;font-family:inherit;display:inline-flex;align-items:center;gap:8px;line-height:1.2;white-space:nowrap}
+.lib-subtab:hover{color:#334155;background:#f8fafc}
+.lib-subtab.active{color:#3b82f6;border-bottom-color:#3b82f6;font-weight:600;background:transparent}
+.lib-count{display:inline-block;background:#f1f5f9;color:#64748b;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;min-width:20px;text-align:center;line-height:1.5}
+.lib-subtab.active .lib-count{background:#dbeafe;color:#1d4ed8}
+
+.lib-row{background:#fff;border:1px solid #e2e8f0;border-radius:9px;padding:12px 14px;margin-bottom:8px;display:flex;flex-direction:column;gap:8px;transition:.15s}
+.lib-row.lib-row-clickable{cursor:pointer}
+.lib-row.lib-row-clickable:hover{border-color:#3b82f6;box-shadow:0 2px 8px rgba(59,130,246,.08)}
+.lib-row-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lib-row-title{font-size:14px;font-weight:600;color:#1e293b;flex:1;min-width:0;line-height:1.3}
+.lib-row-sub{font-size:12px;color:#64748b;line-height:1.4;display:flex;gap:10px;flex-wrap:wrap}
+.lib-row-actions{display:flex;gap:6px;flex-wrap:wrap}
+.lib-row-actions .btn{font-size:12px;padding:5px 12px}
+.lib-badge-version{display:inline-block;background:#ede9fe;color:#6d28d9;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;border:1px solid #ddd6fe}
+.lib-badge-proj{display:inline-block;background:#f0f9ff;color:#0369a1;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;border:1px solid #bae6fd}
+.lib-audio-player{margin-top:6px;width:100%;max-width:520px}
+.lib-audio-player audio{width:100%;height:38px}
+
+/* Модалка предпросмотра */
+.lib-modal{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;animation:libModalIn .15s ease-out}
+@keyframes libModalIn{from{opacity:0}to{opacity:1}}
+.lib-modal-overlay{position:absolute;inset:0;background:rgba(15,23,42,.6);cursor:pointer}
+.lib-modal-content{position:relative;background:#fff;width:92vw;max-width:920px;max-height:88vh;border-radius:14px;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden}
+.lib-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #e2e8f0;background:#f8fafc;flex-shrink:0;gap:12px}
+.lib-modal-title{font-size:15px;font-weight:600;color:#1e293b;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lib-modal-actions{display:flex;gap:10px;align-items:center;flex-shrink:0}
+.lib-modal-close{background:none;border:none;font-size:26px;color:#64748b;cursor:pointer;padding:0 8px;line-height:1;font-weight:300;transition:.15s}
+.lib-modal-close:hover{color:#1e293b}
+.lib-modal-body{flex:1;overflow-y:auto;padding:24px 32px;font-size:14px;line-height:1.65;color:#334155;background:#fff}
+.lib-modal-body h1,.lib-modal-body h2,.lib-modal-body h3,.lib-modal-body h4{color:#1e293b;margin-top:1.4em;margin-bottom:.5em;font-weight:600;line-height:1.3}
+.lib-modal-body h1{font-size:22px;border-bottom:2px solid #e2e8f0;padding-bottom:8px}
+.lib-modal-body h2{font-size:18px}
+.lib-modal-body h3{font-size:16px}
+.lib-modal-body h4{font-size:14px}
+.lib-modal-body table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
+.lib-modal-body th,.lib-modal-body td{border:1px solid #d1d5db;padding:8px 11px;text-align:left;vertical-align:top}
+.lib-modal-body th{background:#f1f5f9;font-weight:600;color:#1e293b}
+.lib-modal-body p{margin:8px 0}
+.lib-modal-body ul,.lib-modal-body ol{margin:8px 0;padding-left:26px}
+.lib-modal-body li{margin:4px 0}
+.lib-modal-body strong{color:#1e293b}
+.lib-modal-body code{background:#f1f5f9;padding:1px 6px;border-radius:4px;font-size:13px;color:#be185d}
+.lib-modal-body hr{border:none;border-top:1px solid #e2e8f0;margin:18px 0}
+@media (max-width:640px){
+  .lib-modal-content{width:100vw;height:100vh;max-height:100vh;border-radius:0}
+  .lib-modal-body{padding:16px 20px}
+  .lib-modal-title{font-size:13px}
+}
+
 /* TRANSCRIPT UPLOAD (альтернативный вход в Шаге 1) */
 .transcript-upload-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .transcript-hint{font-size:12px;color:#94a3b8;flex:1;min-width:160px}
@@ -795,10 +847,49 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 <!-- ======= LIBRARY ======= -->
 <div class="page" id="page-library">
   <div class="card">
-    <div class="card-title"><div class="card-title-icon icon-blue">📂</div>Файлы на серверах Google</div>
-    <p style="font-size:13px;color:#64748b;margin-bottom:12px">Файлы хранятся 48 часов. Нажми на встречу чтобы переделать протокол без повторной загрузки видео.</p>
-    <div id="library-list"><div class="empty-state"><div class="empty-state-icon">📂</div>Нет сохранённых сессий загрузки</div></div>
+    <div class="card-title"><div class="card-title-icon icon-blue">📂</div>Библиотека файлов</div>
+
+    <!-- Block 4: подвкладки Видео / Аудио / Протоколы / Отчёты -->
+    <div class="lib-subtabs">
+      <button type="button" class="lib-subtab" data-subtab="videos" onclick="showLibSubtab('videos')">🎥 Видео <span class="lib-count" id="lib-count-videos">0</span></button>
+      <button type="button" class="lib-subtab" data-subtab="audio" onclick="showLibSubtab('audio')">🎵 Аудио <span class="lib-count" id="lib-count-audio">0</span></button>
+      <button type="button" class="lib-subtab" data-subtab="protocols" onclick="showLibSubtab('protocols')">📝 Протоколы <span class="lib-count" id="lib-count-protocols">0</span></button>
+      <button type="button" class="lib-subtab" data-subtab="reports" onclick="showLibSubtab('reports')">📄 Отчёты <span class="lib-count" id="lib-count-reports">0</span></button>
+    </div>
+
+    <div id="lib-pane-videos" class="lib-pane">
+      <p style="font-size:13px;color:#64748b;margin-bottom:12px">Файлы на серверах Google хранятся 48 часов. Нажми на встречу чтобы переделать протокол без повторной загрузки.</p>
+      <div id="library-list"><div class="empty-state"><div class="empty-state-icon">🎥</div>Нет активных файлов</div></div>
+    </div>
+    <div id="lib-pane-audio" class="lib-pane" style="display:none">
+      <p style="font-size:13px;color:#64748b;margin-bottom:12px">Извлечённые аудиодорожки. Можно прослушать прямо здесь — формат MP3 16kHz mono.</p>
+      <div id="lib-audio-list"></div>
+    </div>
+    <div id="lib-pane-protocols" class="lib-pane" style="display:none">
+      <p style="font-size:13px;color:#64748b;margin-bottom:12px">Сохранённые протоколы интервью. Жми на строку чтобы увидеть содержимое, скачать .docx или удалить.</p>
+      <div id="lib-protocols-list"></div>
+    </div>
+    <div id="lib-pane-reports" class="lib-pane" style="display:none">
+      <p style="font-size:13px;color:#64748b;margin-bottom:12px">Сгенерированные отчёты об обследовании. Каждая генерация создаёт новую версию для проекта.</p>
+      <div id="lib-reports-list"></div>
+    </div>
+
     <div id="library-status"></div>
+  </div>
+</div>
+
+<!-- Block 4: модалка предпросмотра протокола/отчёта -->
+<div id="lib-preview-modal" class="lib-modal" style="display:none">
+  <div class="lib-modal-overlay" onclick="closeLibPreview()"></div>
+  <div class="lib-modal-content">
+    <div class="lib-modal-head">
+      <div class="lib-modal-title" id="lib-preview-title">Предпросмотр</div>
+      <div class="lib-modal-actions">
+        <button type="button" class="btn btn-success" id="lib-preview-download" style="font-size:12px;padding:7px 14px">⬇️ Скачать .docx</button>
+        <button type="button" class="lib-modal-close" onclick="closeLibPreview()" title="Закрыть">×</button>
+      </div>
+    </div>
+    <div class="lib-modal-body" id="lib-preview-body"></div>
   </div>
 </div>
 
@@ -4843,6 +4934,250 @@ function saveProtocol(opts = {}) {
 
 const getProtocols = () => JSON.parse(localStorage.getItem('protocols') || '[]');
 
+// Block 4: хранение сгенерированных отчётов в localStorage['reports'].
+// Структура: [{id, projectId, projectName, version, generatedAt, reportDate, reportData}]
+// version — порядковый номер для проекта (автоинкремент при каждой генерации).
+const getReports = () => JSON.parse(localStorage.getItem('reports') || '[]');
+
+function saveReportToLibrary(rd) {
+  if (!rd || !rd.project) return null;
+  const all = getReports();
+  // Версия = максимум для этого проекта + 1
+  const projVersions = all
+    .filter(r => r.projectId === rd.project.id)
+    .map(r => r.version || 0);
+  const version = (projVersions.length ? Math.max(...projVersions) : 0) + 1;
+  const saved = {
+    id: Date.now(),
+    projectId: rd.project.id,
+    projectName: rd.project.name || '(без названия)',
+    version,
+    generatedAt: Date.now(),
+    reportDate: rd.reportDate || today(),
+    reportData: rd
+  };
+  all.unshift(saved);
+  try {
+    localStorage.setItem('reports', JSON.stringify(all));
+  } catch (e) {
+    console.warn('[reports] localStorage переполнен, не удалось сохранить отчёт', e);
+    // Удаляем самые старые отчёты пока не влезет
+    while (all.length > 1) {
+      all.pop();
+      try {
+        localStorage.setItem('reports', JSON.stringify(all));
+        break;
+      } catch (_) { /* пробуем ещё */ }
+    }
+  }
+  return saved;
+}
+
+function deleteReportFromLibrary(id) {
+  if (!confirm('Удалить эту версию отчёта? Восстановить будет нельзя.')) return;
+  const list = getReports().filter(r => r.id !== id);
+  localStorage.setItem('reports', JSON.stringify(list));
+  try { renderLibrary(); } catch (_) {}
+}
+
+// Block 4: простой markdown → HTML рендерер для предпросмотра
+// Поддерживает: # ## ### #### заголовки, **bold**, *italic*, `code`,
+// списки -/*/1., таблицы вида | a | b | с разделителем, --- (hr), параграфы.
+// Этого достаточно для протоколов и отчётов которые мы генерируем.
+function libRenderMarkdown(md) {
+  if (!md) return '';
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const lines = String(md).replace(/\r\n/g, '\n').split('\n');
+  const out = [];
+  let i = 0;
+
+  // Inline форматирование (внутри строки)
+  const inline = (s) => {
+    let t = esc(s);
+    // bold **x** — сначала, чтобы не съел * как italic
+    t = t.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    // italic *x* (не на стыках со словом)
+    t = t.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>');
+    // inline `code`
+    t = t.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    return t;
+  };
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Пустая
+    if (!line.trim()) { i++; continue; }
+
+    // Заголовки
+    const h = line.match(/^(#{1,4})\s+(.+)$/);
+    if (h) {
+      const lvl = h[1].length;
+      out.push(`<h${lvl}>${inline(h[2].trim())}</h${lvl}>`);
+      i++; continue;
+    }
+
+    // Горизонтальный разделитель
+    if (/^---+\s*$/.test(line) || /^━{3,}/.test(line) || /^═{3,}/.test(line)) {
+      out.push('<hr>'); i++; continue;
+    }
+
+    // Таблица: первая строка с | и | и разделитель |---|---|
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+      const headerCells = line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      i += 2; // пропускаем заголовок и разделитель
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+        const cells = lines[i].trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+        rows.push(cells);
+        i++;
+      }
+      let html = '<table><thead><tr>';
+      headerCells.forEach(c => html += `<th>${inline(c)}</th>`);
+      html += '</tr></thead><tbody>';
+      rows.forEach(r => {
+        html += '<tr>';
+        r.forEach(c => html += `<td>${inline(c)}</td>`);
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      out.push(html);
+      continue;
+    }
+
+    // Маркированный список
+    if (/^\s*[-*+]\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\s*[-*+]\s+/, ''));
+        i++;
+      }
+      out.push('<ul>' + items.map(it => `<li>${inline(it)}</li>`).join('') + '</ul>');
+      continue;
+    }
+
+    // Нумерованный список
+    if (/^\s*\d+\.\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\s*\d+\.\s+/, ''));
+        i++;
+      }
+      out.push('<ol>' + items.map(it => `<li>${inline(it)}</li>`).join('') + '</ol>');
+      continue;
+    }
+
+    // Параграф (объединяем подряд идущие непустые строки)
+    const paragraph = [];
+    while (i < lines.length && lines[i].trim() &&
+           !/^(#{1,4}\s|\s*[-*+]\s|\s*\d+\.\s|---|━{3,}|═{3,}|\s*\|.*\|)/.test(lines[i])) {
+      paragraph.push(lines[i]);
+      i++;
+    }
+    if (paragraph.length) {
+      out.push(`<p>${inline(paragraph.join(' '))}</p>`);
+    }
+  }
+
+  return out.join('\n');
+}
+
+// ── Открыть модалку с предпросмотром ────────────────
+function openLibPreview(title, html, onDownload) {
+  const modal = document.getElementById('lib-preview-modal');
+  const titleEl = document.getElementById('lib-preview-title');
+  const bodyEl  = document.getElementById('lib-preview-body');
+  const dlBtn   = document.getElementById('lib-preview-download');
+  if (!modal) return;
+  titleEl.textContent = title;
+  bodyEl.innerHTML = html;
+  bodyEl.scrollTop = 0;
+  // Перебиндим кнопку скачивания (используем cloneNode чтобы убрать старые слушатели)
+  const newBtn = dlBtn.cloneNode(true);
+  dlBtn.parentNode.replaceChild(newBtn, dlBtn);
+  newBtn.addEventListener('click', () => {
+    try { onDownload && onDownload(); } catch (e) { console.error(e); }
+  });
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  // Esc — закрыть
+  const escHandler = (e) => {
+    if (e.key === 'Escape') { closeLibPreview(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
+}
+
+function closeLibPreview() {
+  const modal = document.getElementById('lib-preview-modal');
+  if (modal) modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// ── Действия для протоколов ──────────────────────────
+function openLibProtocolPreview(protocolId) {
+  const p = getProtocols().find(x => x.id === protocolId);
+  if (!p) { alert('Протокол не найден'); return; }
+  // Склеиваем основной текст + требования (как в downloadDocx)
+  let mergedText = p.protocol || '';
+  if (p.requirements && !/ЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ/i.test(mergedText)) {
+    mergedText = mergedText.trimEnd() + '\n\nЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ:\n' + p.requirements.trim() + '\n';
+  }
+  const html = libRenderMarkdown(mergedText);
+  openLibPreview(p.title || '(без названия)', html, () => downloadProtocolFromLibrary(protocolId));
+}
+
+async function downloadProtocolFromLibrary(protocolId) {
+  const p = getProtocols().find(x => x.id === protocolId);
+  if (!p) { alert('Протокол не найден'); return; }
+  // Ждём библиотеку docx
+  if (!window.docx) {
+    let waited = 0;
+    while (!window.docx && waited < 15000) { await sleep(300); waited += 300; }
+  }
+  if (!window.docx) { alert('Библиотека docx не загрузилась'); return; }
+  let mergedText = p.protocol || '';
+  if (p.requirements && !/ЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ/i.test(mergedText)) {
+    mergedText = mergedText.trimEnd() + '\n\nЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ:\n' + p.requirements.trim() + '\n';
+  }
+  const safeName = (p.title || 'протокол').replace(/[\\/:*?"<>|]+/g, '_');
+  await downloadProtocolDocx(mergedText, `${safeName}.docx`);
+}
+
+function deleteProtocolFromLibrary(protocolId) {
+  if (!confirm('Удалить этот протокол навсегда? Восстановить будет нельзя.')) return;
+  const list = getProtocols().filter(x => x.id !== protocolId);
+  localStorage.setItem('protocols', JSON.stringify(list));
+  try { renderLibrary(); } catch (_) {}
+}
+
+// ── Действия для отчётов ─────────────────────────────
+function openLibReportPreview(reportId) {
+  const r = getReports().find(x => x.id === reportId);
+  if (!r) { alert('Отчёт не найден'); return; }
+  // Превью текстом из той же функции, что используется на вкладке Отчёт
+  let previewText = '';
+  try {
+    previewText = (typeof buildReportPreviewText === 'function') ? buildReportPreviewText(r.reportData) : '(нет превью)';
+  } catch (e) {
+    previewText = '(не удалось построить превью: ' + e.message + ')';
+  }
+  const html = libRenderMarkdown(previewText);
+  const title = `${r.projectName} — отчёт v${r.version}`;
+  openLibPreview(title, html, () => downloadReportFromLibrary(reportId));
+}
+
+async function downloadReportFromLibrary(reportId) {
+  const r = getReports().find(x => x.id === reportId);
+  if (!r) { alert('Отчёт не найден'); return; }
+  if (!window.docx) {
+    let waited = 0;
+    while (!window.docx && waited < 15000) { await sleep(300); waited += 300; }
+  }
+  if (!window.docx) { alert('Библиотека docx не загрузилась'); return; }
+  const safeName = `${r.projectName}_отчёт_v${r.version}`.replace(/[\\/:*?"<>|]+/g, '_');
+  await downloadReportDocx(`${safeName}.docx`, r.reportData);
+}
+
 // ══════════════════════════════════════════════════════
 // E3: Реестр требований — хранение и автопоток из протокола
 // ══════════════════════════════════════════════════════
@@ -5263,7 +5598,7 @@ function regRowHtml(r, executors, areas) {
   ).join('');
 
   const sourceClickable = r.protocolId
-    ? `<a class="reg-cell-source" onclick="openProtocolFromRegistry(${r.protocolId});return false" href="#" title="Открыть протокол в Библиотеке">${escHtml(r.source || '')}</a>`
+    ? `<a class="reg-cell-source" onclick="openProtocolFromRegistry(${r.protocolId});return false" href="#" title="Открыть протокол в Библиотеке → Протоколы">${escHtml(r.source || '')}</a>`
     : `<span style="font-size:11px;color:#94a3b8">${escHtml(r.source || '')}</span>`;
 
   const actions = r.archived
@@ -5571,23 +5906,32 @@ function deleteRegRow(rid) {
 
 // ── Кликабельный источник: переход в Библиотеку ──
 function openProtocolFromRegistry(protocolId) {
-  // Активируем вкладку Library
+  // Block 4: переключаемся на вкладку Библиотека → подвкладка Протоколы
   const tabs = document.querySelectorAll('.tab');
   let libTab = null;
   tabs.forEach(t => { if (t.textContent.includes('Библиотека')) libTab = t; });
   if (libTab) libTab.click();
-  // После рендера прокрутимся к нужному элементу (если есть его id-якорь)
+  // showTab вызовет renderLibrary который активирует libActiveSubtab.
+  // Принудительно переключаемся на «Протоколы» и подсвечиваем строку.
   setTimeout(() => {
-    const item = document.querySelector(`[data-protocol-id="${protocolId}"]`)
-              || document.querySelector(`#lib-${protocolId}`);
-    if (item) {
-      item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      item.style.transition = 'background .8s';
-      const orig = item.style.background;
-      item.style.background = '#fef3c7';
-      setTimeout(() => { item.style.background = orig; }, 1200);
-    }
-  }, 250);
+    showLibSubtab('protocols');
+    setTimeout(() => {
+      const item = document.querySelector(`#lib-proto-${protocolId}`)
+                || document.querySelector(`[data-protocol-id="${protocolId}"]`);
+      if (item) {
+        item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        item.style.transition = 'background .8s, border-color .8s';
+        const origBg = item.style.background;
+        const origBd = item.style.borderColor;
+        item.style.background = '#fef3c7';
+        item.style.borderColor = '#f59e0b';
+        setTimeout(() => {
+          item.style.background = origBg;
+          item.style.borderColor = origBd;
+        }, 1400);
+      }
+    }, 80);
+  }, 200);
 }
 
 // ── XLSX экспорт по стилям шаблона Cemix ──
@@ -6035,7 +6379,16 @@ async function generateReport() {
     document.getElementById('report-preview').textContent = currentReportText;
     document.getElementById('report-result-card').style.display = 'block';
     document.getElementById('report-result-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    showStatus('report-status', 'success', `✅ Отчёт готов! Скачай .docx ниже.`);
+
+    // Block 4: автосохранение в Библиотеку → подвкладка «Отчёты»
+    let _savedVersion = '';
+    try {
+      const savedRep = saveReportToLibrary(reportData);
+      if (savedRep) _savedVersion = ` (версия ${savedRep.version})`;
+    } catch (e) {
+      console.warn('[reports] не удалось сохранить в библиотеку', e);
+    }
+    showStatus('report-status', 'success', `✅ Отчёт готов${_savedVersion}! Скачай .docx ниже или вернись к нему позже через «Библиотека → Отчёты».`);
   } catch (e) {
     console.error('[report] generation failed:', e);
     showStatus('report-status', 'error', `Ошибка: ${e.message}`);
@@ -6675,9 +7028,11 @@ async function downloadSimpleDocx(text, filename) {
 // Шаблон Cemix: шапка «Утверждаю» → Заголовок → таблица параметров → Глоссарий
 //   → Раздел 1 → Раздел 2 (с подразделами AS-IS) → Раздел 3 → Лист согласования.
 
-async function downloadReportDocx(filename) {
-  if (!reportData) { alert('Сначала сгенерируй отчёт'); return; }
-  const d = reportData;
+async function downloadReportDocx(filename, dataOverride) {
+  // Block 4: можно передать готовые данные (для отчётов из Библиотеки).
+  // Если не передано — берём текущий глобал.
+  const d = dataOverride || reportData;
+  if (!d) { alert('Сначала сгенерируй отчёт'); return; }
   const D = window.docx;
   if (!D) { alert('Библиотека docx не загрузилась'); return; }
 
@@ -7113,21 +7468,76 @@ function saveTranscriptToSession(fileKey, transcriptText) {
 }
 
 
+// Block 4: текущая активная подвкладка библиотеки
+let libActiveSubtab = 'videos';
+
+// Главный роутер библиотеки. Вызывается из showTab('library') и при обновлениях.
 function renderLibrary() {
-  // Автоматически убираем истёкшие записи (старше 48 часов)
+  // Чистка истёкших сессий (>48ч)
   const now = Date.now();
   let sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
   localStorage.setItem('upload_sessions', JSON.stringify(sessions));
-
-  // Параллельно чистим аудио-кэш от записей, у которых больше нет сессий (истекшие, удалённые)
   cleanupOrphanAudioBlobs();
 
+  // Активируем сохранённую подвкладку (по умолчанию videos)
+  showLibSubtab(libActiveSubtab || 'videos');
+  updateLibCounts();
+}
+
+// Block 4: переключение подвкладки внутри Библиотеки
+function showLibSubtab(name) {
+  // Если уходим с аудио — освобождаем blob URLs (иначе в памяти зависнут МБ)
+  if (libActiveSubtab === 'audio' && name !== 'audio') {
+    document.querySelectorAll('#lib-audio-list audio[data-blob-url]').forEach(a => {
+      try { URL.revokeObjectURL(a.dataset.blobUrl); } catch (_) {}
+      try { a.pause(); } catch (_) {}
+    });
+  }
+  libActiveSubtab = name;
+  document.querySelectorAll('.lib-pane').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.lib-subtab').forEach(t => t.classList.remove('active'));
+  const pane = document.getElementById(`lib-pane-${name}`);
+  if (pane) pane.style.display = '';
+  const tab = document.querySelector(`.lib-subtab[data-subtab="${name}"]`);
+  if (tab) tab.classList.add('active');
+  // Перерисовать содержимое
+  if (name === 'videos')         renderLibVideos();
+  else if (name === 'audio')     renderLibAudio();
+  else if (name === 'protocols') renderLibProtocols();
+  else if (name === 'reports')   renderLibReports();
+}
+
+// Обновить счётчики на табах
+function updateLibCounts() {
+  const now = Date.now();
+  const sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('lib-count-videos', sessions.length);
+  set('lib-count-protocols', getProtocols().length);
+  set('lib-count-reports', getReports().length);
+  // Аудио — async подсчёт (количество сессий с аудио в IDB)
+  (async () => {
+    let count = 0;
+    for (const s of sessions) {
+      try {
+        const cached = await getAudioBlob(s.fileKey);
+        if (cached && cached.blob) count++;
+      } catch (_) {}
+    }
+    set('lib-count-audio', count);
+  })();
+}
+
+// ── Видео (старая логика, теперь в собственной функции) ───────
+function renderLibVideos() {
+  const now = Date.now();
+  let sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
   const el = document.getElementById('library-list');
+  if (!el) return;
   if (!sessions.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div>Нет активных файлов.<br>Загрузи видео на вкладке «Протокол встречи».</div>';
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎥</div>Нет активных файлов.<br>Загрузи видео на вкладке «Протокол встречи».</div>';
     return;
   }
-
   el.innerHTML = sessions.map(s => {
     const hoursLeft = Math.round(48 - (now - s.uploadedAt) / 1000 / 60 / 60);
     const isWarn = hoursLeft < 12;
@@ -7143,12 +7553,10 @@ function renderLibrary() {
     const transcriptBadge = hasTranscript
       ? `<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;white-space:nowrap" title="Сохранена транскрипция (${s.transcript.length.toLocaleString('ru-RU')} символов)">📝 транскрипция</span>`
       : '';
-    // Слот для бейджа «🎵 аудио в кэше» — заполняется async ниже, после рендера
     const audioBadgeSlot = `<span class="audio-badge-slot" data-fkey="${escHtml(s.fileKey || '')}"></span>`;
     const statusBadge = isPartial
       ? `<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;white-space:nowrap">⚠️ ${doneCount}/${s.numParts}</span>`
       : `<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;white-space:nowrap">✅ Готово</span>`;
-    // Кликабельность строки — только если загрузка завершена
     const rowClick = isPartial ? '' : `onclick="loadSessionToMainPage(${s.id})"`;
     const rowCursor = isPartial ? 'default' : 'pointer';
     const rowHover = isPartial ? '' : 'class="library-row-clickable"';
@@ -7175,9 +7583,7 @@ function renderLibrary() {
         }
       </div>`;
   }).join('');
-
-  // Прогрессивное дополнение: для каждой строки проверяем IDB на наличие аудио
-  // и подставляем бейдж «🎵 аудио в кэше» с размером файла.
+  // Бейдж аудио из IDB
   setTimeout(async () => {
     const slots = document.querySelectorAll('#library-list .audio-badge-slot[data-fkey]');
     for (const slot of slots) {
@@ -7189,9 +7595,126 @@ function renderLibrary() {
           const mb = (cached.blob.size / 1024 / 1024).toFixed(1);
           slot.outerHTML = `<span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;white-space:nowrap" title="Аудио лежит в кэше браузера (${mb} МБ) — Whisper можно запустить даже после F5">🎵 аудио ${mb} МБ</span>`;
         }
-      } catch (e) { /* IDB недоступен — оставляем слот пустым */ }
+      } catch (e) { /* IDB недоступен */ }
     }
   }, 0);
+}
+
+// ── Аудио (новый блок: плеер для каждой записи в IDB) ─────
+async function renderLibAudio() {
+  const el = document.getElementById('lib-audio-list');
+  if (!el) return;
+  el.innerHTML = '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Загружаю аудио из кэша...</div>';
+
+  const now = Date.now();
+  const sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
+  const items = [];
+  for (const s of sessions) {
+    try {
+      const cached = await getAudioBlob(s.fileKey);
+      if (cached && cached.blob) {
+        items.push({ session: s, audio: cached });
+      }
+    } catch (_) {}
+  }
+
+  if (!items.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎵</div>Нет аудио в кэше.<br>Загрузи видео — аудио будет извлечено автоматически.</div>';
+    return;
+  }
+
+  // Освобождаем старые blob URLs перед перерендером
+  document.querySelectorAll('#lib-audio-list audio[data-blob-url]').forEach(a => {
+    try { URL.revokeObjectURL(a.dataset.blobUrl); } catch (_) {}
+  });
+
+  el.innerHTML = items.map(({session: s, audio}) => {
+    const mb = (audio.blob.size / 1024 / 1024).toFixed(1);
+    const url = URL.createObjectURL(audio.blob);
+    return `
+      <div class="lib-row">
+        <div class="lib-row-head">
+          <div class="lib-row-title">🎵 ${escHtml(s.fileName)}</div>
+        </div>
+        <div class="lib-row-sub">
+          <span>${s.date}</span>
+          <span>·</span>
+          <span>${mb} МБ</span>
+          ${s.durationSec ? `<span>·</span><span>${fmtDuration(s.durationSec)}</span>` : ''}
+        </div>
+        <div class="lib-audio-player">
+          <audio controls preload="metadata" data-blob-url="${url}" src="${url}"></audio>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Протоколы (новый блок: список + просмотр + скачать) ─────
+function renderLibProtocols() {
+  const el = document.getElementById('lib-protocols-list');
+  if (!el) return;
+  const protocols = getProtocols();
+  if (!protocols.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div>Нет сохранённых протоколов.<br>Создай протокол на вкладке «Протокол встречи».</div>';
+    return;
+  }
+  const projMap = new Map((getNSI().projects || []).map(p => [p.id, p.name]));
+  el.innerHTML = protocols.map(p => {
+    const projName = p.projectId ? (projMap.get(p.projectId) || 'удалённый проект') : '—';
+    const reqsCount = (p.requirements || '').trim().split(/\n+/).filter(Boolean).length;
+    return `
+      <div class="lib-row" id="lib-proto-${p.id}" data-protocol-id="${p.id}">
+        <div class="lib-row-head">
+          <div class="lib-row-title">${escHtml(p.title || '(без названия)')}</div>
+          <span class="lib-badge-proj">📁 ${escHtml(projName)}</span>
+        </div>
+        <div class="lib-row-sub">
+          <span>📅 ${escHtml(p.date || '')}</span>
+          ${p.protocolNumber ? `<span>·</span><span>№ ${p.protocolNumber}</span>` : ''}
+          <span>·</span>
+          <span>${(p.protocol || '').length.toLocaleString('ru-RU')} симв.</span>
+          ${reqsCount ? `<span>·</span><span>📋 ~${reqsCount} требований</span>` : ''}
+        </div>
+        <div class="lib-row-actions">
+          <button class="btn btn-secondary" onclick="openLibProtocolPreview(${p.id})">👁 Просмотр</button>
+          <button class="btn btn-success" onclick="downloadProtocolFromLibrary(${p.id})">⬇️ Скачать .docx</button>
+          <button class="btn btn-secondary" onclick="deleteProtocolFromLibrary(${p.id})" title="Удалить навсегда" style="color:#dc2626">🗑 Удалить</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Отчёты (новый блок) ─────
+function renderLibReports() {
+  const el = document.getElementById('lib-reports-list');
+  if (!el) return;
+  const reports = getReports();
+  if (!reports.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📄</div>Нет сгенерированных отчётов.<br>Перейди на вкладку «Отчёт об обследовании».</div>';
+    return;
+  }
+  el.innerHTML = reports.map(r => {
+    const dt = new Date(r.generatedAt);
+    const dtStr = dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+    return `
+      <div class="lib-row" id="lib-report-${r.id}">
+        <div class="lib-row-head">
+          <div class="lib-row-title">${escHtml(r.projectName)}</div>
+          <span class="lib-badge-version">v${r.version}</span>
+          <span class="lib-badge-proj">📁 проект</span>
+        </div>
+        <div class="lib-row-sub">
+          <span>📅 дата отчёта: ${escHtml(r.reportDate)}</span>
+          <span>·</span>
+          <span>🕒 сгенерирован: ${dtStr}</span>
+        </div>
+        <div class="lib-row-actions">
+          <button class="btn btn-secondary" onclick="openLibReportPreview(${r.id})">👁 Просмотр</button>
+          <button class="btn btn-success" onclick="downloadReportFromLibrary(${r.id})">⬇️ Скачать .docx</button>
+          <button class="btn btn-secondary" onclick="deleteReportFromLibrary(${r.id})" title="Удалить эту версию" style="color:#dc2626">🗑 Удалить</button>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 async function deleteSession(id) {
