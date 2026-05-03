@@ -2802,14 +2802,14 @@ async function enrichTranscriptWithVideo() {
       }
 
       if (i < uploadedParts.length - 1) {
-        showAP(
-          `Шаг 2 из 2 — добавляю экранный контекст · пауза перед частью ${i + 2}`,
-          pct + 3,
-          `✓ Часть ${i + 1} готова · ждём лимит API`
-        );
         if (statusEl) statusEl.textContent =
           `✓ Часть ${i + 1} обработана, пауза перед следующей...`;
-        await sleep(20000);
+        await sleepWithCountdown(
+          20000,
+          `Шаг 2 из 2 · пауза перед частью ${i + 2}`,
+          pct + 3,
+          `✓ Часть ${i + 1} готова · соблюдаем лимит API`
+        );
       }
     }
 
@@ -3710,6 +3710,18 @@ function showAP(stage, pct, note) {
 }
 function hideAP() { document.getElementById('analysis-progress').style.display = 'none'; }
 
+// Пауза с обратным отсчётом для Шагов 2 и 3 — обновляет showAP каждую секунду.
+// Используется на rate-limit паузах между запросами к API,
+// чтобы юзер видел сколько осталось ждать.
+async function sleepWithCountdown(ms, stage, pct, baseNote) {
+  const totalSec = Math.ceil(ms / 1000);
+  for (let s = totalSec; s > 0; s--) {
+    if (typeof _checkCancelled === 'function') _checkCancelled();
+    showAP(`${stage} · ${s} с`, pct, baseNote || '');
+    await sleep(1000);
+  }
+}
+
 // Раньше каждое промежуточное «Шаг N — ...» дублировалось в плашке #protocol-status под Шагом 3
 // И ОДНОВРЕМЕННО в прогресс-баре. Теперь только в баре — текстовая плашка молча игнорит info-сообщения.
 // Чтобы не выкорчёвывать 12 call-сайтов, осталась стаб-функция с тем же интерфейсом.
@@ -4516,8 +4528,7 @@ async function generateProtocol() {
         ]);
         partTheses.push(thesesRaw || ''); // сохраняем в отдельный массив
 
-        showAP(`Пауза перед шагом ${step2}...`, pctBase + 2, 'Соблюдаем лимит API · тезисы готовы ✓');
-        await sleep(20000);
+        await sleepWithCountdown(20000, `Пауза перед шагом ${step2}`, pctBase + 2, 'Соблюдаем лимит API · тезисы готовы ✓');
 
         // Проход 2: полный протокол с готовыми тезисами
         _silentInfo(
@@ -4537,8 +4548,7 @@ async function generateProtocol() {
         partRequirements.push(rText);
 
         if (i < uploadedParts.length - 1) {
-          showAP(`Пауза перед частью ${i + 2}...`, pctBase + 7, 'Соблюдаем лимит API');
-          await sleep(20000);
+          await sleepWithCountdown(20000, `Пауза перед частью ${i + 2}`, pctBase + 7, 'Соблюдаем лимит API');
         }
       }
 
@@ -4550,7 +4560,7 @@ async function generateProtocol() {
       _silentInfo(
         `Шаг ${stepNum}/${totalSteps} — объединяю протоколы...`);
       showAP('Объединение протоколов...', 62, 'Шапка, глоссарий, вопросы, таблицы — без тезисов');
-      await sleep(20000);
+      await sleepWithCountdown(20000, 'Пауза перед объединением протоколов', 62, 'Соблюдаем лимит API');
       protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
 
       // Объединение тезисов ОТДЕЛЬНЫМ запросом — merge главного протокола их не касается
@@ -4559,7 +4569,7 @@ async function generateProtocol() {
         `Шаг ${stepNum}/${totalSteps} — объединяю тезисы...`);
       showAP('Объединение тезисов...', 70,
         'Консолидирую As Is / To Be по темам, ничего не теряя');
-      await sleep(20000);
+      await sleepWithCountdown(20000, 'Пауза перед объединением тезисов', 70, 'Соблюдаем лимит API');
       const mergedTheses = await callGemini([{
         text: MERGE_THESES_PROMPT(partTheses.filter(t => t && t.trim()), title)
       }]);
@@ -4569,7 +4579,7 @@ async function generateProtocol() {
       _silentInfo(
         `Шаг ${stepNum}/${totalSteps} — объединяю участников...`);
       showAP('Объединение участников...', 75, 'Собираю уникальных людей');
-      await sleep(20000);
+      await sleepWithCountdown(20000, 'Пауза перед объединением участников', 75, 'Соблюдаем лимит API');
       const mergedParticipants = await callGemini([{
         text: MERGE_PARTICIPANTS_PROMPT(partProtocols, title, teamText)
       }]);
@@ -4605,7 +4615,7 @@ async function generateProtocol() {
       _silentInfo(
         `Шаг ${stepNum}/${totalSteps} — объединяю реестры требований...`);
       showAP('Объединение реестров требований...', 82, 'Убираем дубли, сохраняем нюансы');
-      await sleep(20000);
+      await sleepWithCountdown(20000, 'Пауза перед объединением требований', 82, 'Соблюдаем лимит API');
       currentRequirementsText = await callGemini([{
         text: MERGE_REQUIREMENTS_PROMPT(partRequirements, title)
       }]);
@@ -4616,7 +4626,7 @@ async function generateProtocol() {
         `Шаг ${stepNum}/${totalSteps} — финальная проверка требований...`);
       showAP('Сверяю реестр с протоколом...', 90,
         'Проверяем не потерялось ли ничего при объединении');
-      await sleep(20000);
+      await sleepWithCountdown(20000, 'Пауза перед финальной проверкой', 90, 'Соблюдаем лимит API');
       currentRequirementsText = await callGemini([{
         text: FINAL_CHECK_REQUIREMENTS_PROMPT(protocolText, currentRequirementsText, title)
       }]);
@@ -4637,8 +4647,7 @@ async function generateProtocol() {
         { text: THESES_PROMPT(null, currentTranscriptText || '', hasVisual) }
       ]);
 
-      showAP('Пауза...', 45, 'Тезисы готовы ✓ · соблюдаем лимит API');
-      await sleep(20000);
+      await sleepWithCountdown(20000, 'Пауза перед протоколом', 45, 'Тезисы готовы ✓ · соблюдаем лимит API');
 
       _silentInfo( 'Шаг 2 из 2 — составляю протокол...');
       showAP('Шаг 2 из 2 — протокол', 55,
@@ -7759,6 +7768,50 @@ function ensureNSIDefaults() {
     nsi.functionalAreas = defaults.map(([name,prefix],i) => ({id: baseTs + i, name, prefix}));
     changed = true;
   }
+
+  // Block 3 миграция: позиции из string[] в {id, name}[].
+  // Поднимаем до объектов, чтобы участники могли ссылаться по id (positionId).
+  // При переименовании в справочнике все ссылки сразу обновятся.
+  if (Array.isArray(nsi.positions) && nsi.positions.length > 0 && typeof nsi.positions[0] === 'string') {
+    const baseTs2 = Date.now();
+    nsi.positions = nsi.positions.map((name, i) => ({id: baseTs2 + i, name}));
+    changed = true;
+  }
+  if (!Array.isArray(nsi.positions)) {
+    nsi.positions = [];
+    changed = true;
+  }
+
+  // Block 3 миграция: одноразовая очистка участников и команд проектов
+  // (старые форматы несовместимы с новой схемой Заказчик/Исполнитель + ссылка на должность).
+  // Делаем при первом запуске после миграции — флаг nsi._b3migrated предотвращает повторную очистку.
+  if (!nsi._b3migrated) {
+    if (Array.isArray(nsi.participants) && nsi.participants.length > 0) {
+      // Если у первого участника нет поля side — это старый формат, чистим всех
+      if (!nsi.participants[0].side) {
+        nsi.participants = [];
+        changed = true;
+      }
+    }
+    if (Array.isArray(nsi.projects)) {
+      nsi.projects.forEach(proj => {
+        // Старые команды используют isCurator/isLead/isApprover. Чистим.
+        if (Array.isArray(proj.customer) && proj.customer.length > 0 &&
+            (proj.customer[0].isCurator !== undefined || proj.customer[0].fio !== undefined)) {
+          proj.customer = [];
+          changed = true;
+        }
+        if (Array.isArray(proj.executor) && proj.executor.length > 0 &&
+            (proj.executor[0].isCurator !== undefined || proj.executor[0].fio !== undefined)) {
+          proj.executor = [];
+          changed = true;
+        }
+      });
+    }
+    nsi._b3migrated = true;
+    changed = true;
+  }
+
   if (changed) saveNSI(nsi);
 }
 
@@ -7788,7 +7841,19 @@ function isValidDateStr(s) {
   return dt.getDate() === d && dt.getMonth() === mo - 1 && dt.getFullYear() === y;
 }
 
-function deletePosition(idx) { const nsi=getNSI(); nsi.positions.splice(idx,1); saveNSI(nsi); renderNSI(); }
+function deletePosition(id) {
+  const nsi = getNSI();
+  // Block 3: проверяем используется ли должность участниками
+  const usedBy = (nsi.participants || []).filter(p => p.positionId === id);
+  if (usedBy.length > 0) {
+    const names = usedBy.slice(0, 5).map(p => p.name).join(', ') + (usedBy.length > 5 ? ' и ещё...' : '');
+    alert(`Эта должность используется у ${usedBy.length} ${pluralizeRu(usedBy.length, 'участника', 'участников', 'участников')}: ${names}\n\nСначала измени им должность.`);
+    return;
+  }
+  nsi.positions = nsi.positions.filter(p => p.id !== id);
+  saveNSI(nsi);
+  renderNSI();
+}
 
 function deleteParticipant(id) { const nsi=getNSI(); nsi.participants=nsi.participants.filter(p=>p.id!==id); saveNSI(nsi); renderNSI(); }
 
@@ -7870,7 +7935,9 @@ function pcRenderMiniCard(dict, id) {
 
   if (dict === 'positions') {
     titleEl.textContent = isNew ? 'Новая должность' : 'Редактирование должности';
-    const value = isNew ? '' : (nsi.positions[id] || '');
+    // Block 3: позиции теперь {id, name}, поиск по id
+    const pos = isNew ? null : nsi.positions.find(p => p.id === id);
+    const value = pos ? pos.name : '';
     html = `
       <div class="pc-field">
         <label>Название должности <span class="pc-req">*</span></label>
@@ -7914,14 +7981,16 @@ function saveMiniCard(closeAfter) {
   if (dict === 'positions') {
     const name = document.getElementById('mc-positions-name').value.trim();
     if (!name) return showErr('Введи название должности');
+    // Block 3: позиции — {id, name}; уникальность проверяем по name (case-insensitive)
+    const dupName = nsi.positions.find(p =>
+      p.name.toLowerCase() === name.toLowerCase() && p.id !== editingMcId
+    );
+    if (dupName) return showErr('Такая должность уже есть');
     if (isNew) {
-      if (nsi.positions.includes(name)) return showErr('Такая должность уже есть');
-      nsi.positions.push(name);
+      nsi.positions.push({id: Date.now(), name});
     } else {
-      if (nsi.positions[editingMcId] !== name && nsi.positions.includes(name)) {
-        return showErr('Такая должность уже есть');
-      }
-      nsi.positions[editingMcId] = name;
+      const p = nsi.positions.find(x => x.id === editingMcId);
+      if (p) p.name = name;
     }
     saveNSI(nsi);
   } else if (dict === 'participants') {
@@ -8529,10 +8598,10 @@ function renderNSILists() {
   const nsi = getNSI();
 
   const posList = document.getElementById('positions-list');
-  if (posList) posList.innerHTML = nsi.positions.length ? nsi.positions.map((pos,i)=>
-    `<div class="nsi-row" onclick="nsiOpenElementCard('positions', ${i})">
-      <span class="nsi-row-text">${escHtml(pos)}</span>
-      <button class="protocol-del" onclick="event.stopPropagation();deletePosition(${i})">×</button></div>`).join('')
+  if (posList) posList.innerHTML = nsi.positions.length ? nsi.positions.map(pos =>
+    `<div class="nsi-row" onclick="nsiOpenElementCard('positions', ${pos.id})">
+      <span class="nsi-row-text">${escHtml(pos.name)}</span>
+      <button class="protocol-del" onclick="event.stopPropagation();deletePosition(${pos.id})">×</button></div>`).join('')
     : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Пока нет элементов. Нажми «+ Добавить» сверху.</div>';
 
   const partList = document.getElementById('participants-list');
