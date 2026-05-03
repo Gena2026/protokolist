@@ -7687,7 +7687,14 @@ function renderLibProtocols() {
   const projMap = new Map((getNSI().projects || []).map(p => [p.id, p.name]));
   el.innerHTML = protocols.map(p => {
     const projName = p.projectId ? (projMap.get(p.projectId) || 'удалённый проект') : '—';
-    const reqsCount = (p.requirements || '').trim().split(/\n+/).filter(Boolean).length;
+    // Block 4 fix: считаем требования по реальному реестру проекта (только связанные с этим протоколом)
+    let reqsCount = 0;
+    if (p.projectId) {
+      try {
+        const all = getRequirements(p.projectId);
+        reqsCount = all.filter(r => r.protocolId === p.id && !r.archived).length;
+      } catch (_) {}
+    }
     return `
       <div class="lib-row" id="lib-proto-${p.id}" data-protocol-id="${p.id}">
         <div class="lib-row-head">
@@ -7699,7 +7706,7 @@ function renderLibProtocols() {
           ${p.protocolNumber ? `<span>·</span><span>№ ${p.protocolNumber}</span>` : ''}
           <span>·</span>
           <span>${(p.protocol || '').length.toLocaleString('ru-RU')} симв.</span>
-          ${reqsCount ? `<span>·</span><span>📋 ~${reqsCount} требований</span>` : ''}
+          ${reqsCount ? `<span>·</span><span>📋 ${reqsCount} ${pluralizeRu(reqsCount, 'требование', 'требования', 'требований')}</span>` : ''}
         </div>
         <div class="lib-row-actions">
           <button class="btn btn-secondary" onclick="openLibProtocolPreview(${p.id})">👁 Просмотр</button>
