@@ -7855,7 +7855,40 @@ function deletePosition(id) {
   renderNSI();
 }
 
-function deleteParticipant(id) { const nsi=getNSI(); nsi.participants=nsi.participants.filter(p=>p.id!==id); saveNSI(nsi); renderNSI(); }
+function deleteParticipant(id) {
+  const nsi = getNSI();
+  // Block 3: проверяем используется ли участник в командах проектов
+  const usedInProjects = [];
+  (nsi.projects || []).forEach(proj => {
+    const inCustomer = (proj.customer || []).some(m => m.participantId === id);
+    const inExecutor = (proj.executor || []).some(m => m.participantId === id);
+    if (inCustomer || inExecutor) usedInProjects.push(proj.name || '(без названия)');
+  });
+  if (usedInProjects.length > 0) {
+    const list = usedInProjects.slice(0, 5).join(', ') + (usedInProjects.length > 5 ? ' и ещё...' : '');
+    const ok = confirm(
+      `Этот участник используется в ${usedInProjects.length} ${pluralizeRu(usedInProjects.length, 'проекте', 'проектах', 'проектах')}: ${list}\n\n` +
+      `Удалить из них тоже?\n\n` +
+      `OK — удалить везде (включая команды проектов)\n` +
+      `Отмена — оставить всё как есть`
+    );
+    if (!ok) return;
+    // Каскадное удаление из команд
+    (nsi.projects || []).forEach(proj => {
+      if (Array.isArray(proj.customer)) {
+        proj.customer = proj.customer.filter(m => m.participantId !== id);
+      }
+      if (Array.isArray(proj.executor)) {
+        proj.executor = proj.executor.filter(m => m.participantId !== id);
+      }
+    });
+  } else {
+    if (!confirm('Удалить участника?')) return;
+  }
+  nsi.participants = nsi.participants.filter(p => p.id !== id);
+  saveNSI(nsi);
+  renderNSI();
+}
 
 // addProject (старая версия с инпутом) удалён — теперь создание через createProjectAndOpen
 async function deleteProject(id) {
@@ -7947,10 +7980,40 @@ function pcRenderMiniCard(dict, id) {
     const p = isNew ? null : nsi.participants.find(x => x.id === id);
     titleEl.textContent = isNew ? 'Новый участник' : 'Редактирование участника';
     const value = p ? p.name : '';
+    const side = p ? (p.side || '') : '';
+    const positionId = p ? (p.positionId || '') : '';
+    // Список должностей для select
+    const posOptions = (nsi.positions || []).slice().sort((a,b) => a.name.localeCompare(b.name, 'ru')).map(pos =>
+      `<option value="${pos.id}"${pos.id === positionId ? ' selected' : ''}>${escHtml(pos.name)}</option>`
+    ).join('');
+    const noPositions = !(nsi.positions || []).length;
     html = `
       <div class="pc-field">
         <label>ФИО участника <span class="pc-req">*</span></label>
         <input type="text" id="mc-participants-name" class="pc-input" placeholder="Иванов И.И." value="${escHtml(value)}">
+      </div>
+      <div class="pc-field">
+        <label>Сторона <span class="pc-req">*</span></label>
+        <div style="display:flex;gap:18px;padding-top:4px">
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="radio" name="mc-participants-side" value="customer"${side === 'customer' ? ' checked' : ''}>
+            Команда заказчика
+          </label>
+          <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+            <input type="radio" name="mc-participants-side" value="executor"${side === 'executor' ? ' checked' : ''}>
+            Команда исполнителя
+          </label>
+        </div>
+      </div>
+      <div class="pc-field">
+        <label>Должность <span class="pc-req">*</span></label>
+        ${noPositions
+          ? '<div style="font-size:12px;color:#dc2626;padding:8px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px">Сначала создай хотя бы одну должность в справочнике «Должности».</div>'
+          : `<select id="mc-participants-position" class="pc-input">
+              <option value="">— выбери должность —</option>
+              ${posOptions}
+            </select>`
+        }
       </div>`;
   } else if (dict === 'areas') {
     const a = isNew ? null : (nsi.functionalAreas || []).find(x => x.id === id);
@@ -7996,13 +8059,25 @@ function saveMiniCard(closeAfter) {
   } else if (dict === 'participants') {
     const name = document.getElementById('mc-participants-name').value.trim();
     if (!name) return showErr('Введи ФИО');
-    const dup = nsi.participants.find(p => p.name === name && p.id !== editingMcId);
+    // Block 3: side обязателен
+    const sideEl = document.querySelector('input[name="mc-participants-side"]:checked');
+    if (!sideEl) return showErr('Выбери сторону (заказчик или исполнитель)');
+    const side = sideEl.value;
+    // Block 3: positionId обязателен (если справочник пуст — карточка не даст сохранить)
+    const posSelect = document.getElementById('mc-participants-position');
+    if (!posSelect) return showErr('Сначала создай хотя бы одну должность в справочнике «Должности»');
+    const positionId = parseInt(posSelect.value || 0);
+    if (!positionId) return showErr('Выбери должность из списка');
+    // Уникальность по ФИО (case-insensitive)
+    const dup = nsi.participants.find(p =>
+      p.name.toLowerCase() === name.toLowerCase() && p.id !== editingMcId
+    );
     if (dup) return showErr('Такой участник уже есть');
     if (isNew) {
-      nsi.participants.push({id: Date.now(), name});
+      nsi.participants.push({id: Date.now(), name, side, positionId});
     } else {
       const p = nsi.participants.find(x => x.id === editingMcId);
-      if (p) p.name = name;
+      if (p) { p.name = name; p.side = side; p.positionId = positionId; }
     }
     saveNSI(nsi);
   } else if (dict === 'areas') {
@@ -8605,11 +8680,43 @@ function renderNSILists() {
     : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Пока нет элементов. Нажми «+ Добавить» сверху.</div>';
 
   const partList = document.getElementById('participants-list');
-  if (partList) partList.innerHTML = nsi.participants.length ? nsi.participants.map(p=>
-    `<div class="nsi-row" onclick="nsiOpenElementCard('participants', ${p.id})">
-      <span class="nsi-row-text">${escHtml(p.name)}</span>
-      <button class="protocol-del" onclick="event.stopPropagation();deleteParticipant(${p.id})">×</button></div>`).join('')
-    : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Пока нет элементов. Нажми «+ Добавить» сверху.</div>';
+  if (partList) {
+    if (!nsi.participants.length) {
+      partList.innerHTML = '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Пока нет элементов. Нажми «+ Добавить» сверху.</div>';
+    } else {
+      // Block 3: две группы — Заказчик / Исполнитель + должность в строке
+      const posMap = new Map((nsi.positions || []).map(p => [p.id, p.name]));
+      const renderRow = (p) => {
+        const posName = p.positionId ? (posMap.get(p.positionId) || '<em style="color:#dc2626">должность удалена</em>') : '<em style="color:#94a3b8">— без должности —</em>';
+        return `<div class="nsi-row" onclick="nsiOpenElementCard('participants', ${p.id})">
+          <span class="nsi-row-text">
+            <span style="font-weight:500">${escHtml(p.name)}</span>
+            <span style="color:#64748b;font-size:12px;margin-left:8px">· ${posName.startsWith('<') ? posName : escHtml(posName)}</span>
+          </span>
+          <button class="protocol-del" onclick="event.stopPropagation();deleteParticipant(${p.id})">×</button>
+        </div>`;
+      };
+      const customers = nsi.participants.filter(p => p.side === 'customer');
+      const executors = nsi.participants.filter(p => p.side === 'executor');
+      const orphans = nsi.participants.filter(p => p.side !== 'customer' && p.side !== 'executor');
+      const groupTitle = (text, count) =>
+        `<div style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 6px;padding:6px 0;border-bottom:1px solid #e2e8f0">${text} <span style="color:#94a3b8;font-weight:400">· ${count}</span></div>`;
+      let h = '';
+      h += groupTitle('Команда заказчика', customers.length);
+      h += customers.length
+        ? customers.map(renderRow).join('')
+        : '<div style="font-size:12px;color:#94a3b8;padding:10px;text-align:center">Никого ещё не добавлено</div>';
+      h += groupTitle('Команда исполнителя', executors.length);
+      h += executors.length
+        ? executors.map(renderRow).join('')
+        : '<div style="font-size:12px;color:#94a3b8;padding:10px;text-align:center">Никого ещё не добавлено</div>';
+      if (orphans.length > 0) {
+        h += groupTitle('⚠️ Без стороны', orphans.length);
+        h += orphans.map(renderRow).join('');
+      }
+      partList.innerHTML = h;
+    }
+  }
 
   // F-NSI-Hierarchy: список проектов в виде плиток (как Уровень 1) с логотипами
   const projList = document.getElementById('projects-list');
