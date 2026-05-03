@@ -219,7 +219,7 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
 .nsi-proj-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
 .nsi-proj-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:10px;padding:20px 14px 16px;background:#fafafa;border:1px solid #e2e8f0;border-radius:12px;cursor:pointer;transition:.15s;text-align:center;min-height:170px}
 .nsi-proj-tile:hover{background:#fff;border-color:#3b82f6;box-shadow:0 4px 12px rgba(59,130,246,.1);transform:translateY(-2px)}
-.nsi-proj-tile-logo{width:64px;height:64px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;color:#475569;flex-shrink:0;overflow:hidden;background-size:cover;background-position:center}
+.nsi-proj-tile-logo{width:120px;height:60px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:#475569;flex-shrink:0;overflow:hidden;padding:8px;box-sizing:border-box;background-size:contain;background-position:center;background-repeat:no-repeat;background-origin:content-box;background-clip:content-box}
 .nsi-proj-tile-name{font-size:14px;font-weight:600;color:#1e293b;line-height:1.3;word-break:break-word;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .nsi-proj-tile-sub{font-size:11px;color:#94a3b8;font-weight:500;margin-top:auto}
 .nsi-proj-tile-del{position:absolute;top:8px;right:8px;opacity:0;transition:opacity .15s}
@@ -227,7 +227,7 @@ select.step3-input{cursor:pointer;appearance:none;background-image:url("data:ima
 
 /* Логотип в карточке проекта */
 .pc-logo-block{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
-.pc-logo-preview{width:220px;height:110px;border-radius:12px;border:2px dashed #cbd5e1;background:#fafafa;display:flex;align-items:center;justify-content:center;font-size:14px;color:#94a3b8;overflow:hidden;flex-shrink:0;position:relative;background-size:contain;background-position:center;background-repeat:no-repeat}
+.pc-logo-preview{width:220px;height:110px;border-radius:12px;border:2px dashed #cbd5e1;background-color:#fafafa;display:flex;align-items:center;justify-content:center;font-size:14px;color:#94a3b8;overflow:hidden;flex-shrink:0;position:relative;padding:12px;box-sizing:border-box;background-size:contain;background-position:center;background-repeat:no-repeat;background-origin:content-box;background-clip:content-box}
 .pc-logo-preview.has-image{border-style:solid;border-color:#3b82f6}
 .pc-logo-controls{display:flex;flex-direction:column;gap:8px;flex:1;min-width:200px}
 .pc-logo-info{font-size:12px;color:#64748b;line-height:1.4}
@@ -278,6 +278,11 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 .pc-team-row-base td:first-child{position:relative}
 .pc-team-row-base td:first-child::before{content:"●";color:#3b82f6;font-size:8px;position:absolute;left:2px;top:50%;transform:translateY(-50%)}
 .pc-team-row-base td:first-child{padding-left:14px}
+/* Block 3: сегментированный контрол (вместо radio для выбора стороны) */
+.seg-control{display:inline-flex;background:#f1f5f9;border-radius:9px;padding:3px;border:1px solid #e2e8f0;gap:0}
+.seg-btn{padding:8px 16px;font-size:13px;font-weight:500;color:#64748b;border:none;background:transparent;border-radius:7px;cursor:pointer;transition:.15s;text-transform:none;letter-spacing:normal;font-family:inherit;line-height:1.3;white-space:nowrap}
+.seg-btn:hover:not(.seg-btn-active){color:#334155;background:rgba(255,255,255,.4)}
+.seg-btn.seg-btn-active{background:#fff;color:#3b82f6;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 
 /* TRANSCRIPT UPLOAD (альтернативный вход в Шаге 1) */
 .transcript-upload-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
@@ -3849,11 +3854,13 @@ ${hasVideo
 ${teamText || '[справочник пуст — работай только с именами, реально упоминаемыми в записи]'}
 
 🔴 КРИТИЧЕСКИ ВАЖНО ПРО СПРАВОЧНИК:
-— Этот список — это вся команда проекта в принципе. Это НЕ список участников ЭТОЙ встречи.
-— Используй справочник ТОЛЬКО для нормализации имён, которые РЕАЛЬНО прозвучали или упоминаются в записи (например: в речи «Фаррух» → в справочнике «Шамсиддинов Фаррух» → подставляй полное имя).
-— ❌ НИКОГДА не добавляй человека из справочника в таблицу «Участники» или в требования, если он не говорил/не упоминался в записи. Лучше пустая ячейка, чем выдуманный участник.
+— Это вся команда проекта целиком (Заказчик и Исполнитель отдельно). Это НЕ список участников ЭТОЙ встречи.
+— Используй справочник ТОЛЬКО для нормализации имён, которые РЕАЛЬНО прозвучали или упоминаются в записи. Например: в речи «Фаррух» → в справочнике «Шамсиддинов Фаррух» (Команда заказчика, Куратор) → подставляй полное ФИО + должность из справочника.
+— Если на видео мелькает участник на встрече, и его лицо/имя совпадает с кем-то из справочника — используй ФИО из справочника.
+— ❌ НИКОГДА не добавляй человека из справочника в таблицу «Участники», если он не говорил/не упоминался в записи. Лучше пустая ячейка, чем выдуманный участник.
 — ❌ Если запись короткая и говорит только один человек — в «Участниках» должен быть только он, остальные из справочника НЕ ПОПАДАЮТ туда.
-— ✅ Заполни таблицу «Участники» строго теми, кого слышно/видно в записи. Если кто-то упоминается косвенно («передам Маше») — это не делает его участником встречи.
+— ✅ Заполни таблицу «Участники» строго теми, кого слышно/видно в записи.
+— ✅ Когда сопоставил человека из записи со справочником — в таблице «Участники» в первой колонке используй «Команда заказчика» или «Команда исполнителя» соответственно его принадлежности из справочника.
 
 СПИСОК ФУНКЦИОНАЛЬНЫХ ОБЛАСТЕЙ ВСТРЕЧИ (выбраны заранее пользователем):
 ${areasLine}
@@ -5901,6 +5908,26 @@ async function generateReport() {
   const project = getNSI().projects.find(p => p.id === projectId);
   if (!project) { showStatus('report-status', 'error', 'Проект не найден в НСИ'); return; }
 
+  // Block 3: жёсткая проверка ключевых ролей в команде проекта.
+  // Куратор + Руководитель должны быть заполнены с ОБЕИХ сторон (4 роли минимум).
+  const _validateNsi = getNSI();
+  const _missingRoles = [];
+  const _customerCurator = getProjectCurator(project, 'customer', _validateNsi);
+  const _executorCurator = getProjectCurator(project, 'executor', _validateNsi);
+  const _customerLeadRow = (project.customer || []).find(m => m.roleKey === 'lead');
+  const _executorLeadRow = (project.executor || []).find(m => m.roleKey === 'lead');
+  const _customerLead = resolveTeamMember(_customerLeadRow, _validateNsi);
+  const _executorLead = resolveTeamMember(_executorLeadRow, _validateNsi);
+  if (!_customerCurator) _missingRoles.push('Куратор Заказчика');
+  if (!_customerLead)    _missingRoles.push('Руководитель Заказчика');
+  if (!_executorCurator) _missingRoles.push('Куратор Исполнителя');
+  if (!_executorLead)    _missingRoles.push('Руководитель Исполнителя');
+  if (_missingRoles.length) {
+    showStatus('report-status', 'error',
+      `Нельзя создать отчёт: в команде проекта «${project.name}» не заполнены обязательные роли: ${_missingRoles.join(', ')}.\n\nОткрой НСИ → Проекты → ${project.name} → раздел «Команда проекта» и заполни ФИО.`);
+    return;
+  }
+
   // Проверка что у проекта заполнены реквизиты (без них шаблон не соберётся)
   const projectReqMissing = pcValidate({
     ...pcMakeBlankProject(), ...project
@@ -6103,8 +6130,14 @@ function buildReportPreviewText(d) {
   lines.push(d.sectionGoals || '(пусто)');
   lines.push('');
   lines.push('━━━ ЛИСТ СОГЛАСОВАНИЯ ━━━');
-  const approvers = [...(d.project.customer || []), ...(d.project.executor || [])].filter(m => m.isApprover);
-  approvers.forEach(m => lines.push(`${m.fio} — ${m.position}`));
+  // Block 3: подписанты — Куратор Заказчика и Куратор Исполнителя
+  const _nsiPreview = getNSI();
+  const _signers = [];
+  ['customer', 'executor'].forEach(side => {
+    const c = getProjectCurator(d.project, side, _nsiPreview);
+    if (c) _signers.push(c);
+  });
+  _signers.forEach(m => lines.push(`${m.fio} — ${m.position}`));
   return lines.join('\n');
 }
 
@@ -6757,15 +6790,17 @@ async function downloadReportDocx(filename) {
     return runs;
   };
 
-  // ── Команды по ролям ─────────────────────────────
-  const customerCurators = (d.project.customer || []).filter(m => m.isCurator);
-  const customerLeads    = (d.project.customer || []).filter(m => m.isLead);
-  const customerApprovers= (d.project.customer || []).filter(m => m.isApprover);
-  const executorCurators = (d.project.executor || []).filter(m => m.isCurator);
-  const executorLeads    = (d.project.executor || []).filter(m => m.isLead);
-  const executorApprovers= (d.project.executor || []).filter(m => m.isApprover);
+  // ── Команды по ролям (Block 3) ─────────────────────
+  // Подписант = Куратор. Руководитель = роль 'lead'. Берём первого с заполненным ФИО.
+  const _docxNsi = getNSI();
+  const _customerTeam = getResolvedTeam(d.project, 'customer', _docxNsi);
+  const _executorTeam = getResolvedTeam(d.project, 'executor', _docxNsi);
+  const customerCurator = _customerTeam.find(m => m.roleKey === 'curator') || null;
+  const customerLead    = _customerTeam.find(m => m.roleKey === 'lead')    || null;
+  const executorCurator = _executorTeam.find(m => m.roleKey === 'curator') || null;
+  const executorLead    = _executorTeam.find(m => m.roleKey === 'lead')    || null;
 
-  const teamLine = (members) => members.map(m => `${m.fio} (${m.position})`).join(', ') || '—';
+  const teamLineOne = (member) => member ? `${member.fio} (${member.position})` : '—';
   const initialsOf = (fio) => {
     // Иванов И.И. → И. Иванов; Иван Иванов Иваныч → И. Иванов
     const parts = String(fio || '').trim().split(/\s+/);
@@ -6795,9 +6830,9 @@ async function downloadReportDocx(filename) {
     rows: [
       new TableRow({
         children: [
-          cell(approveCellContent(d.project.customerOrg, customerApprovers[0]), { width: 4500, borderless: true, valign: VerticalAlign.CENTER }),
+          cell(approveCellContent(d.project.customerOrg, customerCurator), { width: 4500, borderless: true, valign: VerticalAlign.CENTER }),
           cell([para('', { size: 20 })], { width: 360, borderless: true }),
-          cell(approveCellContent(d.project.executorOrg, executorApprovers[0]), { width: 4500, borderless: true, valign: VerticalAlign.CENTER })
+          cell(approveCellContent(d.project.executorOrg, executorCurator), { width: 4500, borderless: true, valign: VerticalAlign.CENTER })
         ]
       })
     ]
@@ -6818,10 +6853,10 @@ async function downloadReportDocx(filename) {
       paramRow('Краткое наименование проекта', d.project.shortName),
       paramRow('Планируемое время начала и окончания проекта',
         formatDateRange(d.project.projectDateFrom, d.project.projectDateTo)),
-      paramRow('Куратор проекта от Заказчика', teamLine(customerCurators)),
-      paramRow('Руководитель проекта от Заказчика', teamLine(customerLeads)),
-      paramRow('Куратор проекта от Исполнителя', teamLine(executorCurators)),
-      paramRow('Операционный руководитель проекта от Исполнителя', teamLine(executorLeads))
+      paramRow('Куратор проекта от Заказчика', teamLineOne(customerCurator)),
+      paramRow('Руководитель проекта от Заказчика', teamLineOne(customerLead)),
+      paramRow('Куратор проекта от Исполнителя', teamLineOne(executorCurator)),
+      paramRow('Операционный руководитель проекта от Исполнителя', teamLineOne(executorLead))
     ]
   });
 
@@ -6847,7 +6882,8 @@ async function downloadReportDocx(filename) {
   })();
 
   // ── Лист согласования ────────────────────────────
-  const allApprovers = [...customerApprovers, ...executorApprovers];
+  // Block 3: подписанты — Куратор Заказчика и Куратор Исполнителя (если заполнены)
+  const allApprovers = [customerCurator, executorCurator].filter(m => m);
   const approvalTable = new Table({
     width: { size: 9360, type: WidthType.DXA },
     columnWidths: [3000, 3000, 1680, 1680],
@@ -8023,15 +8059,9 @@ function pcRenderMiniCard(dict, id) {
       </div>
       <div class="pc-field">
         <label>Сторона <span class="pc-req">*</span></label>
-        <div style="display:flex;gap:24px;padding-top:4px;flex-wrap:wrap">
-          <label style="display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:500;color:#1e293b;text-transform:none;letter-spacing:normal;cursor:pointer;white-space:nowrap;margin-bottom:0">
-            <input type="radio" name="mc-participants-side" value="customer"${side === 'customer' ? ' checked' : ''} style="width:15px;height:15px;cursor:pointer">
-            Команда заказчика
-          </label>
-          <label style="display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:500;color:#1e293b;text-transform:none;letter-spacing:normal;cursor:pointer;white-space:nowrap;margin-bottom:0">
-            <input type="radio" name="mc-participants-side" value="executor"${side === 'executor' ? ' checked' : ''} style="width:15px;height:15px;cursor:pointer">
-            Команда исполнителя
-          </label>
+        <div id="mc-participants-side-control" class="seg-control" data-value="${side}" style="margin-top:4px">
+          <button type="button" class="seg-btn ${side === 'customer' ? 'seg-btn-active' : ''}" data-side="customer" onclick="mcSetSide('customer')">Команда заказчика</button>
+          <button type="button" class="seg-btn ${side === 'executor' ? 'seg-btn-active' : ''}" data-side="executor" onclick="mcSetSide('executor')">Команда исполнителя</button>
         </div>
       </div>
       <div class="pc-field">
@@ -8061,6 +8091,16 @@ function pcRenderMiniCard(dict, id) {
 }
 
 // Сохранить мини-карточку
+// Block 3: переключение сегментированного контрола в карточке участника
+function mcSetSide(side) {
+  const ctrl = document.getElementById('mc-participants-side-control');
+  if (!ctrl) return;
+  ctrl.dataset.value = side;
+  ctrl.querySelectorAll('.seg-btn').forEach(b => {
+    b.classList.toggle('seg-btn-active', b.dataset.side === side);
+  });
+}
+
 function saveMiniCard(closeAfter) {
   const dict = editingMcDict;
   if (!dict) return;
@@ -8088,10 +8128,10 @@ function saveMiniCard(closeAfter) {
   } else if (dict === 'participants') {
     const name = document.getElementById('mc-participants-name').value.trim();
     if (!name) return showErr('Введи ФИО');
-    // Block 3: side обязателен
-    const sideEl = document.querySelector('input[name="mc-participants-side"]:checked');
-    if (!sideEl) return showErr('Выбери сторону (заказчик или исполнитель)');
-    const side = sideEl.value;
+    // Block 3: side из сегментированного контрола (data-value)
+    const sideCtrl = document.getElementById('mc-participants-side-control');
+    const side = sideCtrl ? sideCtrl.dataset.value : '';
+    if (side !== 'customer' && side !== 'executor') return showErr('Выбери сторону (заказчик или исполнитель)');
     // Block 3: positionId обязателен (если справочник пуст — карточка не даст сохранить)
     const posSelect = document.getElementById('mc-participants-position');
     if (!posSelect) return showErr('Сначала создай хотя бы одну должность в справочнике «Должности»');
@@ -8192,7 +8232,7 @@ function pcMakeBlankProject() {
     customerLegalAddress: '',
     customerHeadcount: '',
     customerDescription: '',
-    // Команда: каждый член { fio, position, isCurator, isLead, isApprover }
+    // Block 3: команда — массив строк {roleKey, participantId, positionOverride, _isBase}
     customer: [],
     executor: []
   };
@@ -8891,23 +8931,64 @@ function updateProjectSelect() {
     nsi.projects.map(p=>`<option value="${p.id}"${p.id==current?' selected':''}>${escHtml(p.name)}</option>`).join('');
 }
 
+// Block 3: разрешает строку команды в {fio, position} с учётом ссылки на НСИ
+// и опционального override должности. nsi передаём извне для оптимизации.
+function resolveTeamMember(member, nsi) {
+  if (!member || !member.participantId) return null;
+  const p = (nsi.participants || []).find(x => x.id === member.participantId);
+  if (!p) return null;
+  const positionFromNsi = (nsi.positions || []).find(pos => pos.id === p.positionId);
+  const overrideStr = (member.positionOverride || '').toString().trim();
+  const position = overrideStr || (positionFromNsi ? positionFromNsi.name : '');
+  return {fio: p.name, position};
+}
+
+// Block 3: вытаскивает Куратора стороны (resolved). null если не заполнен.
+function getProjectCurator(proj, side, nsi) {
+  const team = (proj && proj[side]) || [];
+  const curatorRow = team.find(m => m.roleKey === 'curator');
+  return resolveTeamMember(curatorRow, nsi);
+}
+
+// Block 3: разрешённая команда стороны — массив {roleLabel, fio, position}
+function getResolvedTeam(proj, side, nsi) {
+  const team = (proj && proj[side]) || [];
+  const roles = getProjectRoles(side);
+  const out = [];
+  team.forEach(m => {
+    const resolved = resolveTeamMember(m, nsi);
+    if (!resolved) return;
+    const role = roles.find(r => r.key === m.roleKey);
+    out.push({
+      roleKey: m.roleKey,
+      roleLabel: role ? role.label : m.roleKey,
+      fio: resolved.fio,
+      position: resolved.position
+    });
+  });
+  return out;
+}
+
 function getProjectTeamText() {
   const projId = parseInt(document.getElementById('meeting-project')?.value||0);
   if (!projId) return '';
   const nsi = getNSI();
-  const proj = nsi.projects.find(p=>p.id===projId);
+  const proj = nsi.projects.find(p => p.id === projId);
   if (!proj) return '';
-  const lines = [];
-  // F-Report-3: новая структура — у каждого члена команды есть fio + position напрямую
-  (proj.executor||[]).forEach(m => {
-    const fio = m.fio || (nsi.participants.find(x => x.id === m.participantId)?.name); // fallback на старую схему
-    if (fio) lines.push(`Команда исполнителя | ${m.position || ''} | ${fio}`);
-  });
-  (proj.customer||[]).forEach(m => {
-    const fio = m.fio || (nsi.participants.find(x => x.id === m.participantId)?.name);
-    if (fio) lines.push(`Команда заказчика | ${m.position || ''} | ${fio}`);
-  });
-  return lines.join('\n');
+  // Block 3: новый формат — отдельные блоки заказчика и исполнителя с ролями
+  const customer = getResolvedTeam(proj, 'customer', nsi);
+  const executor = getResolvedTeam(proj, 'executor', nsi);
+  const out = [];
+  if (customer.length) {
+    out.push('КОМАНДА ЗАКАЗЧИКА:');
+    customer.forEach(m => out.push(`- ${m.roleLabel}: ${m.fio}${m.position ? ', ' + m.position : ''}`));
+  }
+  if (executor.length) {
+    if (out.length) out.push('');
+    out.push('КОМАНДА ИСПОЛНИТЕЛЯ:');
+    executor.forEach(m => out.push(`- ${m.roleLabel}: ${m.fio}${m.position ? ', ' + m.position : ''}`));
+  }
+  return out.join('\n');
 }
 
 function getProjectName() {
