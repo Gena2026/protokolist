@@ -265,6 +265,19 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 @media (max-width:520px){.pc-team-add{grid-template-columns:1fr}}
 .pc-team-add .pc-input{padding:7px 10px;font-size:12px}
 .pc-team-add .btn{font-size:12px;padding:7px 12px}
+/* Block 3: новая таблица команды проекта */
+.pc-team-table{width:100%;border-collapse:collapse;table-layout:fixed;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+.pc-team-table th{text-align:left;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.4px;padding:9px 10px;border-bottom:1px solid #e2e8f0;background:#f8fafc}
+.pc-team-table td{padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+.pc-team-table tr:last-child td{border-bottom:none}
+.pc-team-table tr.pc-team-row-base{background:#fefefe}
+.pc-team-input{width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:6px 9px;font-size:13px;font-family:inherit;outline:none;background:#fff;color:#1e293b;box-sizing:border-box;transition:.15s}
+.pc-team-input:focus{border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.1)}
+.pc-team-add-select{font-size:12px;max-width:280px;padding:7px 10px;border:1px dashed #cbd5e1;border-radius:7px;background:#fff;color:#475569;cursor:pointer;outline:none}
+.pc-team-add-select:hover{border-color:#3b82f6;color:#3b82f6}
+.pc-team-row-base td:first-child{position:relative}
+.pc-team-row-base td:first-child::before{content:"●";color:#3b82f6;font-size:8px;position:absolute;left:2px;top:50%;transform:translateY(-50%)}
+.pc-team-row-base td:first-child{padding-left:14px}
 
 /* TRANSCRIPT UPLOAD (альтернативный вход в Шаге 1) */
 .transcript-upload-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
@@ -1058,29 +1071,45 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <!-- Раздел: Команда -->
       <div class="pc-section">
         <div class="pc-section-title">Команда проекта</div>
-        <div style="font-size:12px;color:#64748b;margin-bottom:12px">
-          Минимум 1 человек с каждой стороны. У каждого должны быть отмечены роли (☑ куратор, ☑ руководитель, ☑ подписант). С каждой стороны должно быть минимум по одному куратору, руководителю и подписанту.
+        <div style="font-size:12px;color:#64748b;margin-bottom:14px;line-height:1.5">
+          Куратор и Руководитель обязательны с обеих сторон — без них нельзя создать отчёт об обследовании. Куратор Заказчика — подписант отчёта. ФИО подтягиваются из НСИ → Участники, должность — из карточки участника (можно перезаписать в строке).
         </div>
-        <div class="pc-grid-2">
-          <!-- Команда заказчика -->
-          <div class="pc-team-block">
-            <div class="pc-team-title">Заказчик</div>
-            <div id="pc-customer-team-list" class="pc-team-list"></div>
-            <div class="pc-team-add">
-              <input type="text" id="pc-new-customer-fio" class="pc-input" placeholder="ФИО (Иванов И.И.)">
-              <input type="text" id="pc-new-customer-pos" class="pc-input" placeholder="Должность">
-              <button class="btn btn-secondary" onclick="pcAddTeamMember('customer')" style="font-size:12px">+ Добавить</button>
-            </div>
+
+        <!-- Команда заказчика -->
+        <div class="pc-team-block" style="margin-bottom:16px">
+          <div class="pc-team-title">Команда заказчика</div>
+          <table class="pc-team-table">
+            <thead>
+              <tr>
+                <th style="width:30%">Роль на проекте</th>
+                <th style="width:30%">ФИО</th>
+                <th style="width:32%">Должность</th>
+                <th style="width:36px"></th>
+              </tr>
+            </thead>
+            <tbody id="pc-customer-team-tbody"></tbody>
+          </table>
+          <div style="margin-top:10px">
+            <select id="pc-customer-team-add-select" class="pc-team-add-select" onchange="pcAddTeamRole('customer', this.value); this.value=''"></select>
           </div>
-          <!-- Команда исполнителя -->
-          <div class="pc-team-block">
-            <div class="pc-team-title">Исполнитель</div>
-            <div id="pc-executor-team-list" class="pc-team-list"></div>
-            <div class="pc-team-add">
-              <input type="text" id="pc-new-executor-fio" class="pc-input" placeholder="ФИО (Петров П.П.)">
-              <input type="text" id="pc-new-executor-pos" class="pc-input" placeholder="Должность">
-              <button class="btn btn-secondary" onclick="pcAddTeamMember('executor')" style="font-size:12px">+ Добавить</button>
-            </div>
+        </div>
+
+        <!-- Команда исполнителя -->
+        <div class="pc-team-block">
+          <div class="pc-team-title">Команда исполнителя</div>
+          <table class="pc-team-table">
+            <thead>
+              <tr>
+                <th style="width:30%">Роль на проекте</th>
+                <th style="width:30%">ФИО</th>
+                <th style="width:32%">Должность</th>
+                <th style="width:36px"></th>
+              </tr>
+            </thead>
+            <tbody id="pc-executor-team-tbody"></tbody>
+          </table>
+          <div style="margin-top:10px">
+            <select id="pc-executor-team-add-select" class="pc-team-add-select" onchange="pcAddTeamRole('executor', this.value); this.value=''"></select>
           </div>
         </div>
       </div>
@@ -7994,13 +8023,13 @@ function pcRenderMiniCard(dict, id) {
       </div>
       <div class="pc-field">
         <label>Сторона <span class="pc-req">*</span></label>
-        <div style="display:flex;gap:18px;padding-top:4px">
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-            <input type="radio" name="mc-participants-side" value="customer"${side === 'customer' ? ' checked' : ''}>
+        <div style="display:flex;gap:24px;padding-top:4px;flex-wrap:wrap">
+          <label style="display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:500;color:#1e293b;text-transform:none;letter-spacing:normal;cursor:pointer;white-space:nowrap;margin-bottom:0">
+            <input type="radio" name="mc-participants-side" value="customer"${side === 'customer' ? ' checked' : ''} style="width:15px;height:15px;cursor:pointer">
             Команда заказчика
           </label>
-          <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-            <input type="radio" name="mc-participants-side" value="executor"${side === 'executor' ? ' checked' : ''}>
+          <label style="display:inline-flex;align-items:center;gap:7px;font-size:14px;font-weight:500;color:#1e293b;text-transform:none;letter-spacing:normal;cursor:pointer;white-space:nowrap;margin-bottom:0">
+            <input type="radio" name="mc-participants-side" value="executor"${side === 'executor' ? ' checked' : ''} style="width:15px;height:15px;cursor:pointer">
             Команда исполнителя
           </label>
         </div>
@@ -8179,28 +8208,11 @@ function openProjectCard(id) {
   pcDraft = JSON.parse(JSON.stringify(proj));
   // Гарантируем наличие всех новых полей (миграция: старые проекты могут не иметь полей)
   Object.assign(pcDraft, Object.assign(pcMakeBlankProject(), pcDraft));
-  // Команда — нормализуем структуру (старые проекты могли иметь {participantId, position})
+  // Block 3: гарантируем что customer/executor — массивы и есть базовые роли
   ['customer', 'executor'].forEach(side => {
     if (!Array.isArray(pcDraft[side])) pcDraft[side] = [];
-    pcDraft[side] = pcDraft[side].map(m => {
-      if (m.fio && m.position !== undefined) {
-        return {
-          fio: m.fio,
-          position: m.position || '',
-          isCurator: !!m.isCurator,
-          isLead: !!m.isLead,
-          isApprover: !!m.isApprover
-        };
-      }
-      // Старая схема — конвертируем
-      const p = nsi.participants.find(x => x.id === m.participantId);
-      return {
-        fio: p ? p.name : '',
-        position: m.position || '',
-        isCurator: false, isLead: false, isApprover: false
-      };
-    });
   });
+  pcEnsureBaseRoles();
 
   // F-NSI-Hierarchy: переход на уровень card
   nsiState.level = 'card';
@@ -8262,70 +8274,175 @@ function closeProjectCard() {
   if (typeof populateReportProjectSelect === 'function') populateReportProjectSelect();
 }
 
-// Рендерит блок команды (заказчика или исполнителя) с чекбоксами ролей
+// Block 3: фиксированные роли в команде проекта
+// isBase — базовая строка, нельзя удалить, всегда присутствует
+// unique — может быть только одна с этой ролью (актуально для Куратора)
+const PROJECT_ROLES_CUSTOMER = [
+  {key: 'curator',  label: 'Куратор проекта',       isBase: true, unique: true},
+  {key: 'lead',     label: 'Руководитель проекта',  isBase: true, unique: false},
+  {key: 'keyUser',  label: 'Ключевой пользователь', isBase: true, unique: false}
+];
+const PROJECT_ROLES_EXECUTOR = [
+  {key: 'curator',  label: 'Куратор проекта',         isBase: true, unique: true},
+  {key: 'lead',     label: 'Руководитель проекта',    isBase: true, unique: false},
+  {key: 'funcArch', label: 'Функциональный архитектор', isBase: true, unique: false},
+  {key: 'techArch', label: 'Технический архитектор',   isBase: true, unique: false},
+  {key: 'analyst',  label: 'Аналитик',                 isBase: true, unique: false},
+  {key: 'dev',      label: 'Разработчик',              isBase: true, unique: false}
+];
+function getProjectRoles(side) {
+  return side === 'customer' ? PROJECT_ROLES_CUSTOMER : PROJECT_ROLES_EXECUTOR;
+}
+
+// Block 3: дополняет pcDraft[side] базовыми ролями (которые isBase) и нормализует поля
+function pcEnsureBaseRoles() {
+  ['customer', 'executor'].forEach(side => {
+    if (!Array.isArray(pcDraft[side])) pcDraft[side] = [];
+    const baseRoles = getProjectRoles(side).filter(r => r.isBase);
+
+    // Нормализуем поля каждой строки
+    pcDraft[side] = pcDraft[side].map(m => ({
+      roleKey: m.roleKey || 'curator',
+      participantId: m.participantId || null,
+      positionOverride: (m.positionOverride === undefined) ? null : m.positionOverride,
+      _isBase: !!m._isBase
+    }));
+
+    // Дополняем недостающие базовые роли
+    baseRoles.forEach(role => {
+      const exists = pcDraft[side].some(m => m._isBase && m.roleKey === role.key);
+      if (!exists) {
+        pcDraft[side].push({
+          roleKey: role.key,
+          participantId: null,
+          positionOverride: null,
+          _isBase: true
+        });
+      }
+    });
+
+    // Сортируем: сначала базовые в порядке roles, потом добавленные пользователем
+    pcDraft[side].sort((a, b) => {
+      if (a._isBase !== b._isBase) return a._isBase ? -1 : 1;
+      if (a._isBase) {
+        const ai = baseRoles.findIndex(r => r.key === a.roleKey);
+        const bi = baseRoles.findIndex(r => r.key === b.roleKey);
+        return ai - bi;
+      }
+      return 0;
+    });
+  });
+}
+
+// Рендерит блок команды (заказчика или исполнителя): таблица + select добавления роли
 function pcRenderTeam(side) {
-  const list = document.getElementById(`pc-${side}-team-list`);
-  if (!list) return;
+  const tbody = document.getElementById(`pc-${side}-team-tbody`);
+  const addSelect = document.getElementById(`pc-${side}-team-add-select`);
+  if (!tbody || !addSelect) return;
+
+  const roles = getProjectRoles(side);
   const team = pcDraft[side] || [];
-  if (!team.length) {
-    list.innerHTML = '';
+  const nsi = getNSI();
+  const sideParticipants = (nsi.participants || []).filter(p => p.side === side);
+  const posMap = new Map((nsi.positions || []).map(p => [p.id, p.name]));
+
+  // Рендер строк таблицы
+  if (team.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="font-size:12px;color:#94a3b8;text-align:center;padding:14px">Нет ролей</td></tr>';
+  } else {
+    tbody.innerHTML = team.map((m, idx) => {
+      const role = roles.find(r => r.key === m.roleKey);
+      const roleLabel = role ? role.label : `(${m.roleKey})`;
+      const isBase = !!m._isBase;
+      const rowClass = isBase ? 'pc-team-row-base' : '';
+
+      // ФИО — select из участников этой стороны
+      const noParticipants = sideParticipants.length === 0;
+      const fioOptions = sideParticipants.map(p =>
+        `<option value="${p.id}"${p.id === m.participantId ? ' selected' : ''}>${escHtml(p.name)}</option>`
+      ).join('');
+
+      // Должность: positionOverride > должность участника из НСИ
+      const selectedParticipant = sideParticipants.find(p => p.id === m.participantId);
+      const positionFromNsi = selectedParticipant ? (posMap.get(selectedParticipant.positionId) || '') : '';
+      const positionValue = (m.positionOverride !== null && m.positionOverride !== undefined && m.positionOverride !== '')
+        ? m.positionOverride
+        : positionFromNsi;
+
+      const delBtn = isBase
+        ? '<span style="color:#cbd5e1;font-size:18px;line-height:1" title="Базовую роль удалить нельзя">–</span>'
+        : `<button class="protocol-del" onclick="pcRemoveTeamRow('${side}',${idx})" title="Удалить роль">×</button>`;
+
+      return `<tr class="${rowClass}">
+        <td><span style="font-size:13px;font-weight:500;color:#1e293b">${escHtml(roleLabel)}</span></td>
+        <td>${noParticipants
+          ? '<span style="font-size:11px;color:#dc2626">нет участников этой стороны в НСИ</span>'
+          : `<select class="pc-team-input" onchange="pcSetTeamFio('${side}',${idx},this.value)">
+              <option value="">— выбери —</option>
+              ${fioOptions}
+            </select>`}</td>
+        <td><input type="text" class="pc-team-input" value="${escHtml(positionValue)}" placeholder="${escHtml(positionFromNsi || '— выбери ФИО —')}" oninput="pcSetTeamPositionOverride('${side}',${idx},this.value)"></td>
+        <td style="text-align:center">${delBtn}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Рендер выпадашки добавления роли — фильтруем уже занятые уникальные роли
+  const available = roles.filter(r => {
+    if (!r.unique) return true;
+    return !team.some(m => m.roleKey === r.key);
+  });
+  addSelect.innerHTML = `<option value="">+ Добавить роль</option>` +
+    available.map(r => `<option value="${r.key}">${escHtml(r.label)}</option>`).join('');
+}
+
+// Добавить новую роль в команду (через выпадашку)
+function pcAddTeamRole(side, roleKey) {
+  if (!roleKey || !pcDraft) return;
+  const role = getProjectRoles(side).find(r => r.key === roleKey);
+  if (!role) return;
+  if (role.unique && (pcDraft[side] || []).some(m => m.roleKey === roleKey)) {
+    alert(`Роль «${role.label}» уже занята — она может быть только одна`);
     return;
   }
-  list.innerHTML = team.map((m, idx) => `
-    <div class="pc-team-member">
-      <div class="pc-team-member-head">
-        <div class="pc-team-member-info">
-          <div class="pc-team-member-fio">${escHtml(m.fio)}</div>
-          <div class="pc-team-member-pos">${escHtml(m.position)}</div>
-        </div>
-        <button class="protocol-del" onclick="pcRemoveTeamMember('${side}',${idx})" title="Удалить">×</button>
-      </div>
-      <div class="pc-team-member-roles">
-        <label class="pc-team-role">
-          <input type="checkbox" ${m.isCurator ? 'checked' : ''} onchange="pcToggleRole('${side}',${idx},'isCurator',this.checked)">
-          Куратор
-        </label>
-        <label class="pc-team-role">
-          <input type="checkbox" ${m.isLead ? 'checked' : ''} onchange="pcToggleRole('${side}',${idx},'isLead',this.checked)">
-          Руководитель
-        </label>
-        <label class="pc-team-role">
-          <input type="checkbox" ${m.isApprover ? 'checked' : ''} onchange="pcToggleRole('${side}',${idx},'isApprover',this.checked)">
-          Подписант «Утверждаю»
-        </label>
-      </div>
-    </div>
-  `).join('');
-}
-
-function pcAddTeamMember(side) {
-  if (!pcDraft) return;
-  const fio = document.getElementById(`pc-new-${side}-fio`).value.trim();
-  const pos = document.getElementById(`pc-new-${side}-pos`).value.trim();
-  if (!fio) { alert('Введи ФИО'); return; }
-  if (!pos) { alert('Введи должность'); return; }
-  if (pcDraft[side].find(m => m.fio.toLowerCase() === fio.toLowerCase())) {
-    alert('Этот человек уже добавлен в команду'); return;
-  }
   pcDraft[side].push({
-    fio, position: pos,
-    isCurator: false, isLead: false, isApprover: false
+    roleKey: role.key,
+    participantId: null,
+    positionOverride: null,
+    _isBase: false
   });
-  document.getElementById(`pc-new-${side}-fio`).value = '';
-  document.getElementById(`pc-new-${side}-pos`).value = '';
   pcRenderTeam(side);
 }
 
-function pcRemoveTeamMember(side, idx) {
-  if (!pcDraft) return;
-  if (!confirm('Удалить участника из команды?')) return;
+// Установить ФИО (выбор из выпадашки участников)
+function pcSetTeamFio(side, idx, participantIdStr) {
+  if (!pcDraft || !pcDraft[side][idx]) return;
+  const pid = parseInt(participantIdStr) || null;
+  pcDraft[side][idx].participantId = pid;
+  // Сбрасываем override должности — после смены ФИО автоматом подтянется новая должность
+  pcDraft[side][idx].positionOverride = null;
+  pcRenderTeam(side);
+}
+
+// Перезаписать должность в строке (override). Если совпадает с автозначением — null.
+function pcSetTeamPositionOverride(side, idx, value) {
+  if (!pcDraft || !pcDraft[side][idx]) return;
+  const member = pcDraft[side][idx];
+  const nsi = getNSI();
+  const participant = (nsi.participants || []).find(p => p.id === member.participantId);
+  const posMap = new Map((nsi.positions || []).map(p => [p.id, p.name]));
+  const auto = participant ? (posMap.get(participant.positionId) || '') : '';
+  member.positionOverride = (value === auto) ? null : value;
+  // Не перерендериваем — input потеряет фокус. Значение уже сохранено в pcDraft.
+}
+
+// Удалить не-базовую строку (базовые удалить нельзя)
+function pcRemoveTeamRow(side, idx) {
+  if (!pcDraft || !pcDraft[side][idx]) return;
+  if (pcDraft[side][idx]._isBase) return;
+  if (!confirm('Удалить эту роль из команды?')) return;
   pcDraft[side].splice(idx, 1);
   pcRenderTeam(side);
-}
-
-function pcToggleRole(side, idx, role, checked) {
-  if (!pcDraft) return;
-  if (pcDraft[side][idx]) pcDraft[side][idx][role] = !!checked;
 }
 
 // Собрать draft-объект из формы
@@ -8386,18 +8503,9 @@ function pcValidate(draft) {
       errors.push({fieldId: id, message: `Поле «${label}»: проверь формат ДД.ММ.ГГГГ и реальный календарь`});
     }
   });
-  // Команда — минимум 1 с каждой стороны + по 1 куратору/руководителю/подписанту
-  ['customer', 'executor'].forEach(side => {
-    const sideName = side === 'customer' ? 'Заказчика' : 'Исполнителя';
-    const team = draft[side] || [];
-    if (!team.length) {
-      errors.push({message: `Добавь хотя бы одного человека в команду ${sideName}`});
-      return;
-    }
-    if (!team.find(m => m.isCurator)) errors.push({message: `Команда ${sideName}: отметь хотя бы одного Куратора`});
-    if (!team.find(m => m.isLead)) errors.push({message: `Команда ${sideName}: отметь хотя бы одного Руководителя`});
-    if (!team.find(m => m.isApprover)) errors.push({message: `Команда ${sideName}: отметь хотя бы одного Подписанта «Утверждаю»`});
-  });
+  // Block 3: валидация команд НЕ блокирует сохранение проекта.
+  // Куратор/Руководитель проверяются перед генерацией отчёта (см. createReportFromProtocols).
+  // Здесь — только мягкая проверка целостности данных.
   return errors;
 }
 
