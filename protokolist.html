@@ -364,6 +364,28 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
   .lib-modal-title{font-size:13px}
 }
 
+/* Block 6: модалка «Связанные» — иерархия ассетов */
+.linked-row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:#fff;border:1px solid #e2e8f0;border-radius:9px;margin-bottom:8px;transition:.15s;text-decoration:none;color:inherit}
+.linked-row.linked-clickable{cursor:pointer}
+.linked-row.linked-clickable:hover{border-color:#3b82f6;background:#f8fafc;transform:translateX(2px);box-shadow:0 2px 6px rgba(59,130,246,.08)}
+.linked-row.linked-disabled{opacity:.6;cursor:not-allowed;background:#f8fafc}
+.linked-row.linked-current{background:#eff6ff;border-color:#93c5fd;border-left:3px solid #3b82f6}
+.linked-icon{font-size:22px;flex-shrink:0;width:32px;text-align:center}
+.linked-meta{flex:1;min-width:0}
+.linked-title{font-size:13px;font-weight:600;color:#1e293b;line-height:1.3;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.linked-sub{font-size:11px;color:#64748b;line-height:1.35}
+.linked-arrow{font-size:18px;color:#94a3b8;flex-shrink:0}
+.linked-section-title{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin:14px 0 8px 4px}
+.linked-section-title:first-child{margin-top:0}
+.linked-empty-section{font-size:12px;color:#94a3b8;font-style:italic;padding:8px 14px}
+.linked-status-ok{color:#10b981}
+.linked-status-gone{color:#ef4444}
+.linked-status-na{color:#94a3b8}
+
+/* Кнопка «Связанные» в строках Библиотеки */
+.btn-linked{font-size:11px!important;padding:5px 10px!important;background:#f1f5f9!important;color:#475569!important;border:1px solid #cbd5e1!important}
+.btn-linked:hover{background:#e0e7ff!important;color:#1e40af!important;border-color:#a5b4fc!important}
+
 /* TRANSCRIPT UPLOAD (альтернативный вход в Шаге 1) */
 .transcript-upload-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .transcript-hint{font-size:12px;color:#94a3b8;flex:1;min-width:160px}
@@ -922,10 +944,11 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
   <div class="card">
     <div class="card-title"><div class="card-title-icon icon-blue">📂</div>Библиотека файлов</div>
 
-    <!-- Block 4: подвкладки Видео / Аудио / Протоколы / Отчёты / Презентации -->
+    <!-- Block 4+6: подвкладки Видео / Аудио / Транскрипции / Протоколы / Отчёты / Презентации -->
     <div class="lib-subtabs">
       <button type="button" class="lib-subtab" data-subtab="videos" onclick="showLibSubtab('videos')">🎥 Видео <span class="lib-count" id="lib-count-videos">0</span></button>
       <button type="button" class="lib-subtab" data-subtab="audio" onclick="showLibSubtab('audio')">🎵 Аудио <span class="lib-count" id="lib-count-audio">0</span></button>
+      <button type="button" class="lib-subtab" data-subtab="transcripts" onclick="showLibSubtab('transcripts')">📝 Транскрипции <span class="lib-count" id="lib-count-transcripts">0</span></button>
       <button type="button" class="lib-subtab" data-subtab="protocols" onclick="showLibSubtab('protocols')">📝 Протоколы <span class="lib-count" id="lib-count-protocols">0</span></button>
       <button type="button" class="lib-subtab" data-subtab="reports" onclick="showLibSubtab('reports')">📄 Отчёты <span class="lib-count" id="lib-count-reports">0</span></button>
       <button type="button" class="lib-subtab" data-subtab="presentations" onclick="showLibSubtab('presentations')">🎬 Презентации <span class="lib-count" id="lib-count-presentations">0</span></button>
@@ -938,6 +961,16 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
     <div id="lib-pane-audio" class="lib-pane" style="display:none">
       <p style="font-size:13px;color:#64748b;margin-bottom:12px">Извлечённые аудиодорожки. Можно прослушать прямо здесь — формат MP3 16kHz mono.</p>
       <div id="lib-audio-list"></div>
+    </div>
+    <div id="lib-pane-transcripts" class="lib-pane" style="display:none">
+      <p style="font-size:13px;color:#64748b;margin-bottom:12px">Финальные транскрипции с экранным контекстом и таймкодами. Хранятся отдельно от видео — не удаляются по 48-часовому таймеру.</p>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <label style="font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin:0">Проект:</label>
+        <select id="lib-transcripts-project-filter" onchange="renderLibTranscripts()" style="padding:6px 11px;font-size:13px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-family:inherit;cursor:pointer;min-width:200px">
+          <option value="">— все проекты —</option>
+        </select>
+      </div>
+      <div id="lib-transcripts-list"></div>
     </div>
     <div id="lib-pane-protocols" class="lib-pane" style="display:none">
       <p style="font-size:13px;color:#64748b;margin-bottom:12px">Сохранённые протоколы интервью. Жми на строку чтобы увидеть содержимое, скачать .docx или удалить.</p>
@@ -968,6 +1001,20 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       </div>
     </div>
     <div class="lib-modal-body" id="lib-preview-body"></div>
+  </div>
+</div>
+
+<!-- Block 6: модалка «Связанные файлы» — иерархия видео → аудио → транскрипция → протокол → отчёт → презентация -->
+<div id="lib-linked-modal" class="lib-modal" style="display:none">
+  <div class="lib-modal-overlay" onclick="closeLibLinkedModal()"></div>
+  <div class="lib-modal-content" style="max-width:680px">
+    <div class="lib-modal-head">
+      <div class="lib-modal-title">🔗 Связанные файлы</div>
+      <div class="lib-modal-actions">
+        <button type="button" class="lib-modal-close" onclick="closeLibLinkedModal()" title="Закрыть">×</button>
+      </div>
+    </div>
+    <div class="lib-modal-body" id="lib-linked-body" style="padding:20px"></div>
   </div>
 </div>
 
@@ -8664,6 +8711,7 @@ function showLibSubtab(name) {
   // Перерисовать содержимое
   if (name === 'videos')         renderLibVideos();
   else if (name === 'audio')     renderLibAudio();
+  else if (name === 'transcripts') renderLibTranscripts();
   else if (name === 'protocols') renderLibProtocols();
   else if (name === 'reports')   renderLibReports();
   else if (name === 'presentations') renderLibPresentations();
@@ -8688,6 +8736,16 @@ function updateLibCounts() {
       } catch (_) {}
     }
     set('lib-count-audio', count);
+  })();
+  // Block 6: Транскрипции — async, все записи в IDB которые имеют raw или enriched
+  (async () => {
+    try {
+      const all = await idbGetAllTranscripts();
+      const real = all.filter(r => r.enriched || r.raw);
+      set('lib-count-transcripts', real.length);
+    } catch (_) {
+      set('lib-count-transcripts', 0);
+    }
   })();
 }
 
@@ -8724,7 +8782,7 @@ function renderLibVideos() {
     const rowCursor = isPartial ? 'default' : 'pointer';
     const rowHover = isPartial ? '' : 'class="library-row-clickable"';
     return `
-      <div class="protocol-item" ${rowHover} ${rowClick} style="flex-direction:column;align-items:flex-start;gap:8px;cursor:${rowCursor}">
+      <div class="protocol-item" id="lib-video-${escHtml(s.fileKey || '')}" ${rowHover} ${rowClick} style="flex-direction:column;align-items:flex-start;gap:8px;cursor:${rowCursor}">
         <div style="display:flex;align-items:center;gap:10px;width:100%">
           <div class="protocol-meta" style="min-width:0">
             <div class="protocol-title">${escHtml(s.fileName)}</div>
@@ -8734,6 +8792,7 @@ function renderLibVideos() {
           ${transcriptBadge}
           ${audioBadgeSlot}
           <span style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;background:${badgeBg};color:${badgeTx};border:1px solid ${badgeBd};white-space:nowrap">⏱ ${hoursLeft}ч</span>
+          <button class="btn btn-secondary btn-linked" onclick="event.stopPropagation();openLinkedAssets('video','${escAttr(s.fileKey || '')}')" title="Показать связанные файлы">🔗</button>
           <button class="protocol-del" onclick="event.stopPropagation();deleteSession(${s.id})" title="Удалить">×</button>
         </div>
         ${isPartial
@@ -8795,7 +8854,7 @@ async function renderLibAudio() {
     const mb = (audio.blob.size / 1024 / 1024).toFixed(1);
     const url = URL.createObjectURL(audio.blob);
     return `
-      <div class="lib-row">
+      <div class="lib-row" id="lib-audio-${escHtml(s.fileKey || '')}">
         <div class="lib-row-head">
           <div class="lib-row-title">🎵 ${escHtml(s.fileName)}</div>
         </div>
@@ -8808,8 +8867,560 @@ async function renderLibAudio() {
         <div class="lib-audio-player">
           <audio controls preload="metadata" data-blob-url="${url}" src="${url}"></audio>
         </div>
+        <div class="lib-row-actions">
+          <button class="btn btn-secondary btn-linked" onclick="openLinkedAssets('audio','${escAttr(s.fileKey)}')">🔗 Связанные</button>
+        </div>
       </div>`;
   }).join('');
+}
+
+// ── Block 6: Транскрипции — отдельная подвкладка, переживают удаление видео ─────
+// Источник данных: IDB store `transcripts`. Каждая запись:
+// {fileKey, raw, enriched?, fileName?, sourceTitle?, projectId?, durationSec?, sessionId?, savedAt, enrichedSavedAt?, sizeBytes}
+// Отображаем enriched (приоритет) либо raw (если enriched не было, например, старая запись).
+
+let _libTranscriptsCache = null; // последний загруженный список — чтобы не дёргать IDB на каждый клик фильтра
+
+async function renderLibTranscripts() {
+  const el = document.getElementById('lib-transcripts-list');
+  if (!el) return;
+  el.innerHTML = '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Загружаю транскрипции...</div>';
+
+  let all;
+  try {
+    all = await idbGetAllTranscripts();
+  } catch (e) {
+    el.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div>Не удалось прочитать транскрипции из IDB:<br>${escHtml(e.message || String(e))}</div>`;
+    return;
+  }
+  // Только записи с реальным текстом
+  all = all.filter(r => r.enriched || r.raw);
+  _libTranscriptsCache = all;
+
+  // Заполнить выпадайку проектов
+  refreshLibTranscriptsProjectFilter(all);
+
+  if (!all.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div>Транскрипций пока нет.<br>Загрузи видео и запусти Шаг 2 — транскрипция автоматически попадёт сюда.</div>';
+    return;
+  }
+
+  // Применить фильтр по проекту
+  const filterSel = document.getElementById('lib-transcripts-project-filter');
+  const filterVal = filterSel ? filterSel.value : '';
+  let shown = all.slice();
+  if (filterVal === '__none__') {
+    shown = all.filter(r => !r.projectId);
+  } else if (filterVal) {
+    const pid = parseInt(filterVal);
+    shown = all.filter(r => r.projectId === pid);
+  }
+
+  // Сортировка: свежее enrichedSavedAt / savedAt сверху
+  shown.sort((a, b) => (b.enrichedSavedAt || b.savedAt || 0) - (a.enrichedSavedAt || a.savedAt || 0));
+
+  if (!shown.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div>По выбранному проекту транскрипций нет.</div>';
+    return;
+  }
+
+  const nsi = getNSI();
+  const projName = id => (nsi.projects.find(p => p.id === id) || {}).name || '';
+  const now = Date.now();
+  const liveKeys = new Set(getUploadSessions()
+    .filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000)
+    .map(s => s.fileKey));
+
+  el.innerHTML = shown.map(r => {
+    const text = r.enriched || r.raw || '';
+    const sizeKb = Math.round(text.length / 1024 * 10) / 10;
+    const dt = r.enrichedSavedAt || r.savedAt;
+    const dtStr = dt ? new Date(dt).toLocaleString('ru-RU', { dateStyle:'short', timeStyle:'short' }) : '';
+    const titleText = r.sourceTitle || r.fileName || r.key;
+    const isEnriched = !!r.enriched;
+    const projBadge = r.projectId
+      ? `<span class="lib-badge-proj">📁 ${escHtml(projName(r.projectId) || '?')}</span>`
+      : '<span class="lib-badge-proj" style="background:#fef3c7;color:#92400e;border-color:#fde68a">📁 без проекта</span>';
+    const videoStatus = liveKeys.has(r.key)
+      ? '<span style="font-size:11px;color:#10b981">🎬 видео доступно</span>'
+      : '<span style="font-size:11px;color:#94a3b8">🎬 видео удалено</span>';
+    const fileKeyEsc = escHtml(r.key).replace(/'/g, '&#39;');
+    return `
+      <div class="lib-row" id="lib-transcript-${escHtml(r.key)}">
+        <div class="lib-row-head">
+          <div class="lib-row-title">${escHtml(titleText)}</div>
+          ${isEnriched
+            ? '<span class="lib-badge-version" style="background:#dcfce7;color:#166534;border-color:#bbf7d0">✨ улучшенная</span>'
+            : '<span class="lib-badge-version" style="background:#fee2e2;color:#991b1b;border-color:#fecaca">raw whisper</span>'}
+          ${projBadge}
+        </div>
+        <div class="lib-row-sub">
+          ${r.fileName && r.fileName !== titleText ? `<span>📄 ${escHtml(r.fileName)}</span><span>·</span>` : ''}
+          ${r.durationSec ? `<span>${fmtDuration(r.durationSec)}</span><span>·</span>` : ''}
+          <span>${sizeKb} КБ</span>
+          ${dtStr ? `<span>·</span><span>🕒 ${dtStr}</span>` : ''}
+          <span>·</span>${videoStatus}
+        </div>
+        <div class="lib-row-actions">
+          <button class="btn btn-secondary" onclick="openLibTranscriptPreview('${fileKeyEsc}')">👁 Просмотр</button>
+          <button class="btn btn-success" onclick="downloadTranscriptFromLibrary('${fileKeyEsc}')">⬇️ Скачать .txt</button>
+          <button class="btn btn-secondary btn-linked" onclick="openLinkedAssets('transcript','${fileKeyEsc}')">🔗 Связанные</button>
+          <button class="btn btn-secondary" onclick="deleteTranscriptFromLibrary('${fileKeyEsc}')" title="Удалить эту транскрипцию" style="color:#dc2626">🗑 Удалить</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function refreshLibTranscriptsProjectFilter(all) {
+  const sel = document.getElementById('lib-transcripts-project-filter');
+  if (!sel) return;
+  const current = sel.value;
+  const nsi = getNSI();
+  // Собираем уникальные projectId из транскрипций
+  const ids = new Set();
+  let hasNoProj = false;
+  all.forEach(r => {
+    if (r.projectId) ids.add(r.projectId);
+    else hasNoProj = true;
+  });
+  const projects = nsi.projects.filter(p => ids.has(p.id));
+  let html = '<option value="">— все проекты —</option>';
+  projects.forEach(p => {
+    html += `<option value="${p.id}"${String(p.id) === current ? ' selected' : ''}>${escHtml(p.name)}</option>`;
+  });
+  if (hasNoProj) {
+    html += `<option value="__none__"${current === '__none__' ? ' selected' : ''}>— Без проекта —</option>`;
+  }
+  sel.innerHTML = html;
+}
+
+// Просмотр транскрипции в модалке. Отдаём enriched если есть, иначе raw.
+function openLibTranscriptPreview(fileKey) {
+  if (!fileKey) return;
+  // Берём из кэша если есть, иначе IDB
+  const find = list => list.find(r => r.key === fileKey);
+  const fromCache = _libTranscriptsCache ? find(_libTranscriptsCache) : null;
+  const proceed = (rec) => {
+    if (!rec) { alert('Транскрипция не найдена'); return; }
+    const text = rec.enriched || rec.raw || '';
+    const title = rec.sourceTitle || rec.fileName || fileKey;
+    // Простой preformatted рендер — таймкоды и абзацы
+    const html = `<pre style="white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;color:#1e293b;background:#f8fafc;padding:14px;border-radius:8px;border:1px solid #e2e8f0;line-height:1.55">${escHtml(text)}</pre>`;
+    openLibPreview(`📝 ${title}`, html, () => downloadTranscriptFromLibrary(fileKey));
+  };
+  if (fromCache) return proceed(fromCache);
+  idbGetTranscriptRecord(fileKey).then(rec => proceed(rec ? { key: fileKey, ...rec } : null));
+}
+
+async function downloadTranscriptFromLibrary(fileKey) {
+  if (!fileKey) return;
+  const rec = await idbGetTranscriptRecord(fileKey);
+  if (!rec) { alert('Транскрипция не найдена'); return; }
+  const text = rec.enriched || rec.raw || '';
+  if (!text) { alert('Текст транскрипции пуст'); return; }
+  const baseName = rec.sourceTitle || rec.fileName || 'transcript';
+  const safeName = String(baseName).replace(/[\\/:*?"<>|]+/g, '_').slice(0, 80);
+  downloadTranscript(text, safeName + '_транскрипция.txt');
+}
+
+async function deleteTranscriptFromLibrary(fileKey) {
+  if (!fileKey) return;
+  const rec = await idbGetTranscriptRecord(fileKey);
+  const label = rec ? (rec.sourceTitle || rec.fileName || fileKey) : fileKey;
+  if (!confirm(`Удалить транскрипцию «${label}»?\n\nЭто действие необратимо. Видео и протоколы — НЕ ТРОГАЮТСЯ.`)) return;
+  await idbDeleteTranscript(fileKey);
+  // Также чистим s.transcript из живой сессии (если есть) — чтобы UI шага 2 не подкидывал старую
+  try {
+    const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+    const s = sessions.find(s => s.fileKey === fileKey);
+    if (s && s.transcript) {
+      delete s.transcript;
+      localStorage.setItem('upload_sessions', JSON.stringify(sessions));
+    }
+  } catch (_) {}
+  // Перерисовать
+  renderLibTranscripts();
+  updateLibCounts();
+}
+
+// ── Block 6: «🔗 Связанные» — иерархия ассетов вокруг fileKey/протокола ─────
+// Строит граф для произвольной точки (видео-сессия, транскрипция, протокол, отчёт, презентация)
+// и показывает в модалке. Каждая строка — кликабельная (переброс в нужную подвкладку
+// с подсветкой), либо disabled если ассет недоступен (например, видео уже истекло).
+//
+// Точки входа разные, но ось одна: fileKey. От него поднимаемся вверх (видео/аудио/транскрипция)
+// и спускаемся вниз (протокол → отчёты → презентации).
+//
+// Параметры:
+//   originType: 'video' | 'transcript' | 'protocol' | 'report' | 'presentation' | 'audio'
+//   originId:   id ассета (для transcript — это fileKey, для остальных — числовой id)
+
+async function openLinkedAssets(originType, originId) {
+  const modal = document.getElementById('lib-linked-modal');
+  const body  = document.getElementById('lib-linked-body');
+  if (!modal || !body) return;
+
+  body.innerHTML = '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Собираю связи…</div>';
+  modal.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  // Esc — закрыть
+  const escHandler = (e) => {
+    if (e.key === 'Escape') { closeLibLinkedModal(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
+
+  try {
+    const chain = await buildAssetChain(originType, originId);
+    body.innerHTML = renderLinkedChainHTML(chain, originType, originId);
+  } catch (e) {
+    console.error('[linked] build failed', e);
+    body.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div>Не удалось построить цепочку связей:<br>${escHtml(e.message || String(e))}</div>`;
+  }
+}
+
+function closeLibLinkedModal() {
+  const modal = document.getElementById('lib-linked-modal');
+  if (modal) modal.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// Собирает цепочку: { video, audio, transcript, protocols[], reports[], presentations[] }
+// Каждое поле — либо объект с метаданными, либо null (если ассет отсутствует),
+// либо специальный {gone:true} (видео истекло), {na:true} (никогда не было).
+async function buildAssetChain(originType, originId) {
+  const reports       = getReports();
+  const presentations = getPresentations();
+  const protocols     = getProtocols();
+  const sessions      = getUploadSessions();
+  const now = Date.now();
+  const liveSession   = (fk) => sessions.find(s => s.fileKey === fk && (now - s.uploadedAt) < 48*60*60*1000);
+
+  // Шаг 1: определить «якорный» fileKey, если возможно.
+  // Для video / transcript / audio — fileKey = originId или вычисляется напрямую.
+  // Для protocol — берём protocol.fileKey.
+  // Для report / presentation — fileKey может быть несколько (через все протоколы), но мы выбираем
+  // главный = берём первый протокол; остальное всё равно отобразим как «много протоколов».
+  let fileKey = null;
+  let originProtocol = null;
+  let originReport = null;
+  let originPresentation = null;
+
+  if (originType === 'video' || originType === 'transcript' || originType === 'audio') {
+    fileKey = String(originId);
+  } else if (originType === 'protocol') {
+    originProtocol = protocols.find(p => p.id === Number(originId));
+    fileKey = originProtocol ? (originProtocol.fileKey || null) : null;
+  } else if (originType === 'report') {
+    originReport = reports.find(r => r.id === Number(originId));
+    if (originReport) {
+      const meta = originReport.reportData?.protocolsMeta || [];
+      const firstProto = meta.length ? protocols.find(p => p.id === meta[0].id) : null;
+      fileKey = firstProto?.fileKey || null;
+    }
+  } else if (originType === 'presentation') {
+    originPresentation = presentations.find(p => p.id === Number(originId));
+    if (originPresentation) {
+      originReport = reports.find(r => r.id === originPresentation.reportId) || null;
+      const meta = originReport?.reportData?.protocolsMeta || [];
+      const firstProto = meta.length ? protocols.find(p => p.id === meta[0].id) : null;
+      fileKey = firstProto?.fileKey || null;
+    }
+  }
+
+  // Шаг 2: видео и аудио по fileKey
+  let videoNode = null, audioNode = null, transcriptNode = null;
+  if (fileKey) {
+    const session = sessions.find(s => s.fileKey === fileKey);
+    if (session) {
+      const isLive = (now - session.uploadedAt) < 48 * 60 * 60 * 1000;
+      videoNode = {
+        fileKey, sessionId: session.id, fileName: session.fileName,
+        uploadedAt: session.uploadedAt,
+        live: isLive, status: isLive ? 'live' : 'gone'
+      };
+      // Аудио — есть ли blob в IDB
+      try {
+        const cached = await getAudioBlob(fileKey);
+        if (cached && cached.blob) {
+          audioNode = {
+            fileKey, sessionId: session.id,
+            fileName: session.fileName,
+            sizeMb: (cached.blob.size / 1024 / 1024).toFixed(1)
+          };
+        }
+      } catch (_) {}
+    } else {
+      // Сессии нет (старая, удалённая) — но fileKey известен. Помечаем «удалено».
+      videoNode = { fileKey, status: 'gone' };
+    }
+
+    // Транскрипция
+    try {
+      const trec = await idbGetTranscriptRecord(fileKey);
+      if (trec && (trec.enriched || trec.raw)) {
+        transcriptNode = {
+          fileKey,
+          fileName: trec.fileName,
+          sourceTitle: trec.sourceTitle,
+          isEnriched: !!trec.enriched,
+          sizeKb: Math.round(((trec.enriched || trec.raw).length) / 1024 * 10) / 10,
+          savedAt: trec.enrichedSavedAt || trec.savedAt
+        };
+      }
+    } catch (_) {}
+  }
+
+  // Шаг 3: протоколы
+  // - Если origin == report или presentation: все протоколы из protocolsMeta
+  // - Если origin == protocol: только этот один
+  // - Иначе: все протоколы у которых fileKey совпадает (обычно это 1 шт., но может быть и больше
+  //   если кто-то перегенерировал протокол на той же сессии)
+  const linkedProtocols = [];
+  if (originReport) {
+    const meta = originReport.reportData?.protocolsMeta || [];
+    meta.forEach(m => {
+      const p = protocols.find(x => x.id === m.id);
+      if (p) linkedProtocols.push(p);
+      else linkedProtocols.push({ id: m.id, title: m.title, date: m.date, _missing: true });
+    });
+  } else if (originType === 'presentation' && originPresentation) {
+    // взяли из связанного report выше; если report пропал — пусто
+    const meta = originReport?.reportData?.protocolsMeta || [];
+    meta.forEach(m => {
+      const p = protocols.find(x => x.id === m.id);
+      if (p) linkedProtocols.push(p);
+      else linkedProtocols.push({ id: m.id, title: m.title, date: m.date, _missing: true });
+    });
+  } else if (originProtocol) {
+    linkedProtocols.push(originProtocol);
+  } else if (fileKey) {
+    protocols.filter(p => p.fileKey === fileKey).forEach(p => linkedProtocols.push(p));
+  }
+
+  // Шаг 4: отчёты — все где есть хотя бы один из linkedProtocols
+  const linkedReports = [];
+  if (originReport) {
+    linkedReports.push(originReport);
+  } else if (originPresentation) {
+    if (originReport) linkedReports.push(originReport);
+  } else {
+    const protoIds = new Set(linkedProtocols.filter(p => !p._missing).map(p => p.id));
+    reports.forEach(r => {
+      const meta = r.reportData?.protocolsMeta || [];
+      if (meta.some(m => protoIds.has(m.id))) linkedReports.push(r);
+    });
+  }
+
+  // Шаг 5: презентации — для всех найденных отчётов
+  const linkedPresentations = [];
+  if (originPresentation) {
+    linkedPresentations.push(originPresentation);
+  } else {
+    const reportIds = new Set(linkedReports.map(r => r.id));
+    presentations.forEach(p => {
+      if (reportIds.has(p.reportId)) linkedPresentations.push(p);
+    });
+  }
+
+  return {
+    fileKey,
+    video: videoNode,
+    audio: audioNode,
+    transcript: transcriptNode,
+    protocols: linkedProtocols,
+    reports: linkedReports,
+    presentations: linkedPresentations
+  };
+}
+
+// Рендер цепочки. Каждая строка — кликабельная или disabled.
+// origin... — пометить «вы здесь» сейчас открытый ассет.
+function renderLinkedChainHTML(c, originType, originId) {
+  const lines = [];
+  const isOrigin = (type, id) => originType === type && String(originId) === String(id);
+
+  // ── 🎬 Видео ──
+  lines.push('<div class="linked-section-title">🎬 Видео</div>');
+  if (c.video) {
+    if (c.video.status === 'live') {
+      const remainHours = Math.max(0, Math.round((48*60*60*1000 - (Date.now() - c.video.uploadedAt)) / (60*60*1000)));
+      lines.push(linkedRow({
+        icon: '🎬',
+        title: c.video.fileName || c.video.fileKey,
+        sub: `<span class="linked-status-ok">✅ доступно ещё ~${remainHours}ч</span>`,
+        onClick: `gotoLinkedAsset('video', '${escAttr(c.video.fileKey)}')`,
+        current: isOrigin('video', c.video.fileKey)
+      }));
+    } else {
+      lines.push(linkedRow({
+        icon: '🎬',
+        title: c.video.fileName || '(имя не сохранено)',
+        sub: '<span class="linked-status-gone">⛔ видео удалено (старше 48ч)</span>',
+        disabled: true
+      }));
+    }
+  } else if (c.fileKey) {
+    lines.push('<div class="linked-empty-section">Нет данных о видео</div>');
+  } else {
+    lines.push('<div class="linked-empty-section">Источника не было — протокол создан из ручной транскрипции</div>');
+  }
+
+  // ── 🎵 Аудио ──
+  lines.push('<div class="linked-section-title">🎵 Аудио</div>');
+  if (c.audio) {
+    lines.push(linkedRow({
+      icon: '🎵',
+      title: c.audio.fileName || 'аудиодорожка',
+      sub: `MP3 16kHz mono · ${c.audio.sizeMb} МБ`,
+      onClick: `gotoLinkedAsset('audio', '${escAttr(c.audio.fileKey)}')`,
+      current: isOrigin('audio', c.audio.fileKey)
+    }));
+  } else {
+    lines.push('<div class="linked-empty-section">Аудио в кэше нет (видео истекло или аудио было очищено)</div>');
+  }
+
+  // ── 📝 Транскрипция ──
+  lines.push('<div class="linked-section-title">📝 Транскрипция</div>');
+  if (c.transcript) {
+    const dt = c.transcript.savedAt ? new Date(c.transcript.savedAt).toLocaleString('ru-RU', {dateStyle:'short', timeStyle:'short'}) : '';
+    const versionLabel = c.transcript.isEnriched ? '✨ улучшенная' : 'raw whisper';
+    lines.push(linkedRow({
+      icon: '📝',
+      title: c.transcript.sourceTitle || c.transcript.fileName || 'транскрипция',
+      sub: `${versionLabel} · ${c.transcript.sizeKb} КБ${dt ? ' · ' + dt : ''}`,
+      onClick: `gotoLinkedAsset('transcript', '${escAttr(c.transcript.fileKey)}')`,
+      current: isOrigin('transcript', c.transcript.fileKey)
+    }));
+  } else {
+    lines.push('<div class="linked-empty-section">Транскрипция не сохранена</div>');
+  }
+
+  // ── 📋 Протоколы ──
+  lines.push(`<div class="linked-section-title">📋 Протоколы (${c.protocols.length})</div>`);
+  if (!c.protocols.length) {
+    lines.push('<div class="linked-empty-section">Связанных протоколов нет</div>');
+  } else {
+    c.protocols.forEach(p => {
+      if (p._missing) {
+        lines.push(linkedRow({
+          icon: '📋',
+          title: p.title || '(удалённый протокол)',
+          sub: `${p.date || ''} · <span class="linked-status-gone">⛔ протокол удалён</span>`,
+          disabled: true
+        }));
+      } else {
+        const reqsCount = countProtocolRequirements(p);
+        lines.push(linkedRow({
+          icon: '📋',
+          title: p.title || '(без названия)',
+          sub: `${p.date || ''}${reqsCount ? ` · ${reqsCount} требований` : ''}`,
+          onClick: `gotoLinkedAsset('protocol', ${p.id})`,
+          current: isOrigin('protocol', p.id)
+        }));
+      }
+    });
+  }
+
+  // ── 📄 Отчёты ──
+  lines.push(`<div class="linked-section-title">📄 Отчёты (${c.reports.length})</div>`);
+  if (!c.reports.length) {
+    lines.push('<div class="linked-empty-section">Связанных отчётов нет</div>');
+  } else {
+    c.reports.forEach(r => {
+      const dt = new Date(r.generatedAt).toLocaleDateString('ru-RU');
+      lines.push(linkedRow({
+        icon: '📄',
+        title: `${r.projectName} · Версия ${r.version}`,
+        sub: `сгенерирован ${dt}`,
+        onClick: `gotoLinkedAsset('report', ${r.id})`,
+        current: isOrigin('report', r.id)
+      }));
+    });
+  }
+
+  // ── 🎬 Презентации ──
+  lines.push(`<div class="linked-section-title">🎬 Презентации (${c.presentations.length})</div>`);
+  if (!c.presentations.length) {
+    lines.push('<div class="linked-empty-section">Связанных презентаций нет</div>');
+  } else {
+    c.presentations.forEach(p => {
+      const dt = new Date(p.generatedAt).toLocaleDateString('ru-RU');
+      lines.push(linkedRow({
+        icon: '🎬',
+        title: `${p.projectName} · Версия ${p.version}`,
+        sub: `на основе отчёта v${p.reportVersion || '?'} · ${dt}`,
+        onClick: `gotoLinkedAsset('presentation', ${p.id})`,
+        current: isOrigin('presentation', p.id)
+      }));
+    });
+  }
+
+  return lines.join('');
+}
+
+function linkedRow({ icon, title, sub, onClick, disabled, current }) {
+  let cls = 'linked-row';
+  if (current) cls += ' linked-current';
+  else if (disabled) cls += ' linked-disabled';
+  else if (onClick) cls += ' linked-clickable';
+  const handler = (!disabled && onClick && !current) ? ` onclick="${onClick}"` : '';
+  const arrow = (!disabled && !current) ? '<span class="linked-arrow">→</span>' : (current ? '<span class="linked-arrow" title="Сейчас открыто">📍</span>' : '');
+  return `
+    <div class="${cls}"${handler}>
+      <div class="linked-icon">${icon}</div>
+      <div class="linked-meta">
+        <div class="linked-title">${escHtml(title)}</div>
+        <div class="linked-sub">${sub}</div>
+      </div>
+      ${arrow}
+    </div>`;
+}
+
+// Считает требования протокола по реестру проекта
+function countProtocolRequirements(p) {
+  if (!p || !p.projectId) return 0;
+  try {
+    const all = getRequirements(p.projectId);
+    return all.filter(r => r.protocolId === p.id && !r.archived).length;
+  } catch (_) { return 0; }
+}
+
+// Переброс из модалки связей в нужную подвкладку с подсветкой строки
+function gotoLinkedAsset(type, id) {
+  closeLibLinkedModal();
+  // Если уже на странице Библиотеки — просто переключаем подвкладку и подсвечиваем
+  // Если нет — переходим на Библиотеку
+  if (typeof showTab === 'function') showTab('library');
+
+  // map: тип → имя подвкладки + id префикс DOM-элемента
+  const map = {
+    video:        { sub: 'videos',        domId: () => `lib-video-${id}` },
+    audio:        { sub: 'audio',         domId: () => `lib-audio-${id}` },
+    transcript:   { sub: 'transcripts',   domId: () => `lib-transcript-${id}` },
+    protocol:     { sub: 'protocols',     domId: () => `lib-proto-${id}` },
+    report:       { sub: 'reports',       domId: () => `lib-report-${id}` },
+    presentation: { sub: 'presentations', domId: () => `lib-presentation-${id}` },
+  };
+  const info = map[type];
+  if (!info) return;
+  showLibSubtab(info.sub);
+  // Подождать пока отрендерится список (transcripts и audio — async)
+  setTimeout(() => {
+    let domId = info.domId();
+    let row = domId ? document.getElementById(domId) : null;
+    if (row) {
+      row.scrollIntoView({behavior:'smooth', block:'center'});
+      row.style.transition = 'box-shadow .25s, border-color .25s';
+      row.style.boxShadow = '0 0 0 3px rgba(59,130,246,.35)';
+      row.style.borderColor = '#3b82f6';
+      setTimeout(() => { row.style.boxShadow = ''; row.style.borderColor = ''; }, 2200);
+    }
+  }, 350);
+}
+
+// Утилита экранирования для атрибутов (используется в onclick="...")
+function escAttr(s) {
+  return String(s).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
 }
 
 // ── Протоколы (новый блок: список + просмотр + скачать) ─────
@@ -8848,6 +9459,7 @@ function renderLibProtocols() {
         <div class="lib-row-actions">
           <button class="btn btn-secondary" onclick="openLibProtocolPreview(${p.id})">👁 Просмотр</button>
           <button class="btn btn-success" onclick="downloadProtocolFromLibrary(${p.id})">⬇️ Скачать .docx</button>
+          <button class="btn btn-secondary btn-linked" onclick="openLinkedAssets('protocol',${p.id})">🔗 Связанные</button>
           <button class="btn btn-secondary" onclick="deleteProtocolFromLibrary(${p.id})" title="Удалить навсегда" style="color:#dc2626">🗑 Удалить</button>
         </div>
       </div>`;
@@ -8863,14 +9475,29 @@ function renderLibReports() {
     el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📄</div>Нет сгенерированных отчётов.<br>Перейди на вкладку «Отчёт об обследовании».</div>';
     return;
   }
+  // Block 6: для каждого проекта — определить максимальную версию (=актуальная).
+  // Сравнение по числу версии. Если в одном проекте две записи с одинаковым v —
+  // берём свежую по generatedAt.
+  const maxVerByProject = {};
+  reports.forEach(r => {
+    const k = r.projectId || `_n_${r.projectName || 'noproj'}`;
+    const v = parseInt(r.version || 1) || 1;
+    const prev = maxVerByProject[k];
+    if (!prev || v > prev.v || (v === prev.v && r.generatedAt > prev.generatedAt)) {
+      maxVerByProject[k] = { v, generatedAt: r.generatedAt, id: r.id };
+    }
+  });
   el.innerHTML = reports.map(r => {
     const dt = new Date(r.generatedAt);
     const dtStr = dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+    const k = r.projectId || `_n_${r.projectName || 'noproj'}`;
+    const isLatest = maxVerByProject[k] && maxVerByProject[k].id === r.id;
     return `
       <div class="lib-row" id="lib-report-${r.id}">
         <div class="lib-row-head">
           <div class="lib-row-title">${escHtml(r.projectName)}</div>
-          <span class="lib-badge-version">v${r.version}</span>
+          <span class="lib-badge-version">Версия ${r.version}${isLatest ? ' ★' : ''}</span>
+          ${isLatest ? '<span class="lib-badge-proj" style="background:#dcfce7;color:#166534;border-color:#bbf7d0">актуальная</span>' : ''}
           <span class="lib-badge-proj">📁 проект</span>
         </div>
         <div class="lib-row-sub">
@@ -8881,6 +9508,7 @@ function renderLibReports() {
         <div class="lib-row-actions">
           <button class="btn btn-secondary" onclick="openLibReportPreview(${r.id})">👁 Просмотр</button>
           <button class="btn btn-success" onclick="downloadReportFromLibrary(${r.id})">⬇️ Скачать .docx</button>
+          <button class="btn btn-secondary btn-linked" onclick="openLinkedAssets('report',${r.id})">🔗 Связанные</button>
           <button class="btn btn-secondary" onclick="deleteReportFromLibrary(${r.id})" title="Удалить эту версию" style="color:#dc2626">🗑 Удалить</button>
         </div>
       </div>`;
@@ -8917,6 +9545,7 @@ function renderLibPresentations() {
         <div class="lib-row-actions">
           <button class="btn btn-secondary" onclick="openLibPresentationPreview(${p.id})">👁 Просмотр слайдов</button>
           <button class="btn btn-success" onclick="downloadPresentationFromLibrary(${p.id})">⬇️ Скачать .pptx</button>
+          <button class="btn btn-secondary btn-linked" onclick="openLinkedAssets('presentation',${p.id})">🔗 Связанные</button>
           <button class="btn btn-secondary" onclick="deletePresentationFromLibrary(${p.id})" title="Удалить эту версию" style="color:#dc2626">🗑 Удалить</button>
         </div>
       </div>`;
