@@ -147,6 +147,23 @@ body[data-busy-op="generating"] #step-3 .step-stop-btn{display:inline-flex;align
 .step-0-icon{font-size:18px}
 .step-0-title{font-size:15px;font-weight:600;color:#1e293b;margin:0}
 .step-0-options{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+/* Поле Проекта на Шаге 0 — обязательное, отделено от чекбоксов */
+.step-0-project{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px dashed #d8e0f0}
+.step-0-project-label{font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;min-width:64px}
+.step-0-project-required{color:#ef4444;font-weight:700;margin-left:2px}
+.step-0-project select{flex:1;max-width:380px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 13px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#1e293b;box-sizing:border-box;transition:.15s;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%2364748b' d='M6 9L2 5h8z'/></svg>");background-repeat:no-repeat;background-position:right 13px center;padding-right:32px}
+.step-0-project select:focus{border-color:#3b82f6;background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.step-0-project select.field-empty-warn{border-color:#ef4444!important;background:#fef2f2!important;animation:field-pulse .9s ease-in-out 2}
+/* Read-only лейбл проекта на Шаге 3 — берёт значение из Шага 0 */
+.step3-project-readonly{display:flex;align-items:center;gap:8px;padding:10px 13px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:9px;font-size:13px;color:#475569;line-height:1.3}
+.step3-project-readonly-icon{font-size:14px;flex-shrink:0;color:#94a3b8}
+.step3-project-readonly-name{font-weight:600;color:#1e293b;margin-right:auto}
+.step3-project-readonly-hint{font-size:11px;color:#94a3b8;flex-shrink:0}
+.step3-project-readonly-empty{color:#ef4444;font-weight:500}
+/* Шаг 1 недоступен пока проект не выбран на Шаге 0 */
+.step-card.step-disabled-by-project{opacity:.55;filter:saturate(.7)}
+.step-card.step-disabled-by-project .upload-area{cursor:not-allowed;background:#f8fafc;border-color:#cbd5e1}
+.step-card.step-disabled-by-project .step-card-hint{color:#dc2626;font-weight:500}
 .step-0-checkbox{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#475569;border:1px solid #cbd5e1;border-radius:9px;padding:0 14px;background:#fff;margin:0;transition:all .15s;text-transform:none;letter-spacing:0;font-weight:400;min-width:240px;flex:0 1 auto;height:56px;box-sizing:border-box}
 .step-0-checkbox:hover{border-color:#94a3b8;background:#f8fafc}
 .step-0-checkbox input[type=checkbox]{width:15px;height:15px;cursor:pointer;margin:0;flex-shrink:0}
@@ -527,11 +544,19 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 <!-- ======= PROTOCOL ======= -->
 <div class="page active" id="page-protocol">
 
-  <!-- ШАГ 0: НАСТРОЙКИ СЕССИИ (Авто-режим + Только аудио) -->
+  <!-- ШАГ 0: НАСТРОЙКИ СЕССИИ (Проект + Авто-режим + Только аудио) -->
   <div class="step-card step-0-card" id="step-0">
     <div class="step-0-header">
       <span class="step-0-icon">⚙️</span>
       <h2 class="step-0-title">Настройки сессии</h2>
+    </div>
+
+    <!-- Block 6: Проект — обязательное поле, перенесено сюда с Шага 3 -->
+    <div class="step-0-project">
+      <label class="step-0-project-label" for="meeting-project">Проект<span class="step-0-project-required">*</span></label>
+      <select id="meeting-project" onchange="onMeetingProjectChange()">
+        <option value="">— Выбери проект —</option>
+      </select>
     </div>
 
     <div class="step-0-options">
@@ -683,11 +708,14 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
     <div class="step3-grid">
       <!-- Левая колонка: поля -->
       <div class="step3-form">
+        <!-- Block 6: Проект перенесён на Шаг 0. Здесь только зеркало (read-only). -->
         <div class="step3-field">
           <label>Проект</label>
-          <select id="meeting-project" onchange="onMeetingProjectChange()" class="step3-input">
-            <option value="">— Выбери проект —</option>
-          </select>
+          <div class="step3-project-readonly" id="step3-project-mirror" onclick="document.getElementById('step-0').scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>{const s=document.getElementById('meeting-project');if(s)s.focus();},400)" title="Проект выбирается на Шаге 0 ↑">
+            <span class="step3-project-readonly-icon">📁</span>
+            <span class="step3-project-readonly-name" id="step3-project-mirror-name"><span class="step3-project-readonly-empty">не выбран</span></span>
+            <span class="step3-project-readonly-hint">↑ задаётся на Шаге 0</span>
+          </div>
         </div>
         <div class="step3-field">
           <label>Название встречи</label>
@@ -1487,6 +1515,21 @@ function flashStep3() {
   setTimeout(() => step3.classList.remove('step3-flash'), 2200);
 }
 
+// Block 6: общая блокировка загрузки если на Шаге 0 не выбран проект.
+// Вызывается из onUploadAreaClick и из drag-and-drop. Возвращает true если можно грузить.
+function canAcceptFileForProject() {
+  const sel = document.getElementById('meeting-project');
+  if (sel && sel.value) return true;
+  // Подсветка поля + скролл к Шагу 0
+  if (sel) {
+    sel.classList.add('field-empty-warn');
+    setTimeout(() => sel.classList.remove('field-empty-warn'), 2000);
+  }
+  const step0 = document.getElementById('step-0');
+  if (step0) step0.scrollIntoView({behavior:'smooth', block:'start'});
+  return false;
+}
+
 // Проверка перед загрузкой файла — если Авто включён и Шаг 3 пустой, не пускаем.
 // Вместо alert визуально подсвечиваем красным незаполненные поля + общий flash Шага 3.
 function canAcceptFileForAuto() {
@@ -2089,7 +2132,11 @@ async function loadSessionToMainPage(sessionId) {
   if ($('meeting-date'))    $('meeting-date').value  = session.date || '';
   if ($('audio-only-flag')) $('audio-only-flag').checked = false;
   if ($('manual-transcript')) $('manual-transcript').value = ''; // очищаем — этот режим только для свежих .txt/.docx
-  // meeting-project — оставляем юзеру выбрать (в session не хранится)
+  // Block 6: восстанавливаем projectId сессии на Шаге 0 (раньше юзер выбирал вручную)
+  if (session.projectId && $('meeting-project')) {
+    $('meeting-project').value = String(session.projectId);
+    if (typeof onMeetingProjectChange === 'function') onMeetingProjectChange();
+  }
 
   // Спрятать чип ручной транскрипции (на случай если был открыт раньше)
   if ($('transcript-loaded')) $('transcript-loaded').style.display = 'none';
@@ -2205,6 +2252,7 @@ function onUploadAreaClick() {
   // Блок если идёт ЛЮБАЯ операция (загрузка/транскрипция/генерация)
   if (_busyOp) return;
   if (uploadState === 'uploading') return;
+  if (!canAcceptFileForProject()) return;  // Block 6: блок если на Шаге 0 нет проекта
   if (!canAcceptFileForAuto()) return;  // F3: блок если Авто включён и Шаг 3 пуст
   document.getElementById('audio-file').click();
 }
@@ -2256,6 +2304,7 @@ function onUploadAreaClick() {
     hideOverlay();
     if (_busyOp) return;  // Блок если идёт любая операция
     if (uploadState === 'uploading') return;
+    if (!canAcceptFileForProject()) return;  // Block 6: блок если на Шаге 0 нет проекта
     if (!canAcceptFileForAuto()) return;  // F3: блок если Авто включён и Шаг 3 пуст
     const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
     if (f) startFileUpload(f);
@@ -2270,6 +2319,10 @@ function onUploadAreaClick() {
 function handleFileSelect(input) {
   const f = input.files[0];
   if (!f) return;
+  if (!canAcceptFileForProject()) {  // Block 6: блок без проекта на Шаге 0
+    input.value = '';
+    return;
+  }
   if (!canAcceptFileForAuto()) {  // F3: финальная защита
     input.value = '';
     return;
@@ -2333,6 +2386,9 @@ async function handleTranscriptFile(input) {
   const f = input.files && input.files[0];
   if (!f) return;
   input.value = ''; // позволяет повторно выбрать тот же файл
+
+  // Block 6: транскрипция тоже привязывается к проекту
+  if (!canAcceptFileForProject()) return;
 
   const ext = (f.name.split('.').pop() || '').toLowerCase();
   const btn = document.getElementById('btn-load-transcript');
@@ -2813,7 +2869,7 @@ async function startTranscription() {
       // F2: теперь в IDB (раньше было safeSetItem('whisper_raw_'+key) в localStorage — лимит 5МБ)
       idbSaveTranscript(currentFileKey, whisperRaw).catch(e => console.warn('[F2] save raw failed:', e));
       currentTranscriptText = finalTranscript;
-      saveTranscriptToSession(currentFileKey, finalTranscript);
+      persistEnrichedTranscript(currentFileKey, finalTranscript);
 
       // Attach transcript segments to uploaded parts
       if (uploadedParts.length) {
@@ -2832,7 +2888,7 @@ async function startTranscription() {
           const enriched = await enrichTranscriptWithVideo();
           if (enriched) {
             currentTranscriptText = enriched;
-            saveTranscriptToSession(currentFileKey, enriched);
+            persistEnrichedTranscript(currentFileKey, enriched);
           }
           if (cleanupStatus) cleanupStatus.textContent = '✨ Транскрипция готова: текст улучшен + экранный контекст добавлен';
         } catch(e) {
@@ -3052,7 +3108,7 @@ async function retryGeminiCleanup() {
 
     const cleaned = await cleanTranscriptWithGemini(rawTranscript);
     currentTranscriptText = cleaned;
-    saveTranscriptToSession(currentFileKey, cleaned);
+    persistEnrichedTranscript(currentFileKey, cleaned);
     if (uploadedParts.length) {
       uploadedParts = uploadedParts.map((p, i) => ({
         ...p,
@@ -3065,7 +3121,7 @@ async function retryGeminiCleanup() {
       const enriched = await enrichTranscriptWithVideo();
       if (enriched) {
         currentTranscriptText = enriched;
-        saveTranscriptToSession(currentFileKey, enriched);
+        persistEnrichedTranscript(currentFileKey, enriched);
       }
       showAP('Готово', 100, '');
       if (statusEl) statusEl.textContent = '✨ Готово: текст улучшен + экранный контекст добавлен';
@@ -3316,9 +3372,23 @@ async function cleanupOrphanAudioBlobs() {
 // localStorage имеет лимит 5-10 МБ, а одна транскрипция 1.5-часового видео = 200-500 КБ.
 // После 20-30 встреч localStorage переполняется. Перенесли в IDB (1+ ГБ).
 //
+// Block 6: расширили — теперь храним и enriched (улучшенную с экранным контекстом)
+// версию + метаданные. Так транскрипция переживает удаление видео-сессии (48ч).
+//
 // Object store: transcripts
 //   key   = fileKey (тот же что у audio_blobs и upload_sessions)
-//   value = { raw: string, savedAt: number, sizeBytes: number }
+//   value = {
+//     raw: string,                  // RAW от Whisper (для retry улучшения)
+//     enriched?: string,            // финальная версия после Gemini cleanup + видео-контекста
+//     fileName?: string,            // имя исходного видеофайла
+//     sourceTitle?: string,         // название встречи (Шаг 3, meeting-title)
+//     projectId?: number|null,      // привязка к проекту (Шаг 0)
+//     durationSec?: number,         // длительность аудио
+//     sessionId?: number,           // id связанной UploadSession (для депинков)
+//     savedAt: number,              // первое сохранение (raw)
+//     enrichedSavedAt?: number,     // последнее сохранение enriched
+//     sizeBytes: number             // размер для статистики
+//   }
 
 async function idbSaveTranscript(fileKey, rawText) {
   if (!fileKey || !rawText) return false;
@@ -3327,10 +3397,21 @@ async function idbSaveTranscript(fileKey, rawText) {
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(TRANSCRIPT_STORE, 'readwrite');
       const store = tx.objectStore(TRANSCRIPT_STORE);
-      const record = { raw: rawText, savedAt: Date.now(), sizeBytes: rawText.length };
-      const req = store.put(record, fileKey);
-      req.onsuccess = () => resolve(true);
-      req.onerror  = () => reject(req.error);
+      // Не затираем enriched / meta при перезаписи raw (может быть retry улучшения).
+      const getReq = store.get(fileKey);
+      getReq.onsuccess = () => {
+        const existing = getReq.result || {};
+        const merged = {
+          ...existing,
+          raw: rawText,
+          savedAt: existing.savedAt || Date.now(),
+          sizeBytes: rawText.length + (existing.enriched?.length || 0)
+        };
+        const putReq = store.put(merged, fileKey);
+        putReq.onsuccess = () => resolve(true);
+        putReq.onerror = () => reject(putReq.error);
+      };
+      getReq.onerror = () => reject(getReq.error);
     });
   } catch (e) {
     console.warn('[transcripts] idbSaveTranscript failed:', e);
@@ -3338,6 +3419,40 @@ async function idbSaveTranscript(fileKey, rawText) {
   }
 }
 
+// Block 6: точечный upsert полей записи (enriched, fileName, sourceTitle, projectId, etc).
+// Не передавать undefined-поля — они НЕ перетрут существующее. null допустим
+// (например, projectId явно сбросить).
+async function idbUpsertTranscriptMeta(fileKey, partial) {
+  if (!fileKey || !partial || typeof partial !== 'object') return false;
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(TRANSCRIPT_STORE, 'readwrite');
+      const store = tx.objectStore(TRANSCRIPT_STORE);
+      const getReq = store.get(fileKey);
+      getReq.onsuccess = () => {
+        const existing = getReq.result || {};
+        const merged = { ...existing };
+        // Мерджим только определённые поля (undefined — пропуск)
+        for (const k of Object.keys(partial)) {
+          if (partial[k] !== undefined) merged[k] = partial[k];
+        }
+        if (!merged.savedAt) merged.savedAt = Date.now();
+        if (partial.enriched !== undefined) merged.enrichedSavedAt = Date.now();
+        merged.sizeBytes = (merged.raw?.length || 0) + (merged.enriched?.length || 0);
+        const putReq = store.put(merged, fileKey);
+        putReq.onsuccess = () => resolve(true);
+        putReq.onerror = () => reject(putReq.error);
+      };
+      getReq.onerror = () => reject(getReq.error);
+    });
+  } catch (e) {
+    console.warn('[transcripts] idbUpsertTranscriptMeta failed:', e);
+    return false;
+  }
+}
+
+// Возвращает enriched (если есть) или raw — для совместимости с уже существующим кодом.
 async function idbGetTranscript(fileKey) {
   if (!fileKey) return null;
   try {
@@ -3345,12 +3460,61 @@ async function idbGetTranscript(fileKey) {
     return await new Promise((resolve) => {
       const tx = db.transaction(TRANSCRIPT_STORE, 'readonly');
       const req = tx.objectStore(TRANSCRIPT_STORE).get(fileKey);
-      req.onsuccess = () => resolve(req.result?.raw || null);
+      req.onsuccess = () => {
+        const r = req.result;
+        if (!r) return resolve(null);
+        // Block 6: приоритет — enriched. Если её нет, возвращаем raw (старая совместимость).
+        resolve(r.enriched || r.raw || null);
+      };
       req.onerror  = () => resolve(null);
     });
   } catch (e) {
     console.warn('[transcripts] idbGetTranscript failed:', e);
     return null;
+  }
+}
+
+// Block 6: возвращает полную запись со всеми метаданными (для подвкладки «Транскрипции»).
+async function idbGetTranscriptRecord(fileKey) {
+  if (!fileKey) return null;
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(TRANSCRIPT_STORE, 'readonly');
+      const req = tx.objectStore(TRANSCRIPT_STORE).get(fileKey);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror  = () => resolve(null);
+    });
+  } catch (e) {
+    console.warn('[transcripts] idbGetTranscriptRecord failed:', e);
+    return null;
+  }
+}
+
+// Block 6: получает все записи транскрипций — для подвкладки «Транскрипции» в Библиотеке.
+// Возвращает [{key, ...record}].
+async function idbGetAllTranscripts() {
+  try {
+    const db = await openAudioDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(TRANSCRIPT_STORE, 'readonly');
+      const store = tx.objectStore(TRANSCRIPT_STORE);
+      const out = [];
+      const req = store.openCursor();
+      req.onsuccess = (e) => {
+        const cur = e.target.result;
+        if (cur) {
+          out.push({ key: cur.key, ...(cur.value || {}) });
+          cur.continue();
+        } else {
+          resolve(out);
+        }
+      };
+      req.onerror = () => resolve([]);
+    });
+  } catch (e) {
+    console.warn('[transcripts] idbGetAllTranscripts failed:', e);
+    return [];
   }
 }
 
@@ -3511,6 +3675,37 @@ async function migrateWhisperRawFromLS() {
     }
   }
   if (migrated) console.info(`[F2] Перенесено ${migrated} транскрипций из localStorage в IDB`);
+  return { migrated };
+}
+
+// Block 6: одноразовая миграция — переносит enriched-транскрипции из живых сессий
+// (s.transcript) в IDB вместе с метаданными. Делает их персистентными:
+// после этой миграции сессия может умереть через 48ч, а транскрипция останется в IDB.
+// Запускается при первом старте после Block 6, помечается флагом '_b6migrated'.
+async function migrateExistingEnrichedTranscripts() {
+  if (localStorage.getItem('_b6migrated') === '1') return { migrated: 0 };
+  let migrated = 0;
+  try {
+    const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+    for (const s of sessions) {
+      if (!s.fileKey) continue;
+      const meta = {
+        fileName: s.fileName || null,
+        sourceTitle: s.title || null,
+        projectId: s.projectId || null,
+        durationSec: s.durationSec || 0,
+        sessionId: s.id
+      };
+      // Если в сессии есть текстовая транскрипция — она и есть «enriched» для нашей цели
+      if (s.transcript) meta.enriched = s.transcript;
+      const ok = await idbUpsertTranscriptMeta(s.fileKey, meta);
+      if (ok) migrated++;
+    }
+  } catch (e) {
+    console.warn('[Block 6] migrateExistingEnrichedTranscripts failed:', e);
+  }
+  localStorage.setItem('_b6migrated', '1');
+  if (migrated) console.info(`[Block 6] Миграция: проиндексировано ${migrated} транскрипций в IDB`);
   return { migrated };
 }
 
@@ -4961,6 +5156,9 @@ function saveProtocol(opts = {}) {
     projectId,
     protocolNumber,
     functionalAreaIds,
+    // Block 6: связь протокола с исходной видео-сессией / транскрипцией.
+    // null если протокол сделан из ручной .txt/.docx без видео.
+    fileKey: currentFileKey || null,
     // F-Report-2a: структурные тезисы для отчёта об обследовании.
     // Массив { topic, areaId, areaName, asIs, toBe }. Может быть [] если извлечение не удалось.
     reportTheses: Array.isArray(currentReportTheses) ? currentReportTheses : []
@@ -8315,10 +8513,18 @@ function initSession(file, numParts, meetingTitle, durationSec) {
     // Если сессия уже была без durationSec — допишем теперь, когда знаем
     if (!existing.durationSec && durationSec) {
       existing.durationSec = durationSec;
-      localStorage.setItem('upload_sessions', JSON.stringify(sessions));
     }
+    // Block 6: подтягиваем projectId с Шага 0, если его в сессии ещё нет
+    if (!existing.projectId) {
+      const _pid = parseInt(document.getElementById('meeting-project')?.value || 0) || null;
+      if (_pid) existing.projectId = _pid;
+    }
+    localStorage.setItem('upload_sessions', JSON.stringify(sessions));
     return existing;
   }
+
+  // Block 6: projectId выбирается на Шаге 0 — фиксируем его в момент загрузки
+  const projectId = parseInt(document.getElementById('meeting-project')?.value || 0) || null;
 
   const session = {
     id: Date.now(),
@@ -8329,6 +8535,7 @@ function initSession(file, numParts, meetingTitle, durationSec) {
     title: meetingTitle || file.name,
     date: today(),
     uploadedAt: Date.now(),
+    projectId,
     numParts,
     parts: Array(numParts).fill(null) // null = not uploaded yet
   };
@@ -8350,6 +8557,8 @@ function saveChunkURI(fileKey, chunkIndex, uri, mimeType, label) {
 function saveSingleFileURI(file, uri, mimeType, meetingTitle, durationSec) {
   const key = makeFileKey(file);
   const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+  // Block 6: projectId выбирается на Шаге 0
+  const projectId = parseInt(document.getElementById('meeting-project')?.value || 0) || null;
   const session = {
     id: Date.now(),
     fileKey: key,
@@ -8359,6 +8568,7 @@ function saveSingleFileURI(file, uri, mimeType, meetingTitle, durationSec) {
     title: meetingTitle || file.name,
     date: today(),
     uploadedAt: Date.now(),
+    projectId,
     numParts: 1,
     parts: [{ uri, mimeType, label: 'полное видео' }]
   };
@@ -8387,6 +8597,35 @@ function saveTranscriptToSession(fileKey, transcriptText) {
   if (!s) return;
   s.transcript = transcriptText;
   safeSetItem('upload_sessions', JSON.stringify(sessions));
+}
+
+// Block 6: сохраняем enriched-транскрипцию И в session.transcript (для UI)
+// И в IDB (чтобы пережила удаление сессии через 48ч). В IDB также кладём
+// метаданные сессии — имя файла, проект, длительность — нужны для подвкладки
+// «Транскрипции» в Библиотеке когда сессии больше нет.
+function persistEnrichedTranscript(fileKey, text) {
+  if (!fileKey || !text) return;
+  // 1) В UploadSession (как раньше) — для совместимости и быстрого UI
+  saveTranscriptToSession(fileKey, text);
+  // 2) В IDB — постоянное хранилище
+  const sessions = JSON.parse(localStorage.getItem('upload_sessions') || '[]');
+  const s = sessions.find(s => s.fileKey === fileKey);
+  const meta = { enriched: text };
+  if (s) {
+    meta.fileName = s.fileName;
+    meta.sourceTitle = s.title;
+    meta.projectId = s.projectId || null;
+    meta.durationSec = s.durationSec || 0;
+    meta.sessionId = s.id;
+  } else {
+    // Сессии нет (например, ручная транскрипция или edge case) — берём из формы
+    const projId = parseInt(document.getElementById('meeting-project')?.value || 0) || null;
+    const srcTitle = document.getElementById('meeting-title')?.value?.trim() || null;
+    if (projId) meta.projectId = projId;
+    if (srcTitle) meta.sourceTitle = srcTitle;
+  }
+  idbUpsertTranscriptMeta(fileKey, meta).catch(e =>
+    console.warn('[Block 6] persistEnrichedTranscript IDB failed:', e));
 }
 
 
@@ -10583,6 +10822,9 @@ function updateProjectSelect() {
   const current = sel.value;
   sel.innerHTML = '<option value="">— Выбери проект —</option>' +
     nsi.projects.map(p=>`<option value="${p.id}"${p.id==current?' selected':''}>${escHtml(p.name)}</option>`).join('');
+  // Block 6: после перерисовки списка — синхронизируем зеркало в Шаге 3 и состояние Шага 1
+  if (typeof refreshStep3ProjectMirror === 'function') refreshStep3ProjectMirror();
+  if (typeof refreshStep1AvailabilityByProject === 'function') refreshStep1AvailabilityByProject();
 }
 
 // Block 3: разрешает строку команды в {fio, position} с учётом ссылки на НСИ
@@ -10718,6 +10960,53 @@ function onMeetingProjectChange() {
   const input = document.getElementById('meeting-protocol-num');
   if (input) { input.dataset.userEdited = '0'; input.value = ''; }
   suggestProtocolNumber();
+  // Block 6: обновляем read-only зеркало проекта на Шаге 3 + состояние Шага 1
+  refreshStep3ProjectMirror();
+  refreshStep1AvailabilityByProject();
+  // Если поле было подсвечено как незаполненное — снять подсветку
+  const sel = document.getElementById('meeting-project');
+  if (sel && sel.value) sel.classList.remove('field-empty-warn');
+}
+
+// Block 6: read-only зеркало проекта на Шаге 3 показывает имя выбранного проекта.
+// Вызывается при смене проекта, при загрузке страницы, при обновлении НСИ.
+function refreshStep3ProjectMirror() {
+  const nameEl = document.getElementById('step3-project-mirror-name');
+  if (!nameEl) return;
+  const sel = document.getElementById('meeting-project');
+  const projId = parseInt(sel?.value || 0);
+  if (!projId) {
+    nameEl.innerHTML = '<span class="step3-project-readonly-empty">не выбран</span>';
+    return;
+  }
+  const proj = (getNSI().projects || []).find(p => p.id === projId);
+  nameEl.textContent = proj ? proj.name : `(id ${projId})`;
+}
+
+// Block 6: Шаг 1 (загрузка) недоступен пока на Шаге 0 не выбран проект.
+// Не отключаем кнопку грубо, а показываем подсказку в step-1-hint.
+function refreshStep1AvailabilityByProject() {
+  const sel = document.getElementById('meeting-project');
+  const hasProj = !!(sel && sel.value);
+  const step1 = document.getElementById('step-1');
+  const uploadArea = document.getElementById('upload-area');
+  const hint = document.getElementById('step-1-hint');
+  if (!step1) return;
+  if (hasProj) {
+    step1.classList.remove('step-disabled-by-project');
+    if (uploadArea) uploadArea.style.pointerEvents = '';
+    if (hint && hint.dataset.origText) {
+      hint.textContent = hint.dataset.origText;
+      delete hint.dataset.origText;
+    }
+  } else {
+    step1.classList.add('step-disabled-by-project');
+    if (uploadArea) uploadArea.style.pointerEvents = 'none';
+    if (hint) {
+      if (!hint.dataset.origText) hint.dataset.origText = hint.textContent;
+      hint.textContent = '↑ Сначала выбери проект на Шаге 0 — тогда станет доступна загрузка файла.';
+    }
+  }
 }
 
 
@@ -10915,6 +11204,9 @@ setTimeout(() => {
   ensureNSIDefaults();
   // F2: фоновая миграция транскрипций из localStorage в IDB (идемпотентна)
   migrateWhisperRawFromLS().catch(e => console.warn('[F2] migration failed:', e));
+  // Block 6: одноразовая миграция enriched-транскрипций живых сессий в IDB
+  // (чтобы они пережили удаление сессии через 48ч).
+  migrateExistingEnrichedTranscripts().catch(e => console.warn('[Block 6] migration failed:', e));
   renderNSI();
   updateProjectSelect();
   renderFunctionalAreaChips();
