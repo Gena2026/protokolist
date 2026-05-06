@@ -146,14 +146,18 @@ body[data-busy-op="generating"] #step-3 .step-stop-btn{display:inline-flex;align
 .step-0-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .step-0-icon{font-size:18px}
 .step-0-title{font-size:15px;font-weight:600;color:#1e293b;margin:0}
-.step-0-options{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
-/* Поле Проекта на Шаге 0 — обязательное, отделено от чекбоксов */
-.step-0-project{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px dashed #d8e0f0}
-.step-0-project-label{font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;min-width:64px}
+/* Block 6 v2: единый горизонтальный ряд из трёх равных ячеек (Проект + 2 чекбокса).
+   На узких окнах оборачиваются в столбец естественным flex-wrap. */
+.step-0-row{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+/* Ячейка проекта — выглядит так же как чекбокс (общая визуальная семья) */
+.step-0-cell-project{flex:1 1 280px;display:flex;align-items:center;gap:10px;border:1px solid #cbd5e1;border-radius:9px;padding:0 14px;background:#fff;height:56px;box-sizing:border-box;transition:all .15s}
+.step-0-cell-project:hover{border-color:#94a3b8;background:#f8fafc}
+.step-0-cell-project:focus-within{border-color:#3b82f6;background:#eff6ff;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.step-0-cell-project label{font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;margin:0;line-height:1;cursor:pointer}
 .step-0-project-required{color:#ef4444;font-weight:700;margin-left:2px}
-.step-0-project select{flex:1;max-width:380px;border:1px solid #cbd5e1;border-radius:9px;padding:9px 13px;font-size:14px;font-family:inherit;outline:none;background:#fff;color:#1e293b;box-sizing:border-box;transition:.15s;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%2364748b' d='M6 9L2 5h8z'/></svg>");background-repeat:no-repeat;background-position:right 13px center;padding-right:32px}
-.step-0-project select:focus{border-color:#3b82f6;background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
-.step-0-project select.field-empty-warn{border-color:#ef4444!important;background:#fef2f2!important;animation:field-pulse .9s ease-in-out 2}
+.step-0-cell-project select{flex:1;min-width:0;border:none;outline:none;font-size:14px;font-family:inherit;background:transparent;color:#1e293b;cursor:pointer;appearance:none;padding:0 22px 0 0;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%2364748b' d='M6 9L2 5h8z'/></svg>");background-repeat:no-repeat;background-position:right 4px center}
+/* Подсветка ячейки если внутри селект помечен как пустой */
+.step-0-cell-project:has(select.field-empty-warn){border-color:#ef4444!important;background:#fef2f2!important;animation:field-pulse .9s ease-in-out 2}
 /* Read-only лейбл проекта на Шаге 3 — берёт значение из Шага 0 */
 .step3-project-readonly{display:flex;align-items:center;gap:8px;padding:10px 13px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:9px;font-size:13px;color:#475569;line-height:1.3}
 .step3-project-readonly-icon{font-size:14px;flex-shrink:0;color:#94a3b8}
@@ -164,7 +168,7 @@ body[data-busy-op="generating"] #step-3 .step-stop-btn{display:inline-flex;align
 .step-card.step-disabled-by-project{opacity:.55;filter:saturate(.7)}
 .step-card.step-disabled-by-project .upload-area{cursor:not-allowed;background:#f8fafc;border-color:#cbd5e1}
 .step-card.step-disabled-by-project .step-card-hint{color:#dc2626;font-weight:500}
-.step-0-checkbox{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#475569;border:1px solid #cbd5e1;border-radius:9px;padding:0 14px;background:#fff;margin:0;transition:all .15s;text-transform:none;letter-spacing:0;font-weight:400;min-width:240px;flex:0 1 auto;height:56px;box-sizing:border-box}
+.step-0-checkbox{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#475569;border:1px solid #cbd5e1;border-radius:9px;padding:0 14px;background:#fff;margin:0;transition:all .15s;text-transform:none;letter-spacing:0;font-weight:400;flex:1 1 240px;min-width:240px;height:56px;box-sizing:border-box}
 .step-0-checkbox:hover{border-color:#94a3b8;background:#f8fafc}
 .step-0-checkbox input[type=checkbox]{width:15px;height:15px;cursor:pointer;margin:0;flex-shrink:0}
 .step-0-checkbox:has(input:checked){border-color:#3b82f6;background:#eff6ff;color:#1d4ed8}
@@ -589,15 +593,16 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <h2 class="step-0-title">Настройки сессии</h2>
     </div>
 
-    <!-- Block 6: Проект — обязательное поле, перенесено сюда с Шага 3 -->
-    <div class="step-0-project">
-      <label class="step-0-project-label" for="meeting-project">Проект<span class="step-0-project-required">*</span></label>
-      <select id="meeting-project" onchange="onMeetingProjectChange()">
-        <option value="">— Выбери проект —</option>
-      </select>
-    </div>
+    <!-- Block 6 v2: Проект + 2 чекбокса в одной горизонтальной строке (Вариант 3).
+         Все три ячейки одинаковой высоты и flex:1, при сужении окна — wrap. -->
+    <div class="step-0-row">
+      <div class="step-0-cell-project">
+        <label for="meeting-project">ПРОЕКТ<span class="step-0-project-required">*</span></label>
+        <select id="meeting-project" onchange="onMeetingProjectChange()">
+          <option value="">— Выбери проект —</option>
+        </select>
+      </div>
 
-    <div class="step-0-options">
       <label class="step-0-checkbox">
         <input type="checkbox" id="audio-only-flag" onchange="audioOnlyMode=this.checked">
         <span class="step-0-checkbox-emoji">🔊</span>
@@ -779,7 +784,7 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <!-- Правая колонка: чипы функциональных областей -->
       <div class="step3-areas">
         <div class="step3-areas-title">📐 Функциональная область</div>
-        <div class="step3-areas-hint">Можно выбрать несколько</div>
+        <div class="step3-areas-hint">Выбери одну область</div>
         <div class="area-chips area-chips-vertical" id="meeting-areas-chips"></div>
       </div>
     </div>
@@ -4294,7 +4299,21 @@ ${areasLine}
 |-----------|-----------|-----|
 [Включай ТОЛЬКО людей, которые реально говорили/слышны в записи или явно упомянуты как присутствующие на встрече. Косвенное упоминание («передам Маше») — не делает человека участником.
 Первая колонка — название команды («Команда исполнителя», «Команда заказчика», «ИП ООО «Название»»). Вторая — Должность. Третья — ФИО.
-Если человек звучал в записи без полного имени, сопоставь со справочником «Команда проекта» выше и подставь полное ФИО + должность из справочника.
+
+🎯 АЛГОРИТМ ИДЕНТИФИКАЦИИ УЧАСТНИКА (применяй для каждого упомянутого имени):
+1. Услышал имя в записи (например, «Иван») — пройди по справочнику и собери всех с таким именем.
+2. Если в справочнике РОВНО ОДИН — подставь полное ФИО и поле «должность» из справочника.
+3. Если СОВПАДЕНИЙ НЕСКОЛЬКО (два «Ивана» и т.п.) — выбирай по контексту:
+   • какая функциональная область сейчас обсуждается;
+   • тематика реплик говорящего (логистика / технология / IT / финансы);
+   • роль в проекте (Куратор обычно говорит о целях; Ключевой пользователь — о процессах своего отдела);
+   • должность, соответствующая теме разговора.
+   Например: если двое — «Иванов И.И., Главный технолог» и «Иванов И.А., Финансовый директор», и в записи обсуждают рецептуру/технологию — это первый.
+4. Если контекста недостаточно для однозначного выбора между несколькими совпадениями — оставь только то имя, что услышал, БЕЗ должности (лучше пусто, чем неверно).
+5. Если в записи упомянут человек, которого НЕТ в справочнике — добавь его как услышал. Должность ставь только если она прозвучала.
+
+⚠️ В колонку «Должность» (везде, и в этой таблице, и в «Зафиксированных требованиях») идёт РЕАЛЬНАЯ ДОЛЖНОСТЬ человека из поля «должность» справочника, а НЕ «роль в проекте». «Ключевой пользователь», «Куратор», «Аналитик» — это РОЛИ В ПРОЕКТЕ, в колонку «Должность» они НЕ ПОДСТАВЛЯЮТСЯ.
+
 Если справочник пуст — заполни тем, что слышно в записи.
 ЗАПРЕЩЕНО: добавлять людей из справочника, которых нет в записи.]
 
@@ -4370,6 +4389,7 @@ ${thesesText}
 [Вид требования всегда: Пользовательское требование]
 [Функциональная область — одна из заранее выбранных пользователем областей (см. список выше). Не выдумывай свои.]
 [ФИО владельца требования — кто КОНКРЕТНО высказал это требование/проблему/потребность по записи. Команда проекта (выше) — это СПРАВОЧНИК для сопоставления имён, упоминаемых в речи, а НЕ источник прямой подстановки. Если в записи говорящий явно не идентифицирован — оставь поля «ФИО» и «Должность» ПУСТЫМИ. НЕ ПРИДУМЫВАЙ владельца, не подставляй случайного участника.]
+[Должность — это РЕАЛЬНАЯ ДОЛЖНОСТЬ человека (например «Главный технолог», «Руководитель логистики»). Это НЕ «роль в проекте» и НЕ «Ключевой пользователь» / «Куратор» / «Аналитик» — эти значения являются ролями в проекте и в эту колонку НЕ ИДУТ. Бери поле «должность» из справочника, а не «роль в проекте». Если должность в справочнике пустая или человек не из справочника — оставь колонку пустой.]
 
 Если требований действительно не было — написать: Требований в этом фрагменте не зафиксировано.
 
@@ -11695,19 +11715,52 @@ function getProjectTeamText() {
   const nsi = getNSI();
   const proj = nsi.projects.find(p => p.id === projId);
   if (!proj) return '';
-  // Block 3: новый формат — отдельные блоки заказчика и исполнителя с ролями
+  // Block 6 v2: формат явно разделяет «должность» (что подставлять в таблицу
+  // «Должность» протокола) и «роль в проекте» (для контекста, НЕ для колонки
+  // «Должность»). Также добавлен явный заголовок-обёртка СПРАВОЧНИКА чтобы
+  // Gemini не считал, что все эти люди = участники встречи.
   const customer = getResolvedTeam(proj, 'customer', nsi);
   const executor = getResolvedTeam(proj, 'executor', nsi);
   const out = [];
+  out.push('━━━ СПРАВОЧНИК команды проекта (для нормализации имён в записи) ━━━');
+  out.push('ВНИМАНИЕ: это полный список людей в карточке проекта. На КОНКРЕТНОЙ');
+  out.push('встрече может быть только часть из них. Не вставляй в таблицу');
+  out.push('«УЧАСТНИКИ» тех, кто не звучит/не виден в записи!');
+  out.push('');
   if (customer.length) {
     out.push('КОМАНДА ЗАКАЗЧИКА:');
-    customer.forEach(m => out.push(`- ${m.roleLabel}: ${m.fio}${m.position ? ', ' + m.position : ''}`));
+    customer.forEach(m => {
+      const pos = m.position || '(должность не указана)';
+      out.push(`  - ФИО: ${m.fio}; должность: ${pos}; роль в проекте: ${m.roleLabel}`);
+    });
   }
   if (executor.length) {
-    if (out.length) out.push('');
+    if (customer.length) out.push('');
     out.push('КОМАНДА ИСПОЛНИТЕЛЯ:');
-    executor.forEach(m => out.push(`- ${m.roleLabel}: ${m.fio}${m.position ? ', ' + m.position : ''}`));
+    executor.forEach(m => {
+      const pos = m.position || '(должность не указана)';
+      out.push(`  - ФИО: ${m.fio}; должность: ${pos}; роль в проекте: ${m.roleLabel}`);
+    });
   }
+  out.push('');
+  out.push('ПРАВИЛА ИСПОЛЬЗОВАНИЯ СПРАВОЧНИКА:');
+  out.push('1. В колонку «Должность» (в таблицах «Участники» и «Зафиксированные');
+  out.push('   требования») подставляй именно поле «должность» из справочника,');
+  out.push('   а НЕ «роль в проекте». Например: «Главный технолог», а не');
+  out.push('   «Ключевой пользователь».');
+  out.push('2. Если услышал/увидел в записи имя — найди соответствие в');
+  out.push('   справочнике. Если совпадение единственное — подставь полное ФИО');
+  out.push('   и должность. Если совпадений несколько (например, два «Иван») —');
+  out.push('   выбирай по контексту: какая функциональная область обсуждается,');
+  out.push('   какие темы задаются от лица говорящего, чья должность ему');
+  out.push('   соответствует. Если контекста недостаточно — оставь то имя, что');
+  out.push('   услышал, без должности (лучше без, чем с неверной).');
+  out.push('3. Если в записи звучит/виден человек, которого НЕТ в справочнике —');
+  out.push('   добавь его в таблицу «Участники» с тем именем/должностью, что');
+  out.push('   услышал. Если должность не названа — оставь её пустой.');
+  out.push('4. ЗАПРЕЩЕНО автоматически добавлять в «Участники» людей из');
+  out.push('   справочника, которых на встрече НЕ было.');
+  out.push('━━━ КОНЕЦ СПРАВОЧНИКА ━━━');
   return out.join('\n');
 }
 
@@ -11740,7 +11793,16 @@ function renderFunctionalAreaChips() {
 }
 
 function toggleAreaChip(el) {
-  el.classList.toggle('area-chip-active');
+  // Block 6 v2: SINGLE-SELECT — выбрана может быть только одна область.
+  // Клик по активному чипу — снять (стало "не выбрано").
+  // Клик по неактивному — снять активное у остальных, активировать только этот.
+  const wasActive = el.classList.contains('area-chip-active');
+  // Снимаем со всех братьев в том же контейнере
+  const root = el.parentElement;
+  if (root) {
+    root.querySelectorAll('.area-chip-active').forEach(c => c.classList.remove('area-chip-active'));
+  }
+  if (!wasActive) el.classList.add('area-chip-active');
   // F3: при изменении выбора областей — пересчитать состояние Авто-баннера и подсветку
   if (typeof updateAutoModeBanner === 'function') updateAutoModeBanner();
   if (typeof refreshAreasHighlight === 'function') refreshAreasHighlight();
