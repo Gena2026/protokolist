@@ -146,18 +146,35 @@ body[data-busy-op="generating"] #step-3 .step-stop-btn{display:inline-flex;align
 .step-0-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
 .step-0-icon{font-size:18px}
 .step-0-title{font-size:15px;font-weight:600;color:#1e293b;margin:0}
-/* Block 6 v2: единый горизонтальный ряд из трёх равных ячеек (Проект + 2 чекбокса).
-   На узких окнах оборачиваются в столбец естественным flex-wrap. */
-.step-0-row{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
-/* Ячейка проекта — выглядит так же как чекбокс (общая визуальная семья) */
-.step-0-cell-project{flex:1 1 280px;display:flex;align-items:center;gap:10px;border:1px solid #cbd5e1;border-radius:9px;padding:0 14px;background:#fff;height:56px;box-sizing:border-box;transition:all .15s}
-.step-0-cell-project:hover{border-color:#94a3b8;background:#f8fafc}
+
+/* Block 6 v3: единый горизонтальный ряд, ВСЕ ячейки 48px и однострочные.
+   Тумблеры вместо чекбоксов — никакого вторичного текста в самой ячейке. */
+.step-0-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.step-0-cell{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;box-sizing:border-box;flex:1 1 240px;min-width:240px;transition:.15s;font-size:13px;color:#475569}
+.step-0-cell:hover{border-color:#cbd5e1;background:#f8fafc}
+/* Ячейка проекта */
 .step-0-cell-project:focus-within{border-color:#3b82f6;background:#eff6ff;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
-.step-0-cell-project label{font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;margin:0;line-height:1;cursor:pointer}
+.step-0-cell-project label{font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;margin:0;cursor:pointer;line-height:1}
 .step-0-project-required{color:#ef4444;font-weight:700;margin-left:2px}
 .step-0-cell-project select{flex:1;min-width:0;border:none;outline:none;font-size:14px;font-family:inherit;background:transparent;color:#1e293b;cursor:pointer;appearance:none;padding:0 22px 0 0;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%2364748b' d='M6 9L2 5h8z'/></svg>");background-repeat:no-repeat;background-position:right 4px center}
-/* Подсветка ячейки если внутри селект помечен как пустой */
 .step-0-cell-project:has(select.field-empty-warn){border-color:#ef4444!important;background:#fef2f2!important;animation:field-pulse .9s ease-in-out 2}
+
+/* Ячейка тумблера */
+.step-0-cell-toggle{cursor:pointer;user-select:none}
+.step-0-cell-toggle input{position:absolute;opacity:0;pointer-events:none}
+.step-0-toggle-emoji{font-size:16px;line-height:1;flex-shrink:0}
+.step-0-toggle-name{flex:1;font-size:13px;font-weight:500;color:#475569;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Сам track тумблера */
+.step-0-toggle-switch{position:relative;width:36px;height:20px;background:#cbd5e1;border-radius:99px;flex-shrink:0;transition:.18s}
+.step-0-toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .18s}
+/* Состояние «включён» */
+.step-0-cell-toggle:has(input:checked){border-color:#bfdbfe;background:#eff6ff}
+.step-0-cell-toggle:has(input:checked) .step-0-toggle-name{color:#1d4ed8;font-weight:600}
+.step-0-cell-toggle:has(input:checked) .step-0-toggle-switch{background:#3b82f6}
+.step-0-cell-toggle:has(input:checked) .step-0-toggle-switch::after{transform:translateX(16px)}
+/* Фокус-кольцо для доступности (Tab) */
+.step-0-cell-toggle:has(input:focus-visible){outline:2px solid #3b82f6;outline-offset:2px}
+
 /* Read-only лейбл проекта на Шаге 3 — берёт значение из Шага 0 */
 .step3-project-readonly{display:flex;align-items:center;gap:8px;padding:10px 13px;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:9px;font-size:13px;color:#475569;line-height:1.3}
 .step3-project-readonly-icon{font-size:14px;flex-shrink:0;color:#94a3b8}
@@ -168,15 +185,6 @@ body[data-busy-op="generating"] #step-3 .step-stop-btn{display:inline-flex;align
 .step-card.step-disabled-by-project{opacity:.55;filter:saturate(.7)}
 .step-card.step-disabled-by-project .upload-area{cursor:not-allowed;background:#f8fafc;border-color:#cbd5e1}
 .step-card.step-disabled-by-project .step-card-hint{color:#dc2626;font-weight:500}
-.step-0-checkbox{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#475569;border:1px solid #cbd5e1;border-radius:9px;padding:0 14px;background:#fff;margin:0;transition:all .15s;text-transform:none;letter-spacing:0;font-weight:400;flex:1 1 240px;min-width:240px;height:56px;box-sizing:border-box}
-.step-0-checkbox:hover{border-color:#94a3b8;background:#f8fafc}
-.step-0-checkbox input[type=checkbox]{width:15px;height:15px;cursor:pointer;margin:0;flex-shrink:0}
-.step-0-checkbox:has(input:checked){border-color:#3b82f6;background:#eff6ff;color:#1d4ed8}
-.step-0-checkbox-emoji{font-size:16px;flex-shrink:0;line-height:1;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px}
-.step-0-checkbox-text{display:flex;flex-direction:column;justify-content:center;gap:0;flex:1;height:36px}
-.step-0-checkbox-name{font-size:13px;font-weight:500;color:inherit;white-space:nowrap;line-height:18px;height:18px}
-.step-0-checkbox-hint{color:#94a3b8;font-size:11px;font-weight:400;white-space:nowrap;line-height:18px;height:18px}
-.step-0-checkbox:has(input:checked) .step-0-checkbox-hint{color:#60a5fa}
 /* Баннер «Заполни Шаг 3» — виден только при включённом Авто и пустом Шаге 3 */
 .step-0-warning{display:flex;align-items:center;gap:12px;margin-top:12px;padding:11px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:9px}
 .step-0-warning-icon{font-size:18px;flex-shrink:0}
@@ -593,32 +601,29 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <h2 class="step-0-title">Настройки сессии</h2>
     </div>
 
-    <!-- Block 6 v2: Проект + 2 чекбокса в одной горизонтальной строке (Вариант 3).
-         Все три ячейки одинаковой высоты и flex:1, при сужении окна — wrap. -->
+    <!-- Block 6 v3: одна строка из трёх ячеек одинаковой высоты 48px.
+         Тумблеры вместо чекбоксов — однострочный контент, никакой вторичный
+         текст не ломает выравнивание. Хинты — в title (всплывают по hover). -->
     <div class="step-0-row">
-      <div class="step-0-cell-project">
+      <div class="step-0-cell step-0-cell-project">
         <label for="meeting-project">ПРОЕКТ<span class="step-0-project-required">*</span></label>
         <select id="meeting-project" onchange="onMeetingProjectChange()">
           <option value="">— Выбери проект —</option>
         </select>
       </div>
 
-      <label class="step-0-checkbox">
+      <label class="step-0-cell step-0-cell-toggle" title="Нет показа экрана — обработка только звука, без видеоконтекста">
         <input type="checkbox" id="audio-only-flag" onchange="audioOnlyMode=this.checked">
-        <span class="step-0-checkbox-emoji">🔊</span>
-        <span class="step-0-checkbox-text">
-          <span class="step-0-checkbox-name">Только аудио</span>
-          <span class="step-0-checkbox-hint">нет показа экрана</span>
-        </span>
+        <span class="step-0-toggle-emoji">🔊</span>
+        <span class="step-0-toggle-name">Только аудио</span>
+        <span class="step-0-toggle-switch"></span>
       </label>
 
-      <label class="step-0-checkbox">
+      <label class="step-0-cell step-0-cell-toggle" title="Загрузил → ушёл пить кофе. Шаги 2 и 3 запустятся автоматически.">
         <input type="checkbox" id="auto-mode-flag">
-        <span class="step-0-checkbox-emoji">🚀</span>
-        <span class="step-0-checkbox-text">
-          <span class="step-0-checkbox-name">Авто-режим</span>
-          <span class="step-0-checkbox-hint">загрузил → ушёл пить кофе</span>
-        </span>
+        <span class="step-0-toggle-emoji">🚀</span>
+        <span class="step-0-toggle-name">Авто-режим</span>
+        <span class="step-0-toggle-switch"></span>
       </label>
     </div>
 
