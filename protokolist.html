@@ -386,6 +386,22 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 .btn-linked{font-size:11px!important;padding:5px 10px!important;background:#f1f5f9!important;color:#475569!important;border:1px solid #cbd5e1!important}
 .btn-linked:hover{background:#e0e7ff!important;color:#1e40af!important;border-color:#a5b4fc!important}
 
+/* Block 6: карточки версий отчёта во вкладке «Презентация» */
+.pres-versions-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.pres-version-card{background:#fff;border:2px solid #e2e8f0;border-radius:11px;padding:14px 16px;cursor:pointer;transition:.15s;display:flex;flex-direction:column;gap:8px;position:relative}
+.pres-version-card:hover{border-color:#a5b4fc;box-shadow:0 4px 12px rgba(99,102,241,.1);transform:translateY(-1px)}
+.pres-version-card.pres-selected{border-color:#3b82f6;background:#eff6ff;box-shadow:0 0 0 3px rgba(59,130,246,.15)}
+.pres-version-radio{width:18px;height:18px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s}
+.pres-version-card.pres-selected .pres-version-radio{border-color:#3b82f6;background:#3b82f6}
+.pres-version-card.pres-selected .pres-version-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:#fff}
+.pres-version-head{display:flex;align-items:center;gap:10px}
+.pres-version-num{font-size:18px;font-weight:700;color:#1e293b}
+.pres-version-actual{display:inline-block;background:#dcfce7;color:#166534;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;border:1px solid #bbf7d0;text-transform:uppercase;letter-spacing:.4px}
+.pres-version-meta{display:flex;flex-direction:column;gap:4px;font-size:12px;color:#64748b}
+.pres-version-meta-row{display:flex;align-items:center;gap:6px}
+.pres-version-actions{display:flex;gap:6px;margin-top:4px;border-top:1px dashed #e2e8f0;padding-top:8px}
+.pres-version-actions .btn{font-size:11px;padding:5px 11px;flex:1}
+
 /* TRANSCRIPT UPLOAD (альтернативный вход в Шаге 1) */
 .transcript-upload-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .transcript-hint{font-size:12px;color:#94a3b8;flex:1;min-width:160px}
@@ -909,13 +925,15 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
           <option value="">— выбери проект —</option>
         </select>
       </div>
+    </div>
 
-      <div class="form-row">
-        <label>ВЕРСИЯ ОТЧЁТА</label>
-        <select id="presentation-report" disabled>
-          <option value="">— сначала выбери проект —</option>
-        </select>
+    <!-- Block 6: карточки версий отчёта вместо select. Появляется после выбора проекта. -->
+    <div id="presentation-versions-wrap" style="display:none;margin-bottom:18px">
+      <div style="font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">
+        ВЕРСИЯ ОТЧЁТА
+        <span id="presentation-versions-count" style="font-weight:400;color:#94a3b8;text-transform:none;letter-spacing:0;margin-left:6px"></span>
       </div>
+      <div id="presentation-versions-grid" class="pres-versions-grid"></div>
     </div>
 
     <div class="btn-row">
@@ -944,6 +962,15 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
   <div class="card">
     <div class="card-title"><div class="card-title-icon icon-blue">📂</div>Библиотека файлов</div>
 
+    <!-- Block 6: глобальный фильтр по проекту — действует на все подвкладки -->
+    <div id="lib-global-filter" style="display:flex;gap:10px;align-items:center;margin-bottom:14px;padding:10px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;flex-wrap:wrap">
+      <label for="lib-project-filter" style="font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin:0">📁 Проект:</label>
+      <select id="lib-project-filter" onchange="onLibProjectFilterChange()" style="padding:6px 11px;font-size:13px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-family:inherit;cursor:pointer;min-width:240px">
+        <option value="">— все проекты —</option>
+      </select>
+      <span id="lib-filter-summary" style="font-size:11px;color:#94a3b8;margin-left:auto"></span>
+    </div>
+
     <!-- Block 4+6: подвкладки Видео / Аудио / Транскрипции / Протоколы / Отчёты / Презентации -->
     <div class="lib-subtabs">
       <button type="button" class="lib-subtab" data-subtab="videos" onclick="showLibSubtab('videos')">🎥 Видео <span class="lib-count" id="lib-count-videos">0</span></button>
@@ -964,12 +991,6 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
     </div>
     <div id="lib-pane-transcripts" class="lib-pane" style="display:none">
       <p style="font-size:13px;color:#64748b;margin-bottom:12px">Финальные транскрипции с экранным контекстом и таймкодами. Хранятся отдельно от видео — не удаляются по 48-часовому таймеру.</p>
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-        <label style="font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin:0">Проект:</label>
-        <select id="lib-transcripts-project-filter" onchange="renderLibTranscripts()" style="padding:6px 11px;font-size:13px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-family:inherit;cursor:pointer;min-width:200px">
-          <option value="">— все проекты —</option>
-        </select>
-      </div>
       <div id="lib-transcripts-list"></div>
     </div>
     <div id="lib-pane-protocols" class="lib-pane" style="display:none">
@@ -7331,10 +7352,12 @@ function parsePresentationJSON(raw, fallback) {
   }
 }
 
+// Block 6: текущий выбранный reportId на вкладке Презентация (ранее хранился в select.value)
+let _presentationSelectedReportId = null;
+
 // Инициализация формы вкладки Презентация
 function initPresentationTab() {
   const projSelect = document.getElementById('presentation-project');
-  const repSelect = document.getElementById('presentation-report');
   const btn = document.getElementById('btn-create-presentation');
   if (!projSelect) return;
 
@@ -7353,7 +7376,7 @@ function initPresentationTab() {
 
   if (!projsWithReports.length) {
     projSelect.innerHTML = '<option value="">— нет проектов с отчётами —</option>';
-    repSelect.innerHTML = '<option value="">сначала сгенерируй отчёт об обследовании</option>';
+    renderPresentationVersions([]);
     if (btn) btn.disabled = true;
     return;
   }
@@ -7363,58 +7386,100 @@ function initPresentationTab() {
     projSelect.value = prevProj;
     onPresentationProjectChange();
   } else {
-    repSelect.innerHTML = '<option value="">— сначала выбери проект —</option>';
-    repSelect.disabled = true;
+    renderPresentationVersions([]);
     if (btn) btn.disabled = true;
   }
 }
 
-// Заполняет dropdown версий отчёта при смене проекта
+// Заполняет карточки версий отчёта при смене проекта
 function onPresentationProjectChange() {
   const projSelect = document.getElementById('presentation-project');
-  const repSelect = document.getElementById('presentation-report');
   const btn = document.getElementById('btn-create-presentation');
-  if (!projSelect || !repSelect) return;
+  if (!projSelect) return;
 
   const projId = parseInt(projSelect.value || 0);
+  _presentationSelectedReportId = null;
+  if (btn) btn.disabled = true;
+
   if (!projId) {
-    repSelect.innerHTML = '<option value="">— сначала выбери проект —</option>';
-    repSelect.disabled = true;
-    if (btn) btn.disabled = true;
+    renderPresentationVersions([]);
     return;
   }
 
   const reports = getReports().filter(r => r.projectId === projId);
   // Сортируем по версии убыванию (последняя сверху)
   reports.sort((a, b) => (b.version || 0) - (a.version || 0));
+  renderPresentationVersions(reports);
 
-  if (!reports.length) {
-    repSelect.innerHTML = '<option value="">— нет отчётов для этого проекта —</option>';
-    repSelect.disabled = true;
-    if (btn) btn.disabled = true;
+  // Авто-выбор первой (актуальной) версии — пользователь может переключить
+  if (reports.length > 0) {
+    selectPresentationVersion(reports[0].id);
+  }
+}
+
+// Block 6: рендер сетки карточек версий отчёта
+function renderPresentationVersions(reports) {
+  const wrap = document.getElementById('presentation-versions-wrap');
+  const grid = document.getElementById('presentation-versions-grid');
+  const counter = document.getElementById('presentation-versions-count');
+  if (!wrap || !grid) return;
+
+  if (!reports || !reports.length) {
+    wrap.style.display = 'none';
     return;
   }
+  wrap.style.display = '';
+  if (counter) counter.textContent = `(${reports.length})`;
 
-  repSelect.innerHTML = reports.map(r => {
+  // Самая высокая версия — пометка «актуальная»
+  const maxVersion = Math.max(...reports.map(r => r.version || 0));
+
+  grid.innerHTML = reports.map(r => {
     const dt = new Date(r.generatedAt);
     const dtStr = dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
-    return `<option value="${r.id}">v${r.version} · ${dtStr}</option>`;
+    const isActual = r.version === maxVersion;
+    const meetingsCount = (r.reportData?.protocolsMeta || []).length;
+    const areasCount = (r.reportData?.areaSections || []).length;
+    return `
+      <div class="pres-version-card" data-report-id="${r.id}" onclick="selectPresentationVersion(${r.id})">
+        <div class="pres-version-head">
+          <div class="pres-version-radio"></div>
+          <div class="pres-version-num">v${r.version}</div>
+          ${isActual ? '<span class="pres-version-actual">актуальная</span>' : ''}
+        </div>
+        <div class="pres-version-meta">
+          <div class="pres-version-meta-row">📅 дата отчёта: <strong style="color:#1e293b;font-weight:600">${escHtml(r.reportDate || '')}</strong></div>
+          <div class="pres-version-meta-row">🕒 сгенерирован: ${dtStr}</div>
+          <div class="pres-version-meta-row">📋 встреч: ${meetingsCount} · областей: ${areasCount}</div>
+        </div>
+        <div class="pres-version-actions">
+          <button class="btn btn-secondary" onclick="event.stopPropagation();openLibReportPreview(${r.id})" title="Открыть содержимое отчёта">👁 Предпросмотр</button>
+        </div>
+      </div>`;
   }).join('');
-  repSelect.disabled = false;
+}
+
+// Block 6: выбор версии (клик по карточке) — подсветка + активация кнопки генерации
+function selectPresentationVersion(reportId) {
+  _presentationSelectedReportId = reportId;
+  document.querySelectorAll('.pres-version-card').forEach(card => {
+    card.classList.toggle('pres-selected', String(card.dataset.reportId) === String(reportId));
+  });
+  const btn = document.getElementById('btn-create-presentation');
   if (btn) btn.disabled = false;
 }
 
 // Главная функция: генерирует презентацию из выбранного отчёта
 async function generatePresentation() {
   const projSelect = document.getElementById('presentation-project');
-  const repSelect = document.getElementById('presentation-report');
   const btn = document.getElementById('btn-create-presentation');
   const statusEl = document.getElementById('presentation-status');
   const progressEl = document.getElementById('presentation-progress');
   const resultEl = document.getElementById('presentation-result-card');
 
   const projId = parseInt(projSelect.value || 0);
-  const repId = parseInt(repSelect.value || 0);
+  // Block 6: версия теперь хранится в переменной (выбор по клику на карточку)
+  const repId = _presentationSelectedReportId ? parseInt(_presentationSelectedReportId) : 0;
   if (!projId || !repId) { showStatus('presentation-status', 'error', 'Выбери проект и версию отчёта'); return; }
 
   if (!getKey()) { showStatus('presentation-status', 'error', 'Не указан Gemini API Key (вкладка «API-ключи»)'); return; }
@@ -8679,6 +8744,78 @@ function persistEnrichedTranscript(fileKey, text) {
 // Block 4: текущая активная подвкладка библиотеки
 let libActiveSubtab = 'videos';
 
+// Block 6: глобальный фильтр по проекту для всех подвкладок Библиотеки.
+// '' = все проекты, '__none__' = без проекта, число = projectId.
+// Сохраняется в LS чтобы переживал перезагрузку.
+const LIB_FILTER_KEY = '_lib_project_filter';
+function getLibFilterProjectId() {
+  return localStorage.getItem(LIB_FILTER_KEY) || '';
+}
+function setLibFilterProjectId(v) {
+  if (v) localStorage.setItem(LIB_FILTER_KEY, v);
+  else localStorage.removeItem(LIB_FILTER_KEY);
+}
+function onLibProjectFilterChange() {
+  const sel = document.getElementById('lib-project-filter');
+  setLibFilterProjectId(sel ? sel.value : '');
+  // Перерисовать активную подвкладку + счётчики
+  if (libActiveSubtab) showLibSubtab(libActiveSubtab);
+  updateLibCounts();
+}
+
+// Заполняет список проектов в фильтре. Вызывается при каждом рендере библиотеки.
+async function refreshLibProjectFilterOptions() {
+  const sel = document.getElementById('lib-project-filter');
+  if (!sel) return;
+  const current = getLibFilterProjectId();
+  const nsi = getNSI();
+  // Собираем все projectId которые встречаются хоть где-то
+  const ids = new Set();
+  let anyNoProject = false;
+  const trackId = (id) => { if (id) ids.add(id); else anyNoProject = true; };
+
+  // sessions
+  getUploadSessions().forEach(s => trackId(s.projectId));
+  // protocols
+  getProtocols().forEach(p => trackId(p.projectId));
+  // reports / presentations
+  getReports().forEach(r => trackId(r.projectId));
+  getPresentations().forEach(p => trackId(p.projectId));
+  // transcripts (async)
+  try {
+    const all = await idbGetAllTranscripts();
+    all.filter(r => r.enriched || r.raw).forEach(r => trackId(r.projectId));
+  } catch (_) {}
+
+  const projects = nsi.projects.filter(p => ids.has(p.id));
+  let html = '<option value="">— все проекты —</option>';
+  projects.forEach(p => {
+    html += `<option value="${p.id}"${String(p.id) === current ? ' selected' : ''}>${escHtml(p.name)}</option>`;
+  });
+  if (anyNoProject) {
+    html += `<option value="__none__"${current === '__none__' ? ' selected' : ''}>— Без проекта —</option>`;
+  }
+  sel.innerHTML = html;
+  // Сводка справа
+  const summary = document.getElementById('lib-filter-summary');
+  if (summary) {
+    if (current === '__none__') summary.textContent = 'показаны записи без проекта';
+    else if (current) {
+      const proj = nsi.projects.find(p => String(p.id) === current);
+      summary.textContent = proj ? `фильтр: ${proj.name}` : '';
+    } else summary.textContent = '';
+  }
+}
+
+// Универсальные хелперы фильтрации:
+// matchesLibFilter(projectId) → true если запись с таким projectId должна быть видна.
+function matchesLibFilter(projectId) {
+  const f = getLibFilterProjectId();
+  if (!f) return true;                          // без фильтра
+  if (f === '__none__') return !projectId;      // только без проекта
+  return String(projectId) === f;               // конкретный проект
+}
+
 // Главный роутер библиотеки. Вызывается из showTab('library') и при обновлениях.
 function renderLibrary() {
   // Чистка истёкших сессий (>48ч)
@@ -8686,6 +8823,9 @@ function renderLibrary() {
   let sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
   localStorage.setItem('upload_sessions', JSON.stringify(sessions));
   cleanupOrphanAudioBlobs();
+
+  // Block 6: глобальный фильтр по проекту — обновить список опций
+  refreshLibProjectFilterOptions();
 
   // Активируем сохранённую подвкладку (по умолчанию videos)
   showLibSubtab(libActiveSubtab || 'videos');
@@ -8717,19 +8857,24 @@ function showLibSubtab(name) {
   else if (name === 'presentations') renderLibPresentations();
 }
 
-// Обновить счётчики на табах
+// Обновить счётчики на табах. Block 6: учитывают глобальный фильтр по проекту.
 function updateLibCounts() {
   const now = Date.now();
-  const sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
+  const liveSessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
+  const sessionsFiltered = liveSessions.filter(s => matchesLibFilter(s.projectId));
+  const protocolsFiltered = getProtocols().filter(p => matchesLibFilter(p.projectId));
+  const reportsFiltered = getReports().filter(r => matchesLibFilter(r.projectId));
+  const presFiltered = getPresentations().filter(p => matchesLibFilter(p.projectId));
+
   const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  set('lib-count-videos', sessions.length);
-  set('lib-count-protocols', getProtocols().length);
-  set('lib-count-reports', getReports().length);
-  set('lib-count-presentations', getPresentations().length);
-  // Аудио — async подсчёт (количество сессий с аудио в IDB)
+  set('lib-count-videos', sessionsFiltered.length);
+  set('lib-count-protocols', protocolsFiltered.length);
+  set('lib-count-reports', reportsFiltered.length);
+  set('lib-count-presentations', presFiltered.length);
+  // Аудио — async подсчёт по уже отфильтрованным сессиям
   (async () => {
     let count = 0;
-    for (const s of sessions) {
+    for (const s of sessionsFiltered) {
       try {
         const cached = await getAudioBlob(s.fileKey);
         if (cached && cached.blob) count++;
@@ -8737,11 +8882,11 @@ function updateLibCounts() {
     }
     set('lib-count-audio', count);
   })();
-  // Block 6: Транскрипции — async, все записи в IDB которые имеют raw или enriched
+  // Block 6: Транскрипции — async, учитываем фильтр по projectId
   (async () => {
     try {
       const all = await idbGetAllTranscripts();
-      const real = all.filter(r => r.enriched || r.raw);
+      const real = all.filter(r => (r.enriched || r.raw) && matchesLibFilter(r.projectId));
       set('lib-count-transcripts', real.length);
     } catch (_) {
       set('lib-count-transcripts', 0);
@@ -8753,10 +8898,16 @@ function updateLibCounts() {
 function renderLibVideos() {
   const now = Date.now();
   let sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
+  // Block 6: глобальный фильтр по проекту
+  sessions = sessions.filter(s => matchesLibFilter(s.projectId));
   const el = document.getElementById('library-list');
   if (!el) return;
   if (!sessions.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎥</div>Нет активных файлов.<br>Загрузи видео на вкладке «Протокол встречи».</div>';
+    const f = getLibFilterProjectId();
+    const msg = f
+      ? '<div class="empty-state"><div class="empty-state-icon">🔍</div>По выбранному проекту видео нет.</div>'
+      : '<div class="empty-state"><div class="empty-state-icon">🎥</div>Нет активных файлов.<br>Загрузи видео на вкладке «Протокол встречи».</div>';
+    el.innerHTML = msg;
     return;
   }
   el.innerHTML = sessions.map(s => {
@@ -8829,7 +8980,10 @@ async function renderLibAudio() {
   el.innerHTML = '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Загружаю аудио из кэша...</div>';
 
   const now = Date.now();
-  const sessions = getUploadSessions().filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000);
+  // Block 6: фильтр по проекту
+  const sessions = getUploadSessions()
+    .filter(s => (now - s.uploadedAt) < 48 * 60 * 60 * 1000)
+    .filter(s => matchesLibFilter(s.projectId));
   const items = [];
   for (const s of sessions) {
     try {
@@ -8841,7 +8995,10 @@ async function renderLibAudio() {
   }
 
   if (!items.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎵</div>Нет аудио в кэше.<br>Загрузи видео — аудио будет извлечено автоматически.</div>';
+    const f = getLibFilterProjectId();
+    el.innerHTML = f
+      ? '<div class="empty-state"><div class="empty-state-icon">🔍</div>По выбранному проекту аудио в кэше нет.</div>'
+      : '<div class="empty-state"><div class="empty-state-icon">🎵</div>Нет аудио в кэше.<br>Загрузи видео — аудио будет извлечено автоматически.</div>';
     return;
   }
 
@@ -8897,24 +9054,13 @@ async function renderLibTranscripts() {
   all = all.filter(r => r.enriched || r.raw);
   _libTranscriptsCache = all;
 
-  // Заполнить выпадайку проектов
-  refreshLibTranscriptsProjectFilter(all);
-
   if (!all.length) {
     el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div>Транскрипций пока нет.<br>Загрузи видео и запусти Шаг 2 — транскрипция автоматически попадёт сюда.</div>';
     return;
   }
 
-  // Применить фильтр по проекту
-  const filterSel = document.getElementById('lib-transcripts-project-filter');
-  const filterVal = filterSel ? filterSel.value : '';
-  let shown = all.slice();
-  if (filterVal === '__none__') {
-    shown = all.filter(r => !r.projectId);
-  } else if (filterVal) {
-    const pid = parseInt(filterVal);
-    shown = all.filter(r => r.projectId === pid);
-  }
+  // Block 6: применяем глобальный фильтр
+  const shown = all.filter(r => matchesLibFilter(r.projectId));
 
   // Сортировка: свежее enrichedSavedAt / savedAt сверху
   shown.sort((a, b) => (b.enrichedSavedAt || b.savedAt || 0) - (a.enrichedSavedAt || a.savedAt || 0));
@@ -8969,29 +9115,6 @@ async function renderLibTranscripts() {
         </div>
       </div>`;
   }).join('');
-}
-
-function refreshLibTranscriptsProjectFilter(all) {
-  const sel = document.getElementById('lib-transcripts-project-filter');
-  if (!sel) return;
-  const current = sel.value;
-  const nsi = getNSI();
-  // Собираем уникальные projectId из транскрипций
-  const ids = new Set();
-  let hasNoProj = false;
-  all.forEach(r => {
-    if (r.projectId) ids.add(r.projectId);
-    else hasNoProj = true;
-  });
-  const projects = nsi.projects.filter(p => ids.has(p.id));
-  let html = '<option value="">— все проекты —</option>';
-  projects.forEach(p => {
-    html += `<option value="${p.id}"${String(p.id) === current ? ' selected' : ''}>${escHtml(p.name)}</option>`;
-  });
-  if (hasNoProj) {
-    html += `<option value="__none__"${current === '__none__' ? ' selected' : ''}>— Без проекта —</option>`;
-  }
-  sel.innerHTML = html;
 }
 
 // Просмотр транскрипции в модалке. Отдаём enriched если есть, иначе raw.
@@ -9403,19 +9526,75 @@ function gotoLinkedAsset(type, id) {
   };
   const info = map[type];
   if (!info) return;
+  // Block 6: если глобальный фильтр включён и не совпадает с проектом цели — снять фильтр.
+  // Иначе целевая запись будет скрыта и переход «потеряется».
+  const targetProjectId = resolveTargetProjectId(type, id);
+  const f = getLibFilterProjectId();
+  if (f) {
+    const matchesTarget = (f === '__none__' && !targetProjectId) || (String(targetProjectId) === f);
+    if (!matchesTarget) {
+      setLibFilterProjectId('');
+      const sel = document.getElementById('lib-project-filter');
+      if (sel) sel.value = '';
+    }
+  }
   showLibSubtab(info.sub);
-  // Подождать пока отрендерится список (transcripts и audio — async)
-  setTimeout(() => {
-    let domId = info.domId();
-    let row = domId ? document.getElementById(domId) : null;
+
+  // Polling: ждём пока строка появится в DOM (async рендеры transcripts/audio занимают 100-500мс)
+  const deadline = Date.now() + 2500;
+  const targetId = info.domId();
+  const tick = () => {
+    const row = targetId ? document.getElementById(targetId) : null;
     if (row) {
       row.scrollIntoView({behavior:'smooth', block:'center'});
+      // Чтобы подсветка не зависела от inline-стилей строки — используем :focus-like обводку
       row.style.transition = 'box-shadow .25s, border-color .25s';
-      row.style.boxShadow = '0 0 0 3px rgba(59,130,246,.35)';
+      row.style.boxShadow = '0 0 0 3px rgba(59,130,246,.45)';
+      const prevBorder = row.style.borderColor;
       row.style.borderColor = '#3b82f6';
-      setTimeout(() => { row.style.boxShadow = ''; row.style.borderColor = ''; }, 2200);
+      setTimeout(() => { row.style.boxShadow = ''; row.style.borderColor = prevBorder; }, 2500);
+      return;
     }
-  }, 350);
+    if (Date.now() < deadline) {
+      setTimeout(tick, 60);
+    } else {
+      console.warn('[linked] target row not found:', targetId);
+    }
+  };
+  // Стартовая задержка чтобы showLibSubtab успел запустить рендер
+  setTimeout(tick, 80);
+}
+
+// Block 6: достаёт projectId связанного ассета — нужно чтобы решить, надо ли снимать фильтр.
+function resolveTargetProjectId(type, id) {
+  try {
+    if (type === 'video' || type === 'audio') {
+      const s = getUploadSessions().find(x => x.fileKey === id);
+      return s ? s.projectId : null;
+    }
+    if (type === 'transcript') {
+      // Синхронно недоступно (IDB), но для решения достаточно: если нет — фильтр снимем.
+      // Берём из кэша, если есть.
+      if (_libTranscriptsCache) {
+        const r = _libTranscriptsCache.find(x => x.key === id);
+        if (r) return r.projectId || null;
+      }
+      return null;
+    }
+    if (type === 'protocol') {
+      const p = getProtocols().find(x => x.id === Number(id));
+      return p ? p.projectId : null;
+    }
+    if (type === 'report') {
+      const r = getReports().find(x => x.id === Number(id));
+      return r ? r.projectId : null;
+    }
+    if (type === 'presentation') {
+      const p = getPresentations().find(x => x.id === Number(id));
+      return p ? p.projectId : null;
+    }
+  } catch (_) {}
+  return null;
 }
 
 // Утилита экранирования для атрибутов (используется в onclick="...")
@@ -9427,9 +9606,14 @@ function escAttr(s) {
 function renderLibProtocols() {
   const el = document.getElementById('lib-protocols-list');
   if (!el) return;
-  const protocols = getProtocols();
+  let protocols = getProtocols();
+  // Block 6: глобальный фильтр
+  protocols = protocols.filter(p => matchesLibFilter(p.projectId));
   if (!protocols.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div>Нет сохранённых протоколов.<br>Создай протокол на вкладке «Протокол встречи».</div>';
+    const f = getLibFilterProjectId();
+    el.innerHTML = f
+      ? '<div class="empty-state"><div class="empty-state-icon">🔍</div>По выбранному проекту протоколов нет.</div>'
+      : '<div class="empty-state"><div class="empty-state-icon">📝</div>Нет сохранённых протоколов.<br>Создай протокол на вкладке «Протокол встречи».</div>';
     return;
   }
   const projMap = new Map((getNSI().projects || []).map(p => [p.id, p.name]));
@@ -9470,16 +9654,22 @@ function renderLibProtocols() {
 function renderLibReports() {
   const el = document.getElementById('lib-reports-list');
   if (!el) return;
-  const reports = getReports();
+  let reports = getReports();
+  // Block 6: глобальный фильтр
+  const reportsAll = reports.slice();  // нужен полный список для расчёта актуальной версии
+  reports = reports.filter(r => matchesLibFilter(r.projectId));
   if (!reports.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📄</div>Нет сгенерированных отчётов.<br>Перейди на вкладку «Отчёт об обследовании».</div>';
+    const f = getLibFilterProjectId();
+    el.innerHTML = f
+      ? '<div class="empty-state"><div class="empty-state-icon">🔍</div>По выбранному проекту отчётов нет.</div>'
+      : '<div class="empty-state"><div class="empty-state-icon">📄</div>Нет сгенерированных отчётов.<br>Перейди на вкладку «Отчёт об обследовании».</div>';
     return;
   }
   // Block 6: для каждого проекта — определить максимальную версию (=актуальная).
-  // Сравнение по числу версии. Если в одном проекте две записи с одинаковым v —
-  // берём свежую по generatedAt.
+  // Считаем по полному списку (reportsAll), а не по отфильтрованному, чтобы пометка
+  // «актуальная» была корректной даже если из-за фильтра показали не все версии.
   const maxVerByProject = {};
-  reports.forEach(r => {
+  reportsAll.forEach(r => {
     const k = r.projectId || `_n_${r.projectName || 'noproj'}`;
     const v = parseInt(r.version || 1) || 1;
     const prev = maxVerByProject[k];
@@ -9496,8 +9686,8 @@ function renderLibReports() {
       <div class="lib-row" id="lib-report-${r.id}">
         <div class="lib-row-head">
           <div class="lib-row-title">${escHtml(r.projectName)}</div>
-          <span class="lib-badge-version">Версия ${r.version}${isLatest ? ' ★' : ''}</span>
           ${isLatest ? '<span class="lib-badge-proj" style="background:#dcfce7;color:#166534;border-color:#bbf7d0">актуальная</span>' : ''}
+          <span class="lib-badge-version">v${r.version}</span>
           <span class="lib-badge-proj">📁 проект</span>
         </div>
         <div class="lib-row-sub">
@@ -9519,9 +9709,14 @@ function renderLibReports() {
 function renderLibPresentations() {
   const el = document.getElementById('lib-presentations-list');
   if (!el) return;
-  const presentations = getPresentations();
+  let presentations = getPresentations();
+  // Block 6: глобальный фильтр
+  presentations = presentations.filter(p => matchesLibFilter(p.projectId));
   if (!presentations.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🎬</div>Нет сгенерированных презентаций.<br>Перейди на вкладку «Презентация».</div>';
+    const f = getLibFilterProjectId();
+    el.innerHTML = f
+      ? '<div class="empty-state"><div class="empty-state-icon">🔍</div>По выбранному проекту презентаций нет.</div>'
+      : '<div class="empty-state"><div class="empty-state-icon">🎬</div>Нет сгенерированных презентаций.<br>Перейди на вкладку «Презентация».</div>';
     return;
   }
   el.innerHTML = presentations.map(p => {
