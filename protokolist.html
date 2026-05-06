@@ -9531,9 +9531,17 @@ function countProtocolRequirements(p) {
 // Переброс из модалки связей в нужную подвкладку с подсветкой строки
 function gotoLinkedAsset(type, id) {
   closeLibLinkedModal();
-  // Если уже на странице Библиотеки — просто переключаем подвкладку и подсвечиваем
-  // Если нет — переходим на Библиотеку
-  if (typeof showTab === 'function') showTab('library');
+
+  // Если ещё не на странице Библиотеки — переключаемся.
+  // ВАЖНО: showTab(name, el) ожидает DOM-элемент таба вторым аргументом — без него
+  // он бросает на el.classList и страница остаётся пустой. Передаём элемент таба.
+  const libraryPageActive = document.getElementById('page-library')?.classList.contains('active');
+  if (!libraryPageActive) {
+    const tabEl = document.getElementById('tab-library');
+    if (typeof showTab === 'function' && tabEl) {
+      showTab('library', tabEl);
+    }
+  }
 
   // map: тип → имя подвкладки + id префикс DOM-элемента
   const map = {
