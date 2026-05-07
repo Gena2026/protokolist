@@ -147,13 +147,13 @@ body[data-busy-op="generating"] #step-3 .step-stop-btn{display:inline-flex;align
 .step-0-icon{font-size:18px}
 .step-0-title{font-size:15px;font-weight:600;color:#1e293b;margin:0}
 
-/* Block 6 v3: единый горизонтальный ряд через GRID — три колонки строго 1fr.
-   Grid делит пространство математически независимо от intrinsic content
-   (с flex был баг: ПРОЕКТ-ячейка с <select> сообщала большой preferred size
-   и забирала больше места). На узких экранах wraps в одну колонку. */
-.step-0-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-@media (max-width: 760px){
+/* Block 6 v4: Проект на 1-й строке во всю ширину, два тумблера рядом 50/50 на 2-й.
+   Grid 2 колонки: Проект span 2, тумблеры по одной. */
+.step-0-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.step-0-cell-project{grid-column:1 / -1}
+@media (max-width: 540px){
   .step-0-row{grid-template-columns:1fr}
+  .step-0-cell-project{grid-column:auto}
 }
 .step-0-cell{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;box-sizing:border-box;min-width:0;transition:.15s;font-size:13px;color:#475569}
 .step-0-cell:hover{border-color:#cbd5e1;background:#f8fafc}
