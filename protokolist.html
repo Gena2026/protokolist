@@ -147,23 +147,29 @@ body[data-busy-op="generating"] #step-3 .step-stop-btn{display:inline-flex;align
 .step-0-icon{font-size:18px}
 .step-0-title{font-size:15px;font-weight:600;color:#1e293b;margin:0}
 
-/* Block 6 v3: единый горизонтальный ряд, ВСЕ ячейки 48px и однострочные.
-   Тумблеры вместо чекбоксов — никакого вторичного текста в самой ячейке. */
-.step-0-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.step-0-cell{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;box-sizing:border-box;flex:1 1 240px;min-width:240px;transition:.15s;font-size:13px;color:#475569}
+/* Block 6 v3: единый горизонтальный ряд через GRID — три колонки строго 1fr.
+   Grid делит пространство математически независимо от intrinsic content
+   (с flex был баг: ПРОЕКТ-ячейка с <select> сообщала большой preferred size
+   и забирала больше места). На узких экранах wraps в одну колонку. */
+.step-0-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width: 760px){
+  .step-0-row{grid-template-columns:1fr}
+}
+.step-0-cell{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;box-sizing:border-box;min-width:0;transition:.15s;font-size:13px;color:#475569}
 .step-0-cell:hover{border-color:#cbd5e1;background:#f8fafc}
 /* Ячейка проекта */
 .step-0-cell-project:focus-within{border-color:#3b82f6;background:#eff6ff;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
 .step-0-cell-project label{font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;margin:0;cursor:pointer;line-height:1}
 .step-0-project-required{color:#ef4444;font-weight:700;margin-left:2px}
-.step-0-cell-project select{flex:1;min-width:0;border:none;outline:none;font-size:14px;font-family:inherit;background:transparent;color:#1e293b;cursor:pointer;appearance:none;padding:0 22px 0 0;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%2364748b' d='M6 9L2 5h8z'/></svg>");background-repeat:no-repeat;background-position:right 4px center}
+.step-0-cell-project select{flex:1;min-width:0;border:none;outline:none;font-size:14px;font-family:inherit;background:transparent;color:#1e293b;cursor:pointer;appearance:none;padding:0 22px 0 0;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%2364748b' d='M6 9L2 5h8z'/></svg>");background-repeat:no-repeat;background-position:right 4px center;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
 .step-0-cell-project:has(select.field-empty-warn){border-color:#ef4444!important;background:#fef2f2!important;animation:field-pulse .9s ease-in-out 2}
 
 /* Ячейка тумблера */
-.step-0-cell-toggle{cursor:pointer;user-select:none}
+.step-0-cell-toggle{cursor:pointer;user-select:none;text-transform:none}
 .step-0-cell-toggle input{position:absolute;opacity:0;pointer-events:none}
 .step-0-toggle-emoji{font-size:16px;line-height:1;flex-shrink:0}
-.step-0-toggle-name{flex:1;font-size:13px;font-weight:500;color:#475569;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Явно отменяем глобальный label{text-transform:uppercase} для текста тумблера */
+.step-0-toggle-name{flex:1;min-width:0;font-size:13px;font-weight:500;color:#475569;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:none;letter-spacing:0}
 /* Сам track тумблера */
 .step-0-toggle-switch{position:relative;width:36px;height:20px;background:#cbd5e1;border-radius:99px;flex-shrink:0;transition:.18s}
 .step-0-toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .18s}
