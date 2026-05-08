@@ -147,38 +147,35 @@ body[data-busy-op="generating"] #step-3 .step-stop-btn{display:inline-flex;align
 .step-0-icon{font-size:18px}
 .step-0-title{font-size:15px;font-weight:600;color:#1e293b;margin:0}
 
-/* Block 6 v4: Проект на 1-й строке во всю ширину, два тумблера рядом 50/50 на 2-й.
-   Grid 2 колонки: Проект span 2, тумблеры по одной. */
-.step-0-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.step-0-cell-project{grid-column:1 / -1}
-@media (max-width: 540px){
-  .step-0-row{grid-template-columns:1fr}
-  .step-0-cell-project{grid-column:auto}
-}
+/* Block 6 v5: Проект — label сверху отдельной строкой (как в Шаге 3),
+   под ним обычный select, под этим тумблеры в строку. Весь блок ограничен
+   по ширине, чтобы не растягиваться на весь экран. */
+.step-0-block{max-width:720px}
+.step-0-project-row{margin-bottom:14px}
+.step-0-project-row label{display:block;font-size:12px;font-weight:600;color:#475569;margin:0 0 5px 0;text-transform:uppercase;letter-spacing:.5px}
+.step-0-project-required{color:#ef4444;font-weight:700;margin-left:2px}
+.step-0-project-row select{display:block;width:100%;height:44px;padding:0 14px;font-size:14px;font-family:inherit;border:1px solid #cbd5e1;border-radius:9px;background:#fff;color:#1e293b;cursor:pointer;outline:none;transition:.15s;box-sizing:border-box;appearance:none;padding-right:36px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%2364748b' d='M6 9L2 5h8z'/></svg>");background-repeat:no-repeat;background-position:right 13px center;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
+.step-0-project-row select:hover{border-color:#94a3b8}
+.step-0-project-row select:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.step-0-project-row select.field-empty-warn{border-color:#ef4444!important;background:#fef2f2!important;animation:field-pulse .9s ease-in-out 2}
+
+/* Тумблеры — два рядом 50/50 */
+.step-0-toggles-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:540px){.step-0-toggles-row{grid-template-columns:1fr}}
 .step-0-cell{display:flex;align-items:center;gap:10px;height:48px;padding:0 14px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;box-sizing:border-box;min-width:0;transition:.15s;font-size:13px;color:#475569}
 .step-0-cell:hover{border-color:#cbd5e1;background:#f8fafc}
-/* Ячейка проекта */
-.step-0-cell-project:focus-within{border-color:#3b82f6;background:#eff6ff;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
-.step-0-cell-project label{font-size:11px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.4px;flex-shrink:0;margin:0;cursor:pointer;line-height:1}
-.step-0-project-required{color:#ef4444;font-weight:700;margin-left:2px}
-.step-0-cell-project select{flex:1;min-width:0;border:none;outline:none;font-size:14px;font-family:inherit;background:transparent;color:#1e293b;cursor:pointer;appearance:none;padding:0 22px 0 0;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='%2364748b' d='M6 9L2 5h8z'/></svg>");background-repeat:no-repeat;background-position:right 4px center;text-overflow:ellipsis;white-space:nowrap;overflow:hidden}
-.step-0-cell-project:has(select.field-empty-warn){border-color:#ef4444!important;background:#fef2f2!important;animation:field-pulse .9s ease-in-out 2}
 
 /* Ячейка тумблера */
 .step-0-cell-toggle{cursor:pointer;user-select:none;text-transform:none}
 .step-0-cell-toggle input{position:absolute;opacity:0;pointer-events:none}
 .step-0-toggle-emoji{font-size:16px;line-height:1;flex-shrink:0}
-/* Явно отменяем глобальный label{text-transform:uppercase} для текста тумблера */
 .step-0-toggle-name{flex:1;min-width:0;font-size:13px;font-weight:500;color:#475569;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:none;letter-spacing:0}
-/* Сам track тумблера */
 .step-0-toggle-switch{position:relative;width:36px;height:20px;background:#cbd5e1;border-radius:99px;flex-shrink:0;transition:.18s}
 .step-0-toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .18s}
-/* Состояние «включён» */
 .step-0-cell-toggle:has(input:checked){border-color:#bfdbfe;background:#eff6ff}
 .step-0-cell-toggle:has(input:checked) .step-0-toggle-name{color:#1d4ed8;font-weight:600}
 .step-0-cell-toggle:has(input:checked) .step-0-toggle-switch{background:#3b82f6}
 .step-0-cell-toggle:has(input:checked) .step-0-toggle-switch::after{transform:translateX(16px)}
-/* Фокус-кольцо для доступности (Tab) */
 .step-0-cell-toggle:has(input:focus-visible){outline:2px solid #3b82f6;outline-offset:2px}
 
 /* Read-only лейбл проекта на Шаге 3 — берёт значение из Шага 0 */
@@ -607,30 +604,32 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <h2 class="step-0-title">Настройки сессии</h2>
     </div>
 
-    <!-- Block 6 v3: одна строка из трёх ячеек одинаковой высоты 48px.
-         Тумблеры вместо чекбоксов — однострочный контент, никакой вторичный
-         текст не ломает выравнивание. Хинты — в title (всплывают по hover). -->
-    <div class="step-0-row">
-      <div class="step-0-cell step-0-cell-project">
-        <label for="meeting-project">ПРОЕКТ<span class="step-0-project-required">*</span></label>
+    <!-- Block 6 v5: Проект — label сверху обычным стилем (как в Шаге 3),
+         потом обычный select. Под ним строка тумблеров 50/50.
+         Весь блок ограничен max-width 720px чтобы не растягиваться. -->
+    <div class="step-0-block">
+      <div class="step-0-project-row">
+        <label for="meeting-project">Проект<span class="step-0-project-required">*</span></label>
         <select id="meeting-project" onchange="onMeetingProjectChange()">
           <option value="">— Выбери проект —</option>
         </select>
       </div>
 
-      <label class="step-0-cell step-0-cell-toggle" title="Нет показа экрана — обработка только звука, без видеоконтекста">
-        <input type="checkbox" id="audio-only-flag" onchange="audioOnlyMode=this.checked">
-        <span class="step-0-toggle-emoji">🔊</span>
-        <span class="step-0-toggle-name">Только аудио</span>
-        <span class="step-0-toggle-switch"></span>
-      </label>
+      <div class="step-0-toggles-row">
+        <label class="step-0-cell step-0-cell-toggle" title="Нет показа экрана — обработка только звука, без видеоконтекста">
+          <input type="checkbox" id="audio-only-flag" onchange="audioOnlyMode=this.checked">
+          <span class="step-0-toggle-emoji">🔊</span>
+          <span class="step-0-toggle-name">Только аудио</span>
+          <span class="step-0-toggle-switch"></span>
+        </label>
 
-      <label class="step-0-cell step-0-cell-toggle" title="Загрузил → ушёл пить кофе. Шаги 2 и 3 запустятся автоматически.">
-        <input type="checkbox" id="auto-mode-flag">
-        <span class="step-0-toggle-emoji">🚀</span>
-        <span class="step-0-toggle-name">Авто-режим</span>
-        <span class="step-0-toggle-switch"></span>
-      </label>
+        <label class="step-0-cell step-0-cell-toggle" title="Загрузил → ушёл пить кофе. Шаги 2 и 3 запустятся автоматически.">
+          <input type="checkbox" id="auto-mode-flag">
+          <span class="step-0-toggle-emoji">🚀</span>
+          <span class="step-0-toggle-name">Авто-режим</span>
+          <span class="step-0-toggle-switch"></span>
+        </label>
+      </div>
     </div>
 
     <!-- Баннер появляется только когда Авто включён И Шаг 3 не заполнен (управляется JS) -->
@@ -739,6 +738,17 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
         onclick="retryGeminiCleanup()" title="Повторить постобработку Gemini">✨ Улучшить</button>
     </div>
     <div class="step-card-hint" id="step-2-hint">Whisper расшифрует аудио, Gemini почистит пунктуацию и добавит экранный контекст.</div>
+    <!-- Block 6 v4: баннер исчерпанного лимита Groq Whisper. Показывается реактивно
+         после 429 ответа от Groq. Блокирует кнопку «Транскрибировать» до сброса. -->
+    <div id="groq-lock-banner" style="display:none;margin-top:12px;padding:12px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:9px;color:#991b1b;font-size:13px;line-height:1.45">
+      <div style="display:flex;align-items:center;gap:10px;font-weight:600;margin-bottom:4px">
+        <span style="font-size:16px">🚫</span>
+        <span>Лимит Groq Whisper исчерпан</span>
+      </div>
+      <div id="groq-lock-banner-body" style="font-weight:400">
+        Бесплатный тариф: 7200 сек аудио / час. Доступно через <strong id="groq-lock-countdown">…</strong>.
+      </div>
+    </div>
     <div class="cleanup-status-line" id="cleanup-status"></div>
     <div class="progress-wrap" id="analysis-progress">
       <div class="progress-label">
@@ -847,6 +857,15 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
     <textarea id="report-instructions" rows="3" placeholder="Например: акцент на интеграцию с 1С..."></textarea>
     <div class="btn-row"><button class="btn btn-primary" onclick="generateReport()">✨ Создать отчёт</button></div>
     <div id="report-status"></div>
+    <!-- Block 6 v4: прогресс-бар отчёта (стиль такой же как у шагов 2/3 протокола) -->
+    <div id="report-progress" style="display:none;margin-top:14px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px">
+      <div class="progress-label" style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+        <span id="report-progress-stage" style="color:#475569;font-weight:500">Готовлю запросы…</span>
+        <span id="report-progress-pct" style="color:#3b82f6;font-weight:600">0%</span>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar" id="report-progress-bar"></div></div>
+      <div id="report-progress-note" style="font-size:11px;color:#94a3b8;margin-top:6px"></div>
+    </div>
   </div>
   <div class="card" id="report-result-card" style="display:none">
     <div class="card-title"><div class="card-title-icon icon-amber">📄</div>Отчёт</div>
@@ -2874,6 +2893,17 @@ async function extractAudioWithFFmpeg(file) {
 
 // ── STEP 2: TRANSCRIBE (manual trigger) ──────────────
 async function startTranscription() {
+  // Block 6 v4: пред-проверка лимита Groq. Если лок активен — не начинаем,
+  // чтобы юзер не делал ffmpeg-извлечение аудио зря (это секунды CPU).
+  if (isGroqLocked()) {
+    refreshGroqLockUI();
+    const sec = Math.max(0, Math.ceil((getGroqLockUntil() - Date.now()) / 1000));
+    const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+    const ss = String(sec % 60).padStart(2, '0');
+    alert(`Лимит Groq Whisper исчерпан.\n\nДоступно через ${mm}:${ss}.\n\nЭто бесплатный тариф (7200 сек аудио в час). Дождись таймера и повтори — приложение само разблокирует кнопку.`);
+    return;
+  }
+
   // ── Step A: убедиться что у нас есть локальный аудио-File ──
   // Источники, в порядке приоритета:
   //   1. currentRawFile (свежезагруженное видео — есть прямо в памяти)
@@ -7155,19 +7185,50 @@ async function generateReport() {
     const usedAreaIds = [...new Set(selectedProtocols.flatMap(p => p.functionalAreaIds || []))];
 
     // ── 3. Запускаем Gemini-вызовы ──────────────────────
-    // Запускаем Intro+Goals параллельно с глоссарием — оба используют общий контекст
-    showStatus('report-status', 'info', `🤖 Готовлю Введение и Цели (1 из ${2 + usedAreaIds.length})...`);
+    // Block 6 v4: прогресс-бар. Всего N=2+usedAreaIds.length промисов.
+    // 0%   — старт
+    // 5%   — отправлены запросы
+    // 5..90% — растёт по мере завершения каждого промиса (5 + 85 * done/total)
+    // 95%  — парсинг
+    // 100% — готово
+    const totalCalls = 2 + usedAreaIds.length;  // intro + glossary + N областей
+    let doneCalls = 0;
+    const progressEl = document.getElementById('report-progress');
+    const stageEl = document.getElementById('report-progress-stage');
+    const pctEl = document.getElementById('report-progress-pct');
+    const barEl = document.getElementById('report-progress-bar');
+    const noteEl = document.getElementById('report-progress-note');
+    const setReportProgress = (pct, stage, note) => {
+      if (!progressEl) return;
+      progressEl.style.display = 'block';
+      if (stageEl && stage !== undefined) stageEl.textContent = stage;
+      if (pctEl) pctEl.textContent = `${Math.round(pct)}%`;
+      if (barEl) barEl.style.width = `${pct}%`;
+      if (noteEl && note !== undefined) noteEl.textContent = note;
+    };
+    const onCallDone = () => {
+      doneCalls++;
+      const pct = 5 + 85 * (doneCalls / totalCalls);
+      setReportProgress(pct, `🤖 Получено ответов от Gemini: ${doneCalls} из ${totalCalls}`,
+        `Параллельные запросы: введение, глоссарий, ${usedAreaIds.length} ${pluralizeRu(usedAreaIds.length, 'область', 'области', 'областей')}`);
+    };
+
+    setReportProgress(5, '📤 Отправляю запросы в Gemini…', `Всего параллельных запросов: ${totalCalls}`);
+    // Чистим старый текстовый статус — теперь его роль играет прогресс-бар
+    showStatus('report-status', '', '');
 
     const introPromise = callGemini([{
       text: REPORT_INTRO_PROMPT(project, protocolsMeta, allToBeTheses, instr)
-    }]);
+    }]).then(r => { onCallDone(); return r; })
+      .catch(e => { onCallDone(); throw e; });
 
     const combinedProtocolsText = selectedProtocols.map(p =>
       `=== ${p.title} (${p.date}) ===\n${p.protocol}`
     ).join('\n\n');
     const glossaryPromise = callGemini([{
       text: REPORT_GLOSSARY_PROMPT(combinedProtocolsText)
-    }]);
+    }]).then(r => { onCallDone(); return r; })
+      .catch(e => { onCallDone(); throw e; });
 
     // AS-IS по каждой функциональной области — параллельно
     const areaPromises = usedAreaIds.map(aid => {
@@ -7175,15 +7236,16 @@ async function generateReport() {
       const asIsTheses = (thesesByArea[aid] || []).filter(t => t.asIs);
       return callGemini([{
         text: REPORT_AREA_AS_IS_PROMPT(areaName, asIsTheses)
-      }]).then(text => ({ areaId: aid, areaName, text }))
-        .catch(e => ({ areaId: aid, areaName, text: `[Ошибка генерации: ${e.message}]` }));
+      }]).then(text => { onCallDone(); return { areaId: aid, areaName, text }; })
+        .catch(e => { onCallDone(); return { areaId: aid, areaName, text: `[Ошибка генерации: ${e.message}]` }; });
     });
 
     // ── 4. Ожидание всех вызовов ──────────────────────
-    showStatus('report-status', 'info', `🤖 Жду ответ от Gemini (${2 + usedAreaIds.length} запросов параллельно)...`);
     const [introRaw, glossaryRaw, ...areaResults] = await Promise.all([
       introPromise, glossaryPromise, ...areaPromises
     ]);
+
+    setReportProgress(92, '🔧 Парсинг результатов и сборка отчёта…', '');
 
     // ── 5. Парсинг результатов ──────────────────────
     const introBlocks = parseReportIntroBlocks(introRaw);
@@ -7215,9 +7277,13 @@ async function generateReport() {
     } catch (e) {
       console.warn('[reports] не удалось сохранить в библиотеку', e);
     }
+    setReportProgress(100, '✅ Готово!', '');
+    setTimeout(() => { if (progressEl) progressEl.style.display = 'none'; }, 1200);
     showStatus('report-status', 'success', `✅ Отчёт готов${_savedVersion}! Скачай .docx ниже или вернись к нему позже через «Библиотека → Отчёты».`);
   } catch (e) {
     console.error('[report] generation failed:', e);
+    const progressEl2 = document.getElementById('report-progress');
+    if (progressEl2) progressEl2.style.display = 'none';
     showStatus('report-status', 'error', `Ошибка: ${e.message}`);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '✨ Создать отчёт'; }
@@ -7522,24 +7588,31 @@ async function generatePresentation() {
   if (!rd) { showStatus('presentation-status', 'error', 'У отчёта нет данных для презентации'); return; }
 
   resultEl.style.display = 'none';
-  showStatus('presentation-status', 'info', '🤖 Готовлю запросы к Gemini...');
+  showStatus('presentation-status', '', '');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Генерация...'; }
+  // Block 6 v4: тонкий стандартный progress-bar (стиль идентичен шагам 2/3 протокола и отчёту)
   progressEl.style.display = 'block';
+  progressEl.style.padding = '14px';
+  progressEl.style.background = '#f8fafc';
+  progressEl.style.border = '1px solid #e2e8f0';
+  progressEl.style.borderRadius = '9px';
   progressEl.innerHTML = `
-    <div style="background:#f1f5f9;border-radius:8px;padding:14px">
-      <div id="pres-stage" style="font-size:13px;color:#1e293b;font-weight:500;margin-bottom:6px">Подготовка...</div>
-      <div style="background:#e2e8f0;height:8px;border-radius:4px;overflow:hidden">
-        <div id="pres-bar" style="background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;width:0;transition:.3s"></div>
-      </div>
-      <div id="pres-pct" style="font-size:11px;color:#64748b;margin-top:6px;text-align:right">0%</div>
-    </div>`;
-  const setProgress = (stage, pct) => {
+    <div class="progress-label" style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+      <span id="pres-stage" style="color:#475569;font-weight:500">Подготовка…</span>
+      <span id="pres-pct" style="color:#3b82f6;font-weight:600">0%</span>
+    </div>
+    <div class="progress-bar-bg"><div class="progress-bar" id="pres-bar"></div></div>
+    <div id="pres-note" style="font-size:11px;color:#94a3b8;margin-top:6px"></div>
+  `;
+  const setProgress = (stage, pct, note) => {
     const s = document.getElementById('pres-stage');
     const b = document.getElementById('pres-bar');
     const p = document.getElementById('pres-pct');
-    if (s) s.textContent = stage;
+    const n = document.getElementById('pres-note');
+    if (s && stage !== undefined) s.textContent = stage;
     if (b) b.style.width = pct + '%';
     if (p) p.textContent = Math.round(pct) + '%';
+    if (n && note !== undefined) n.textContent = note;
   };
 
   try {
@@ -7562,25 +7635,32 @@ async function generatePresentation() {
     });
 
     // ── 2. Параллельные запросы: общие части + по каждой области ──
-    setProgress('Запрос общих разделов и обзора областей...', 5);
+    // Block 6 v4: реальный прогресс по мере завершения промисов
+    const totalRequests = 1 + (rd.areaSections || []).length;
+    let doneRequests = 0;
+    const onPresCallDone = () => {
+      doneRequests++;
+      const pct = 5 + 70 * (doneRequests / totalRequests);
+      setProgress(`🤖 Получено ответов от Gemini: ${doneRequests} из ${totalRequests}`, pct,
+        `Параллельные запросы: общий обзор + ${(rd.areaSections || []).length} ${pluralizeRu((rd.areaSections || []).length, 'область', 'области', 'областей')}`);
+    };
+    setProgress('📤 Отправляю запросы в Gemini…', 5, `Всего параллельных запросов: ${totalRequests}`);
 
     const overviewPromise = callGemini([{
       text: PRESENTATION_OVERVIEW_PROMPT(rd.project, rd.sectionIntro, rd.sectionGoals, rd.protocolsMeta, customerCurator)
-    }]);
+    }]).then(r => { onPresCallDone(); return r; })
+      .catch(e => { onPresCallDone(); throw e; });
 
     const areaPromises = (rd.areaSections || []).map(area =>
       callGemini([{
         text: PRESENTATION_AREA_PROMPT(area.areaName, area.text, thesesByArea[area.areaId] || [])
-      }]).then(raw => ({ areaId: area.areaId, areaName: area.areaName, raw }))
-        .catch(e => ({ areaId: area.areaId, areaName: area.areaName, raw: '[]', error: e.message }))
+      }]).then(raw => { onPresCallDone(); return { areaId: area.areaId, areaName: area.areaName, raw }; })
+        .catch(e => { onPresCallDone(); return { areaId: area.areaId, areaName: area.areaName, raw: '[]', error: e.message }; })
     );
-
-    const totalRequests = 1 + areaPromises.length;
-    setProgress(`🤖 Жду ответов от Gemini (${totalRequests} запросов параллельно)...`, 15);
 
     const [overviewRaw, ...areaResults] = await Promise.all([overviewPromise, ...areaPromises]);
 
-    setProgress('Парсинг ответов...', 75);
+    setProgress('Парсинг ответов...', 80, '');
 
     // ── 3. Парсинг ──
     const overviewParsed = parsePresentationJSON(overviewRaw, {
@@ -7604,7 +7684,7 @@ async function generatePresentation() {
       }
     });
 
-    setProgress('Сборка структуры презентации...', 88);
+    setProgress('Сборка структуры презентации...', 92, '');
 
     // ── 4. Финальная структура презентации ──
     const presentation = {
@@ -7636,8 +7716,8 @@ async function generatePresentation() {
     if (saved) presentation.version = saved.version;
     currentPresentation = presentation;
 
-    setProgress('✅ Готово!', 100);
-    setTimeout(() => { progressEl.style.display = 'none'; }, 800);
+    setProgress('✅ Готово!', 100, '');
+    setTimeout(() => { progressEl.style.display = 'none'; }, 1200);
 
     const slideCount = 4 + areaSlides.length; // Cover + Goals + Survey + ProjectGoals/Closing + areas
     showStatus('presentation-status', 'success',
@@ -11921,6 +12001,104 @@ function refreshStep1AvailabilityByProject() {
 const GROQ_WHISPER_MODEL = 'whisper-large-v3';
 const WHISPER_MAX_MB = 24;
 
+// ── Block 6 v4: лимит Groq (Whisper free tier) ──────────────────
+// Реактивная блокировка: при 429 от Groq читаем retry-after или
+// x-ratelimit-reset-* и пишем глобальное «доступно с» в LS.
+// Пока время не наступило — показываем баннер с countdown и блокируем
+// кнопку «Транскрибировать». Баннер обновляется раз в секунду.
+const GROQ_LOCK_KEY = '_groq_locked_until';
+
+function getGroqLockUntil() {
+  const v = parseInt(localStorage.getItem(GROQ_LOCK_KEY) || '0');
+  return isFinite(v) && v > 0 ? v : 0;
+}
+
+function isGroqLocked() {
+  const until = getGroqLockUntil();
+  if (!until) return false;
+  if (Date.now() >= until) {
+    // Срок прошёл — чистим
+    localStorage.removeItem(GROQ_LOCK_KEY);
+    return false;
+  }
+  return true;
+}
+
+// Парсит ответ 429 от Groq и устанавливает блокировку.
+// Groq возвращает заголовки:
+//   retry-after — секунды до следующей попытки (всегда есть)
+//   x-ratelimit-reset-audio-seconds — когда сбросится квота на аудио (если она исчерпана)
+// Берём максимальное из двух (по факту обычно retry-after меньше).
+function setGroqLockFromResponse(res) {
+  let waitSec = 0;
+  try {
+    const retryAfter = parseInt(res.headers.get('retry-after') || '0');
+    const resetAudio = parseFloat(res.headers.get('x-ratelimit-reset-audio-seconds') || '0');
+    waitSec = Math.max(retryAfter || 0, resetAudio || 0);
+  } catch (_) {}
+  if (!waitSec || waitSec < 1) waitSec = 60;       // fallback: минимум 1 минута
+  if (waitSec > 60 * 60 * 2) waitSec = 60 * 60;    // сверху капируем 1ч (защита от мусора)
+  const until = Date.now() + waitSec * 1000;
+  localStorage.setItem(GROQ_LOCK_KEY, String(until));
+  refreshGroqLockUI();
+  return waitSec;
+}
+
+// Обновляет видимость баннера и кнопки — вызывается при старте, тиками таймера, после 429
+let _groqLockTimerId = null;
+function refreshGroqLockUI() {
+  const banner = document.getElementById('groq-lock-banner');
+  const btn = document.getElementById('btn-transcribe');
+  if (!banner) return;
+  const until = getGroqLockUntil();
+  const now = Date.now();
+  if (!until || now >= until) {
+    // Лок снят / истёк
+    banner.style.display = 'none';
+    if (until) localStorage.removeItem(GROQ_LOCK_KEY);
+    if (_groqLockTimerId) { clearInterval(_groqLockTimerId); _groqLockTimerId = null; }
+    // Восстанавливаем кнопку (если она именно нами была заблокирована)
+    if (btn && btn.dataset.lockedByGroq === '1') {
+      delete btn.dataset.lockedByGroq;
+      btn.disabled = false;
+      btn.title = '';
+    }
+    return;
+  }
+  // Лок активен — рисуем баннер и countdown
+  banner.style.display = 'block';
+  const cd = document.getElementById('groq-lock-countdown');
+  if (cd) {
+    const sec = Math.max(0, Math.ceil((until - now) / 1000));
+    const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+    const ss = String(sec % 60).padStart(2, '0');
+    cd.textContent = `${mm}:${ss}`;
+  }
+  // Блокируем кнопку Шага 2
+  if (btn && !btn.disabled) {
+    btn.disabled = true;
+    btn.dataset.lockedByGroq = '1';
+    btn.title = 'Лимит Groq Whisper — доступно после сброса';
+  }
+  // Запускаем тикер если ещё не идёт
+  if (!_groqLockTimerId) {
+    _groqLockTimerId = setInterval(refreshGroqLockUI, 1000);
+  }
+}
+
+// Snapshot remaining квоты — обновляется по заголовкам каждого УСПЕШНОГО ответа от Groq.
+// Если Groq ответил 200 — лок (если был активен) можно снять.
+function readGroqRateLimitFromHeaders(res) {
+  if (!res) return;
+  // Если был лок и Groq ответил успешно — лимит уже сброшен
+  if (res.ok) {
+    if (getGroqLockUntil()) {
+      localStorage.removeItem(GROQ_LOCK_KEY);
+      refreshGroqLockUI();
+    }
+  }
+}
+
 async function transcribeWithWhisper(file) {
   const key = getGroqKey();
   if (!key) throw new Error('Не указан Groq API Key');
@@ -12017,18 +12195,26 @@ async function transcribeWithWhisper(file) {
         method:'POST', headers:{'Authorization':'Bearer '+key}, body:formData,
         signal: abortSignal
       });
-      if (res.status !== 429 || retries >= 5) break;
-      retries++;
-      const retryAfter = parseInt(res.headers.get('retry-after') || '65');
-      const waitSec = Math.max(retryAfter, 65);
-      for (let w = waitSec; w > 0; w--) {
-        if (typeof _checkCancelled === 'function') _checkCancelled();
-        whisperProgressUI(
-          `⏳ Лимит Groq, жду ${w} сек (попытка ${retries}/5)...`,
-          `Часть ${i+1}`, pct, '429 rate limit — автоповтор'
-        );
-        await sleep(1000);
+      // Block 6 v4: при 429 записываем глобальный лок (баннер + блокировка кнопки)
+      if (res.status === 429) {
+        const waitSec = setGroqLockFromResponse(res);
+        if (retries >= 5) {
+          throw new Error(`Лимит Groq Whisper исчерпан. Доступно через ~${Math.ceil(waitSec/60)} мин.`);
+        }
+        retries++;
+        for (let w = waitSec; w > 0; w--) {
+          if (typeof _checkCancelled === 'function') _checkCancelled();
+          whisperProgressUI(
+            `⏳ Лимит Groq, жду ${w} сек (попытка ${retries}/5)...`,
+            `Часть ${i+1}`, pct, '429 rate limit — автоповтор'
+          );
+          await sleep(1000);
+        }
+        continue;
       }
+      // Block 6 v4: успешный ответ — снимаем лок (если был)
+      readGroqRateLimitFromHeaders(res);
+      break;
     }
 
     if (!res.ok) { const e=await res.json().catch(()=>{}); throw new Error('Groq Whisper: '+(e?.error?.message||res.status)); }
@@ -12112,6 +12298,8 @@ setTimeout(() => {
   // Block 6: одноразовая миграция enriched-транскрипций живых сессий в IDB
   // (чтобы они пережили удаление сессии через 48ч).
   migrateExistingEnrichedTranscripts().catch(e => console.warn('[Block 6] migration failed:', e));
+  // Block 6 v4: восстанавливаем UI лока Groq если он был активен
+  if (typeof refreshGroqLockUI === 'function') refreshGroqLockUI();
   renderNSI();
   updateProjectSelect();
   renderFunctionalAreaChips();
