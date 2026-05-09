@@ -1563,12 +1563,17 @@ const PerfLog = {
     const startedAt = Date.now();
     this.currentOp = { name, label, startedAt, events: [], meta: meta || {} };
     this._record('OP_START', label + ' (' + name + ')', meta || {});
+    // Heartbeat покажет реальную работу таймеров в логе (alive каждые 5с).
+    // Если защита от throttling работает — drift всегда ~5000ms даже когда вкладка в фоне.
+    try { if (typeof HeartbeatMonitor !== 'undefined') HeartbeatMonitor.start(); } catch (_) {}
     this._refreshUI();
   },
 
   endOp(status, extraMeta) {
     if (!this.currentOp) return;
     if (this.currentStep) this.stepEnd();
+    // Останавливаем heartbeat — пока следующая операция не стартует
+    try { if (typeof HeartbeatMonitor !== 'undefined') HeartbeatMonitor.stop(); } catch (_) {}
     const op = this.currentOp;
     const endedAt = Date.now();
     const totalMs = endedAt - op.startedAt;
@@ -1889,6 +1894,139 @@ function openPerfLogHistory() {
     '</div>';
   document.body.appendChild(overlay);
 }
+
+// ── STATE ────────────────────────────────────────────
+// ── WORKER TIMER — обход Chrome background tab throttling ────────────
+// Когда вкладка уходит в фон, Chrome троттлит setTimeout в главном потоке
+// (до 1 раза в минуту после 5 минут idle). Это превращает 20s паузы в
+// многоминутные дыры. Web Worker работает в отдельном потоке и НЕ троттлится —
+// держит «честные» таймеры независимо от состояния вкладки.
+//
+// Используем inline воркер через Blob URL (без отдельного файла).
+// Если воркеры недоступны — fallback на обычный setTimeout.
+const WorkerTimer = (() => {
+  let worker = null;
+  let workerOk = false;
+  const callbacks = new Map();
+  let nextId = 0;
+
+  function _init() {
+    if (typeof Worker === 'undefined') return false;
+    try {
+      // Воркер просто эхом возвращает id через указанное время.
+      // setTimeout внутри воркера НЕ троттлится Chrome'ом.
+      const code = 'self.onmessage=function(e){' +
+        'var d=e.data;' +
+        'if(d.cmd==="sleep"){setTimeout(function(){self.postMessage({id:d.id});},d.ms);}' +
+        'else if(d.cmd==="ping"){self.postMessage({pong:true,t:Date.now()});}' +
+        '};';
+      const blob = new Blob([code], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
+      worker = new Worker(url);
+      worker.onmessage = (e) => {
+        const data = e.data || {};
+        if (data.id != null) {
+          const cb = callbacks.get(data.id);
+          if (cb) { callbacks.delete(data.id); cb(); }
+        }
+      };
+      worker.onerror = (err) => {
+        try { PerfLog.warn('WorkerTimer error: ' + (err.message || 'unknown'), { lineno: err.lineno }); } catch (_) {}
+        // При фатальной ошибке воркера — все висящие колбэки разбудить, дальше fallback
+        for (const cb of callbacks.values()) { try { cb(); } catch (_) {} }
+        callbacks.clear();
+        workerOk = false;
+      };
+      workerOk = true;
+      try { PerfLog.info('WorkerTimer запущен — таймеры защищены от throttling'); } catch (_) {}
+      return true;
+    } catch (e) {
+      try { PerfLog.warn('WorkerTimer init failed: ' + e.message); } catch (_) {}
+      return false;
+    }
+  }
+
+  // Надёжный sleep: пробуем воркер, при сбое — fallback на setTimeout
+  function sleep(ms) {
+    if (worker === null) _init();
+    if (!workerOk) {
+      return new Promise(r => setTimeout(r, ms));
+    }
+    return new Promise(resolve => {
+      const id = ++nextId;
+      // Защита: если воркер по какой-то причине не ответит за ms+5000 — просыпаемся через main-thread setTimeout
+      const safety = setTimeout(() => {
+        if (callbacks.has(id)) {
+          callbacks.delete(id);
+          try { PerfLog.warn('WorkerTimer safety triggered (worker silent)', { ms }); } catch (_) {}
+          resolve();
+        }
+      }, ms + 5000);
+      callbacks.set(id, () => { clearTimeout(safety); resolve(); });
+      try {
+        worker.postMessage({ cmd: 'sleep', id, ms });
+      } catch (e) {
+        clearTimeout(safety);
+        callbacks.delete(id);
+        workerOk = false;
+        setTimeout(resolve, ms);
+      }
+    });
+  }
+
+  function isReady() { return workerOk; }
+
+  return { sleep, isReady, _init };
+})();
+
+// ── HEARTBEAT для PerfLog ─────────────────────────────
+// Пока активна операция — каждые 5 сек пишем «alive» в лог.
+// Если в логе будет дыра между alive-метками > 5s — значит что-то блокирует,
+// и точно увидим где (а не догадываемся как раньше).
+// Использует WorkerTimer — иначе сам heartbeat был бы троттлен.
+const HeartbeatMonitor = (() => {
+  let active = false;
+  let lastBeat = 0;
+
+  async function _loop() {
+    while (active) {
+      const now = Date.now();
+      const drift = lastBeat ? (now - lastBeat) : 0;
+      lastBeat = now;
+      try {
+        if (PerfLog.currentOp) {
+          PerfLog.info('alive', drift > 6000 ? { driftMs: drift, suspicious: true } : { driftMs: drift });
+        }
+      } catch (_) {}
+      await WorkerTimer.sleep(5000);
+    }
+  }
+
+  function start() {
+    if (active) return;
+    active = true;
+    lastBeat = Date.now();
+    _loop();
+  }
+
+  function stop() { active = false; }
+
+  return { start, stop };
+})();
+
+// ── VISIBILITY TRACKING ───────────────────────────────
+// Фиксируем в PerfLog моменты когда вкладка уходит в фон / возвращается.
+// После фикса (WorkerTimer) переходы в фон НЕ должны влиять на таймеры —
+// но логировать всё равно полезно чтобы знать что юзер делал во время прогона.
+document.addEventListener('visibilitychange', () => {
+  try {
+    if (document.hidden) {
+      PerfLog.info('TAB_HIDDEN — вкладка ушла в фон (taймеры через WorkerTimer не пострадают)');
+    } else {
+      PerfLog.info('TAB_VISIBLE — вкладка вернулась');
+    }
+  } catch (_) {}
+});
 
 // ── STATE ────────────────────────────────────────────
 let currentProtocolText = '';
@@ -3732,7 +3870,10 @@ async function waitForActive(fileUri) {
   throw new Error('Превышено время ожидания обработки файла (3 мин)');
 }
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// sleep() — раньше был обычный setTimeout, который Chrome троттлит в фоновых вкладках
+// (после 5 минут idle — до 1 раза в минуту). Это превращало 20-секундные паузы в
+// многоминутные дыры. Теперь идём через WorkerTimer (отдельный поток — не троттлится).
+const sleep = ms => WorkerTimer.sleep(ms);
 
 // ── VIDEO DURATION ────────────────────────────────────
 function getVideoDuration(file) {
