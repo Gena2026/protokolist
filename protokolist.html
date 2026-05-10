@@ -2041,9 +2041,14 @@ const WorkerTimer = (() => {
 const HeartbeatMonitor = (() => {
   let active = false;
   let lastBeat = 0;
+  // Каждый старт получает уникальный generation-id. _loop проверяет что его generation
+  // всё ещё актуальный — иначе завершается. Защита от двойного цикла, который случался
+  // при последовательности endOp → startOp пока старый _loop был в await sleep(5000):
+  // он просыпался, видел active=true (уже от нового запуска) и продолжал параллельно с новым.
+  let generation = 0;
 
-  async function _loop() {
-    while (active) {
+  async function _loop(myGen) {
+    while (active && myGen === generation) {
       const now = Date.now();
       const drift = lastBeat ? (now - lastBeat) : 0;
       lastBeat = now;
@@ -2059,11 +2064,15 @@ const HeartbeatMonitor = (() => {
   function start() {
     if (active) return;
     active = true;
+    generation++;             // новый id — заставит проснувшийся старый цикл выйти, если он есть
     lastBeat = Date.now();
-    _loop();
+    _loop(generation);
   }
 
-  function stop() { active = false; }
+  function stop() {
+    active = false;
+    generation++;             // увеличиваем чтобы текущий спящий цикл не продолжил после перезапуска
+  }
 
   return { start, stop };
 })();
@@ -3204,10 +3213,15 @@ async function startFileUpload(file) {
   audioOnlyMode = document.getElementById('audio-only-flag')?.checked || false;
   markStepStart(1);  // хронометраж Шага 1
   try {
+    // currentMediaInfo обновляется ниже в startFileUpload (после getVideoDuration),
+    // поэтому здесь длительность ещё может быть 0. Главный источник для шагов 2 и 3.
+    const _videoSec = (typeof currentMediaInfo !== 'undefined' && currentMediaInfo.durationSec) || 0;
     PerfLog.startOp('upload', 'Шаг 1: Загрузка файла', {
       fileName: file.name,
       fileSizeMB: +(file.size / 1024 / 1024).toFixed(1),
       fileType: file.type,
+      videoDurationSec: _videoSec || null,        // возможно ещё неизвестна на этом этапе
+      videoDurationMin: _videoSec ? +(_videoSec / 60).toFixed(1) : null,
       audioOnlyMode
     });
   } catch (_) {}
@@ -3590,9 +3604,12 @@ async function startTranscription() {
   markStepStart(2);   // хронометраж Шага 2
   setBusy('transcribing');
   try {
+    const _videoSec = (typeof currentMediaInfo !== 'undefined' && currentMediaInfo.durationSec) || 0;
     PerfLog.startOp('transcribe', 'Шаг 2: Транскрипция (Whisper + Gemini cleanup + видео-обогащение)', {
       fileName: fileForWhisper.name,
       fileSizeMB: +(fileForWhisper.size / 1024 / 1024).toFixed(1),
+      videoDurationSec: _videoSec || null,
+      videoDurationMin: _videoSec ? +(_videoSec / 60).toFixed(1) : null,
       audioOnlyMode,
       hasGeminiCleanup: !!getKey(),
       hasMultipart: uploadedParts.length > 0,
@@ -5684,6 +5701,13 @@ async function generateProtocol() {
       manualTextChars: manualText ? manualText.length : 0,
       hasTranscript: !!currentTranscriptText,
       transcriptChars: (currentTranscriptText || '').length,
+      // Размер и длительность исходного видео — главный показатель сложности задачи.
+      // С ними понятно, нормальная ли длительность Шага 3 для этого видео.
+      videoDurationSec: (typeof currentMediaInfo !== 'undefined' && currentMediaInfo.durationSec) || null,
+      videoDurationMin: (typeof currentMediaInfo !== 'undefined' && currentMediaInfo.durationSec)
+        ? +(currentMediaInfo.durationSec / 60).toFixed(1) : null,
+      fileSizeMB: (typeof uploadedFile !== 'undefined' && uploadedFile && uploadedFile.size)
+        ? +(uploadedFile.size / 1024 / 1024).toFixed(1) : null,
       title, projectName, meetingDate,
       areasCount: selectedAreas.length,
       audioOnlyMode
