@@ -4172,7 +4172,41 @@ ${rawTranscript}`;
 }
 
 // ── ENRICH TRANSCRIPT WITH VIDEO CONTEXT ─────────────
-function ENRICH_PROMPT(transcriptSegment) {
+function ENRICH_PROMPT(transcriptSegment, glitches) {
+  // Block 7 (B): если есть подозрительные участки от детектора Whisper-галлюцинаций,
+  // добавляем доп.задачу — проверить эти таймкоды по аудио и вернуть вердикты.
+  let glitchTask = '';
+  if (Array.isArray(glitches) && glitches.length > 0) {
+    const listLines = glitches.map((g, idx) =>
+      `${idx + 1}. [${g.from} – ${g.to}] Whisper выдал повторы: "${(g.repeatPhrase || '').slice(0, 50)}" (×${g.repeatCount || '?'})`
+    ).join('\n');
+    glitchTask = `
+
+━━━ ДОПОЛНИТЕЛЬНАЯ ЗАДАЧА: ПРОВЕРКА ПОДОЗРИТЕЛЬНЫХ УЧАСТКОВ ━━━
+Whisper, вероятно, зациклился на следующих участках (это известная проблема — модель «застревает» на тишине, шуме или неразборчивой речи и повторяет одно слово/фразу):
+
+${listLines}
+
+Послушай аудио в каждом окне ВНИМАТЕЛЬНО. В конце ответа (ПОСЛЕ обогащённой транскрипции) добавь отдельный блок:
+
+===ПРОВЕРКА===
+[ОТ – ДО] ВЕРДИКТ: КОД | ЦИТАТА
+
+Возможные коды:
+- ЕСТЬ_РЕЧЬ — слышишь реальную речь. Тогда ЦИТАТА = что именно сказано (5-30 слов, своими словами или близко к тексту)
+- ТИШИНА — в окне тишина или почти тишина. ЦИТАТА не нужна.
+- ШУМ — фоновый шум, посторонние звуки, музыка без разборчивой речи. ЦИТАТА не нужна.
+- НЕРАЗБОРЧИВО — речь есть, но разобрать невозможно (перебивают, шепчут, далеко от микрофона). ЦИТАТА не нужна.
+
+ПРИМЕРЫ:
+[00:25:14 – 00:25:42] ВЕРДИКТ: ТИШИНА
+[00:30:01 – 00:30:15] ВЕРДИКТ: ЕСТЬ_РЕЧЬ | А давайте теперь посмотрим следующий блок диаграммы
+
+ВАЖНО: если не уверен — выбирай НЕРАЗБОРЧИВО. НЕ ВЫДУМЫВАЙ речь. Лучше пометка чем галлюцинация поверх галлюцинации.
+ВАЖНО: вердикт нужен для КАЖДОГО участка из списка выше. Не пропускай.
+━━━ КОНЕЦ ДОП.ЗАДАЧИ ━━━`;
+  }
+
   return `Ты — помощник-аналитик. Тебе дана видеозапись рабочей встречи и транскрипция к ней.
 
 Задача: обогати транскрипцию экранным контекстом из видео.
@@ -4185,7 +4219,7 @@ function ENRICH_PROMPT(transcriptSegment) {
 3. Если на экране в данный момент ничего важного или экран не виден — не добавляй ничего.
 4. Не меняй слова участников, не переформулируй их речь.
 5. Сохрани все таймкоды без изменений.
-6. Верни ТОЛЬКО обогащённую транскрипцию, без пояснений.
+6. Верни ТОЛЬКО обогащённую транскрипцию, без пояснений.${glitchTask}
 
 ТРАНСКРИПЦИЯ WHISPER:
 ${transcriptSegment}`;
@@ -4211,14 +4245,30 @@ async function enrichTranscriptWithVideo() {
       if (statusEl) statusEl.textContent =
         `🎬 Анализирую экран: часть ${i + 1} из ${uploadedParts.length} (${part.label})...`;
 
+      // Block 7 (B): детектор подозрительных Whisper-повторов для этой части
+      const partGlitches = detectWhisperGlitches(part.transcriptSegment || '');
+      if (partGlitches.length > 0) {
+        console.log(`[Block 7-B] Часть ${i+1}: найдено ${partGlitches.length} подозрительных участков:`,
+          partGlitches.map(g => `${g.from}-${g.to} (${g.kind}, ×${g.repeatCount})`));
+      }
+
       try {
-        const enriched = await callGemini([
+        const rawGemini = await callGemini([
           { fileData: { mimeType: part.mimeType, fileUri: part.uri } },
-          { text: ENRICH_PROMPT(part.transcriptSegment || '') }
+          { text: ENRICH_PROMPT(part.transcriptSegment || '', partGlitches) }
         ]);
-        enrichedSegments.push(enriched || part.transcriptSegment || '');
+        // Block 7 (B): разделяем enriched-транскрипцию и блок проверки,
+        // подменяем подозрительные строки вердиктами.
+        const processed = applyGlitchResolutions(
+          rawGemini || part.transcriptSegment || '',
+          partGlitches
+        );
+        enrichedSegments.push(processed);
       } catch(e) {
-        enrichedSegments.push(part.transcriptSegment || ''); // fallback to original
+        // При ошибке Gemini: всё равно подменяем подозрительные участки на пометки,
+        // чтобы не оставить «связь-да-связь-да» в финальной транскрипции.
+        const fallback = applyGlitchResolutions(part.transcriptSegment || '', partGlitches, true);
+        enrichedSegments.push(fallback);
       }
 
       if (i < uploadedParts.length - 1) {
@@ -4249,16 +4299,145 @@ async function enrichTranscriptWithVideo() {
     );
     if (statusEl) statusEl.textContent = '🎬 Gemini смотрит видео и расшифровывает экран...';
 
+    // Block 7 (B): детектор для целой транскрипции
+    const fullGlitches = detectWhisperGlitches(currentTranscriptText || '');
+    if (fullGlitches.length > 0) {
+      console.log(`[Block 7-B] Найдено ${fullGlitches.length} подозрительных участков:`,
+        fullGlitches.map(g => `${g.from}-${g.to} (${g.kind}, ×${g.repeatCount})`));
+    }
+
     try {
-      const enriched = await callGemini([
+      const rawGemini = await callGemini([
         { fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } },
-        { text: ENRICH_PROMPT(currentTranscriptText || '') }
+        { text: ENRICH_PROMPT(currentTranscriptText || '', fullGlitches) }
       ]);
-      return enriched || currentTranscriptText;
+      const processed = applyGlitchResolutions(rawGemini || currentTranscriptText, fullGlitches);
+      return processed;
     } catch(e) {
-      return null; // fallback to existing
+      // При ошибке Gemini: подменяем подозрительные участки на пометки
+      return applyGlitchResolutions(currentTranscriptText || '', fullGlitches, true);
     }
   }
+}
+
+// ── BLOCK 7 (B): GLITCH RESOLUTIONS ───────────────────
+// После того как Gemini вернул enriched-транскрипцию + блок ===ПРОВЕРКА===,
+// эта функция:
+// 1) отделяет блок проверки от текста транскрипции
+// 2) парсит вердикты (ЕСТЬ_РЕЧЬ / ТИШИНА / ШУМ / НЕРАЗБОРЧИВО) для каждого
+//    подозрительного таймкода
+// 3) заменяет подозрительные строки в транскрипции на:
+//    - цитату Gemini (если ЕСТЬ_РЕЧЬ)
+//    - пометку [тишина / шум / неразборчиво в HH:MM:SS]
+//    - пометку [фрагмент в HH:MM:SS не распознан — возможно галлюцинация Whisper]
+//      если Gemini не дал вердикт для этого участка (или сбоит вообще: forceFallback=true)
+function applyGlitchResolutions(enrichedText, glitches, forceFallback = false) {
+  if (!enrichedText) return enrichedText || '';
+  if (!Array.isArray(glitches) || glitches.length === 0) {
+    // Глюков не было — но всё равно вырежем блок ПРОВЕРКА если Gemini его прислал случайно
+    return enrichedText.replace(/\n*===ПРОВЕРКА===[\s\S]*$/, '').trimEnd();
+  }
+
+  // 1. Отделяем блок проверки от транскрипции
+  let transcript = enrichedText;
+  let verdictBlock = '';
+  const splitMatch = enrichedText.match(/\n*===ПРОВЕРКА===\s*\n([\s\S]*?)$/);
+  if (splitMatch) {
+    transcript = enrichedText.slice(0, splitMatch.index).trimEnd();
+    verdictBlock = splitMatch[1];
+  }
+
+  // 2. Парсим вердикты. Ожидаемый формат строки:
+  //    [HH:MM:SS – HH:MM:SS] ВЕРДИКТ: КОД | ЦИТАТА (или без цитаты)
+  // Толерантны к разным тире (–, —, -) и пробелам.
+  const verdictMap = {}; // key = "HH:MM:SS" (start), value = {kind, quote}
+  if (verdictBlock && !forceFallback) {
+    const lines = verdictBlock.split('\n');
+    for (const line of lines) {
+      const m = line.match(/\[(\d{2}:\d{2}:\d{2})\s*[–—-]\s*(\d{2}:\d{2}:\d{2})\]\s*ВЕРДИКТ\s*:\s*(\w+)(?:\s*\|\s*(.*))?/i);
+      if (!m) continue;
+      const start = m[1];
+      const code = m[3].toUpperCase().replace(/_/g, '_');
+      const quote = (m[4] || '').trim();
+      verdictMap[start] = { kind: code, quote };
+    }
+  }
+
+  // 3. Применяем замены к строкам транскрипции для каждого подозрительного таймкода
+  const transcriptLines = transcript.split('\n');
+  // Для быстрого поиска: индекс строк по таймкоду (берём первую строку с таким временем)
+  const firstLineByHms = {};
+  for (let i = 0; i < transcriptLines.length; i++) {
+    const m = transcriptLines[i].match(/^\[(\d{2}:\d{2}:\d{2})\]/);
+    if (m && firstLineByHms[m[1]] === undefined) firstLineByHms[m[1]] = i;
+  }
+
+  // Парсим HH:MM:SS → секунды
+  const hmsToSec = (hms) => {
+    const m = hms.match(/(\d{2}):(\d{2}):(\d{2})/);
+    return m ? parseInt(m[1])*3600 + parseInt(m[2])*60 + parseInt(m[3]) : 0;
+  };
+
+  // Множество индексов строк, которые надо удалить (заменяются на одну пометку)
+  const linesToDelete = new Set();
+  // Список вставок: { atLineIdx, replacementText }
+  const insertions = [];
+
+  for (const g of glitches) {
+    const verdict = verdictMap[g.from];
+    let replacement;
+
+    if (forceFallback || !verdict) {
+      // Gemini не ответил — пометка о возможной галлюцинации
+      replacement = `[${g.from}] [⚠️ фрагмент не распознан — возможно галлюцинация Whisper в районе ${g.from}–${g.to}]`;
+    } else if (verdict.kind === 'ЕСТЬ_РЕЧЬ' && verdict.quote) {
+      replacement = `[${g.from}] ${verdict.quote}`;
+    } else if (verdict.kind === 'ТИШИНА') {
+      replacement = `[${g.from}] [тишина · ${g.from}–${g.to}]`;
+    } else if (verdict.kind === 'ШУМ') {
+      replacement = `[${g.from}] [фоновый шум · ${g.from}–${g.to}]`;
+    } else if (verdict.kind === 'НЕРАЗБОРЧИВО') {
+      replacement = `[${g.from}] [неразборчиво · ${g.from}–${g.to}]`;
+    } else {
+      // Неизвестный код вердикта — тоже на пометку
+      replacement = `[${g.from}] [⚠️ фрагмент не распознан — возможно галлюцинация Whisper в районе ${g.from}–${g.to}]`;
+    }
+
+    // Находим строки в транскрипции, которые попадают в диапазон g.from..g.to
+    const fromSec = hmsToSec(g.from);
+    const toSec = hmsToSec(g.to);
+    let firstMatchIdx = -1;
+    for (let i = 0; i < transcriptLines.length; i++) {
+      const m = transcriptLines[i].match(/^\[(\d{2}:\d{2}:\d{2})\]/);
+      if (!m) continue;
+      const sec = hmsToSec(m[1]);
+      if (sec >= fromSec && sec <= toSec) {
+        if (firstMatchIdx === -1) firstMatchIdx = i;
+        linesToDelete.add(i);
+      }
+    }
+
+    if (firstMatchIdx !== -1) {
+      insertions.push({ atLineIdx: firstMatchIdx, replacementText: replacement });
+    }
+  }
+
+  // 4. Строим итоговый текст: пропускаем удалённые строки, на месте первой
+  //    из удалённой группы вставляем замену.
+  const insertionMap = {};
+  for (const ins of insertions) insertionMap[ins.atLineIdx] = ins.replacementText;
+
+  const result = [];
+  for (let i = 0; i < transcriptLines.length; i++) {
+    if (insertionMap[i] !== undefined) {
+      result.push(insertionMap[i]);
+      continue; // saved replacement, skip original even if it's also in linesToDelete
+    }
+    if (linesToDelete.has(i)) continue;
+    result.push(transcriptLines[i]);
+  }
+
+  return result.join('\n').trimEnd();
 }
 
 // ── RETRY GEMINI CLEANUP (without re-running Whisper) ─
@@ -13768,6 +13947,199 @@ function getTranscriptSegment(fullTranscript, startSec, endSec) {
     } else if (result.length>0) result.push(line);
   }
   return result.join('\n');
+}
+
+// ── BLOCK 7 (B): WHISPER GLITCH DETECTOR ─────────────
+// Ищет в сырой транскрипции массивные повторы — признак галлюцинаций Whisper
+// на тишине/шуме (например бесконечные «связь, да, связь, да...»).
+// ВАЖНО: пороги выставлены ВЫСОКО, чтобы не задеть реальную речь типа
+// «да-да-да-да» (3-4 повтора), что подтверждено в Аудитах NotebookLM №2 и №4.
+//
+// Два механизма обнаружения:
+// 1) ВНУТРИ ОДНОЙ СТРОКИ: одно слово (≥3 символа) повторяется ≥20 раз
+//    ИЛИ короткая фраза из 2-3 слов повторяется ≥10 раз. Покрывает случаи когда
+//    Whisper выдал зацикливание одной длинной строкой (Customer Service:
+//    «связь, да, связь, да...» × 1000+ в одной строке). Строка может НЕ иметь
+//    таймкод в начале — тогда берём таймкод из ближайшей строки выше.
+// 2) НА СОСЕДНИХ СТРОКАХ: одинаковый текст ≥5 раз подряд.
+//    Покрывает случаи когда Whisper разбил зацикливание на много мелких
+//    сегментов с одинаковым содержимым.
+//
+// Возвращает массив подозрительных таймкодов:
+// [{ from: "HH:MM:SS", to: "HH:MM:SS", originalText: "...", lineIndices: [...] }]
+function detectWhisperGlitches(transcript) {
+  if (!transcript || typeof transcript !== 'string') return [];
+  const lines = transcript.split('\n');
+  const glitches = [];
+
+  // Хелпер: извлечь таймкод из строки. Возвращает {sec, hms} или null.
+  const parseTimecode = (line) => {
+    const m = line.match(/^\[(\d{2}):(\d{2}):(\d{2})\]/);
+    if (!m) return null;
+    const sec = parseInt(m[1])*3600 + parseInt(m[2])*60 + parseInt(m[3]);
+    return { sec, hms: `${m[1]}:${m[2]}:${m[3]}` };
+  };
+
+  // Хелпер: для строки i найти таймкод — либо из неё самой, либо из ближайшей
+  // строки выше с таймкодом (Whisper иногда выдаёт длинные блоки без таймкода).
+  const findTimecodeForLine = (idx) => {
+    for (let k = idx; k >= 0; k--) {
+      const tc = parseTimecode(lines[k]);
+      if (tc) return tc;
+    }
+    return null;
+  };
+
+  // Хелпер: добавить N секунд к таймкоду HH:MM:SS
+  const addSec = (hms, n) => {
+    const m = hms.match(/(\d{2}):(\d{2}):(\d{2})/);
+    if (!m) return hms;
+    let s = parseInt(m[1])*3600 + parseInt(m[2])*60 + parseInt(m[3]) + n;
+    if (s < 0) s = 0;
+    const hh = String(Math.floor(s/3600)).padStart(2,'0');
+    const mm = String(Math.floor((s%3600)/60)).padStart(2,'0');
+    const ss = String(s%60).padStart(2,'0');
+    return `${hh}:${mm}:${ss}`;
+  };
+
+  // Хелпер: нормализовать строку для подсчёта (lowercase, убрать пунктуацию)
+  // ВАЖНО: используем простую токенизацию по пробелам, БЕЗ regex \b
+  // (он не работает с кириллицей в JS).
+  const tokenize = (text) => {
+    return text
+      .toLowerCase()
+      .replace(/[.,!?;:()«»"'`\-—–]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 0);
+  };
+
+  // Хелпер: найти самую частую последовательность из k слов в массиве токенов.
+  // Возвращает {phrase, count} или null если повторов нет.
+  const findMostRepeatedNgram = (tokens, k) => {
+    if (tokens.length < k * 2) return null;
+    const counts = new Map();
+    for (let i = 0; i + k <= tokens.length; i++) {
+      const ngram = tokens.slice(i, i + k).join(' ');
+      counts.set(ngram, (counts.get(ngram) || 0) + 1);
+    }
+    let best = null;
+    for (const [phrase, count] of counts) {
+      // Игнорируем очень короткие токены (типа «а», «о», «и» — союзы/частицы)
+      if (k === 1 && phrase.length < 3) continue;
+      if (!best || count > best.count) best = { phrase, count };
+    }
+    return best;
+  };
+
+  // ───── Механизм 1: повторы внутри одной строки ─────
+  // Перебираем строки. Длинные строки (>200 символов) проверяем на массивные
+  // повторы. Берём таймкод из строки или из ближайшей выше.
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line || line.length < 200) continue; // только длинные строки
+    // Убираем таймкоды и квадратные скобки внутри строки
+    const body = line
+      .replace(/\[\d{2}:\d{2}:\d{2}\]/g, ' ')
+      .replace(/\[[^\]]*\]/g, ' ')
+      .trim();
+    if (body.length < 200) continue;
+
+    const tokens = tokenize(body);
+    if (tokens.length < 40) continue;
+
+    // Ищем самые частые n-граммы для k=1, 2, 3
+    let detected = null;
+    for (const k of [2, 1, 3]) { // k=2 первым: 2-словные фразы стабильнее
+      const top = findMostRepeatedNgram(tokens, k);
+      if (!top) continue;
+      // Пороги:
+      //  k=1: ≥20 повторов одного слова
+      //  k=2: ≥15 повторов биграммы
+      //  k=3: ≥10 повторов триграммы
+      const threshold = k === 1 ? 20 : k === 2 ? 15 : 10;
+      // Дополнительно: эти повторы должны составлять существенную часть строки.
+      // Если из 2288 токенов только 25 «связь» — это галлюцинация, но если
+      // в большой осмысленной речи 20 раз сказали «человек» — нет.
+      // Условие: повторы должны занимать ≥50% всех токенов (с учётом длины n-граммы).
+      const coverageRatio = (top.count * k) / tokens.length;
+      if (top.count >= threshold && coverageRatio >= 0.5) {
+        detected = { phrase: top.phrase, count: top.count, k };
+        break;
+      }
+    }
+
+    if (detected) {
+      const tc = findTimecodeForLine(i);
+      if (!tc) continue;
+      // Оценка длительности: каждое повторение ~0.5 сек, кэп 120 сек
+      const durSec = Math.min(Math.max(detected.count * 0.5, 5), 120);
+      glitches.push({
+        from: tc.hms,
+        to: addSec(tc.hms, Math.round(durSec)),
+        originalText: body.slice(0, 100) + (body.length > 100 ? '...' : ''),
+        lineIndices: [i],
+        kind: 'in-line-repeat',
+        repeatPhrase: detected.phrase,
+        repeatCount: detected.count
+      });
+    }
+  }
+
+  // ───── Механизм 2: повторы соседних строк ─────
+  // Группируем подряд идущие строки с одинаковым «телом» (без таймкода).
+  // Если группа ≥5 строк и тело короткое (<50 символов) — это галлюцинация.
+  let groupStart = -1;
+  let groupBody = '';
+  for (let i = 0; i <= lines.length; i++) {
+    const line = lines[i];
+    const tc = line ? parseTimecode(line) : null;
+    let body = '';
+    if (tc) {
+      body = line.replace(/^\[\d{2}:\d{2}:\d{2}\]\s*/, '');
+      body = body.replace(/\[[^\]]*\]/g, '').trim().toLowerCase().replace(/[.,!?;:]/g, '');
+    }
+
+    if (tc && body && body.length < 50 && body === groupBody) {
+      continue;
+    }
+
+    // граница: закрыть текущую группу
+    if (groupStart >= 0) {
+      const groupEnd = i - 1;
+      const groupLen = groupEnd - groupStart + 1;
+      if (groupLen >= 5) {
+        const firstTc = parseTimecode(lines[groupStart]);
+        const lastTc = parseTimecode(lines[groupEnd]);
+        if (firstTc && lastTc) {
+          const alreadyCovered = glitches.some(g =>
+            g.lineIndices.some(idx => idx >= groupStart && idx <= groupEnd)
+          );
+          if (!alreadyCovered) {
+            const indices = [];
+            for (let k = groupStart; k <= groupEnd; k++) indices.push(k);
+            glitches.push({
+              from: firstTc.hms,
+              to: addSec(lastTc.hms, 3),
+              originalText: groupBody.slice(0, 100),
+              lineIndices: indices,
+              kind: 'consecutive-repeat',
+              repeatPhrase: groupBody,
+              repeatCount: groupLen
+            });
+          }
+        }
+      }
+      groupStart = -1;
+      groupBody = '';
+    }
+
+    if (tc && body && body.length < 50) {
+      groupStart = i;
+      groupBody = body;
+    }
+  }
+
+  return glitches;
 }
 
 
