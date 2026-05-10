@@ -3607,7 +3607,14 @@ async function startTranscription() {
 
   try {
     // ── Step A: Whisper raw transcription ──
-    const whisperRaw = await transcribeWithWhisper(fileForWhisper);
+    // Block 7 (А2): передаём prompt из НСИ (имена проекта + термины глоссария) и temperature=0
+    const _projIdRaw = document.getElementById('meeting-project')?.value || '';
+    const _whisperPrompt = (typeof buildWhisperPrompt === 'function')
+      ? buildWhisperPrompt(parseInt(_projIdRaw) || 0) : '';
+    const whisperRaw = await transcribeWithWhisper(fileForWhisper, {
+      prompt: _whisperPrompt,
+      temperature: 0
+    });
 
     if (whisperRaw) {
       let finalTranscript = whisperRaw;
@@ -11673,20 +11680,23 @@ function pcRenderMiniCard(dict, id) {
         <input type="text" id="mc-areas-prefix" class="pc-input" maxlength="2" style="text-transform:uppercase;font-family:monospace;letter-spacing:.5px;text-align:center" placeholder="ПЛ" value="${a ? escHtml(a.prefix) : ''}">
       </div>`;
   } else if (dict === 'glossary') {
-    // Block 7: мини-карточка термина глоссария — Термин, Определение (опц.), Область применения, [✓ Также в Общие]
+    // Block 7: мини-карточка термина глоссария — Термин, Определение (опц.), [✓ Также в Общие]
+    // Scope не отображается полем — он определён ВКОНТЕКСТЕ:
+    //   - для нового — из _glossaryNewScopePreset (выставляется кнопкой «+ Добавить» в нужном блоке)
+    //   - для редактирования — из самой записи
+    // Заголовок карточки информирует юзера о scope, чтобы было видно куда сохраняем.
     const g = isNew ? null : (nsi.glossary || []).find(x => x.id === id);
-    titleEl.textContent = isNew ? 'Новый термин' : 'Редактирование термина';
-    // Для нового термина scope берём из _glossaryNewScopePreset (выставляется кнопкой «+ Добавить»
-    // в нужном блоке: 0 = в общем блоке, projectId = в проектном блоке).
-    // Для редактирования — из самой записи.
     const curScope = g ? (g.scope || 0) : (_glossaryNewScopePreset || 0);
-    const projects = (nsi.projects || []).slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ru'));
-    const scopeOpts = [`<option value="0"${curScope === 0 ? ' selected' : ''}>🌐 Общий (для всех проектов)</option>`]
-      .concat(projects.map(p => {
-        const nm = p.name || `Проект #${p.id}`;
-        return `<option value="${p.id}"${curScope === p.id ? ' selected' : ''}>${escHtml(nm)}</option>`;
-      })).join('');
-    // Галочка «также в Общие» видна только когда scope = проект (для общего термина бессмысленна).
+    _glossaryEditingScope = curScope; // запоминаем для saveMiniCard
+    // Информативный заголовок с указанием scope
+    let scopeLabel = '🌐 общий';
+    if (curScope !== 0) {
+      const proj = (nsi.projects || []).find(p => p.id === curScope);
+      const projName = proj ? (proj.name || `Проект #${proj.id}`) : `проект #${curScope}`;
+      scopeLabel = `📁 проект «${projName}»`;
+    }
+    titleEl.textContent = (isNew ? 'Новый термин · ' : 'Редактирование термина · ') + scopeLabel;
+    // Галочка «Также в Общие» — только для проектных терминов (для общего бессмысленна)
     const alsoCommonHidden = curScope === 0 ? 'display:none' : '';
     html = `
       <div class="pc-field">
@@ -11696,11 +11706,6 @@ function pcRenderMiniCard(dict, id) {
       <div class="pc-field">
         <label>Определение <span style="color:#94a3b8;font-weight:400;font-size:11px">(опционально)</span></label>
         <textarea id="mc-glossary-definition" class="pc-input" rows="2" placeholder="Краткое определение, чтобы помнить что это" style="resize:vertical;min-height:54px">${g ? escHtml(g.definition || '') : ''}</textarea>
-      </div>
-      <div class="pc-field">
-        <label>Область применения <span class="pc-req">*</span></label>
-        <select id="mc-glossary-scope" class="pc-input" onchange="mcGlossaryToggleAlsoCommon()">${scopeOpts}</select>
-        <div style="font-size:11px;color:#94a3b8;margin-top:4px">«Общий» термин используется во всех проектах. Проектный — только в выбранном.</div>
       </div>
       <div class="pc-field" id="mc-glossary-also-common-wrap" style="${alsoCommonHidden}">
         <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer;font-weight:400">
@@ -11715,16 +11720,9 @@ function pcRenderMiniCard(dict, id) {
   fieldsEl.innerHTML = html;
 }
 
-// Block 7: показывает/скрывает чек-бокс «также в Общие» в зависимости от выбранного scope
-function mcGlossaryToggleAlsoCommon() {
-  const sel = document.getElementById('mc-glossary-scope');
-  const wrap = document.getElementById('mc-glossary-also-common-wrap');
-  const cb = document.getElementById('mc-glossary-also-common');
-  if (!sel || !wrap) return;
-  const isProject = parseInt(sel.value || '0') !== 0;
-  wrap.style.display = isProject ? '' : 'none';
-  if (!isProject && cb) cb.checked = false;
-}
+// Block 7: scope текущего редактируемого термина (общий = 0 / id проекта).
+// Запоминается в pcRenderMiniCard и читается в saveMiniCard, чтобы заменить удалённый селект.
+let _glossaryEditingScope = 0;
 
 // Сохранить мини-карточку
 // Block 3: переключение сегментированного контрола в карточке участника
@@ -11804,9 +11802,11 @@ function saveMiniCard(closeAfter) {
     saveNSI(nsi);
   } else if (dict === 'glossary') {
     // Block 7: сохранение термина глоссария
+    // Scope больше НЕ читается из формы — он определён контекстом (откуда нажали «+ Добавить»
+    // или какая запись редактируется) и хранится в _glossaryEditingScope (выставляется в pcRenderMiniCard).
     const term = document.getElementById('mc-glossary-term').value.trim();
     const definition = document.getElementById('mc-glossary-definition').value.trim();
-    const scope = parseInt(document.getElementById('mc-glossary-scope').value || '0') || 0;
+    const scope = _glossaryEditingScope || 0;
     const alsoCommonCb = document.getElementById('mc-glossary-also-common');
     const alsoCommon = !!(alsoCommonCb && alsoCommonCb.checked && scope !== 0);
     if (!term) return showErr('Введи термин');
@@ -11866,7 +11866,7 @@ function saveMiniCard(closeAfter) {
       // Берём ту что соответствует выбранному scope (где находится сама редактируемая запись).
       const arr = getNSI().glossary;
       const term = document.getElementById('mc-glossary-term').value.trim();
-      const sc = parseInt(document.getElementById('mc-glossary-scope').value || '0') || 0;
+      const sc = _glossaryEditingScope || 0;
       const found = arr.find(g => (g.term||'').toLowerCase() === term.toLowerCase() && (g.scope||0) === sc);
       newId = found ? found.id : (arr.length ? arr[arr.length-1].id : null);
     }
@@ -12966,6 +12966,90 @@ function refreshStep1AvailabilityByProject() {
 const GROQ_WHISPER_MODEL = 'whisper-large-v3';
 const WHISPER_MAX_MB = 24;
 
+// ── Block 7 (А2): сборка Whisper-prompt из НСИ ──────────────
+// Whisper API лимит prompt = 224 токена. Эмпирически 1 токен русского ≈ 2.5 симв,
+// поэтому ставим бюджет 550 символов (224 * 2.5 = 560 минус 10 для безопасности).
+// Приоритет: сначала имена участников проекта (из карточки проекта), потом термины глоссария.
+// При нехватке места — обрезаем по последней запятой, чтобы не оборвать слово/ФИО.
+const WHISPER_PROMPT_BUDGET = 550;
+
+function buildWhisperPrompt(projectId) {
+  const pid = parseInt(projectId) || 0;
+  if (!pid) {
+    // Проекта нет — возвращаем только общие термины (без имён)
+    const terms = (typeof getGlossaryTerms === 'function') ? getGlossaryTerms(0) : [];
+    if (!terms.length) return '';
+    return _packPromptSection('Термины', terms, WHISPER_PROMPT_BUDGET);
+  }
+
+  const nsi = getNSI();
+  const proj = (nsi.projects || []).find(p => p.id === pid);
+  if (!proj) return '';
+
+  // Имена: команда заказчика + команда исполнителя из карточки проекта.
+  // Берём только ФИО (без должностей — экономим лимит).
+  const team = []
+    .concat(getResolvedTeam(proj, 'customer', nsi))
+    .concat(getResolvedTeam(proj, 'executor', nsi));
+  // Уникальные ФИО (case-insensitive) с сохранением порядка
+  const seenNames = new Set();
+  const names = [];
+  team.forEach(m => {
+    const fio = (m.fio || '').trim();
+    if (!fio) return;
+    const k = fio.toLowerCase();
+    if (seenNames.has(k)) return;
+    seenNames.add(k);
+    names.push(fio);
+  });
+
+  // Термины: общие + проектные (уже дедуплицированы в getGlossaryTerms)
+  const terms = (typeof getGlossaryTerms === 'function') ? getGlossaryTerms(pid) : [];
+
+  // Собираем итог: «Имена: …\nТермины: …»
+  // Имена имеют приоритет — режем термины, не имена.
+  const parts = [];
+  let used = 0;
+  if (names.length) {
+    const namesSection = _packPromptSection('Имена', names, WHISPER_PROMPT_BUDGET);
+    if (namesSection) {
+      parts.push(namesSection);
+      used += namesSection.length + 1; // +1 за \n между секциями
+    }
+  }
+  if (terms.length) {
+    const remaining = WHISPER_PROMPT_BUDGET - used;
+    if (remaining > 20) { // меньше — нет смысла, не влезет даже короткий термин
+      const termsSection = _packPromptSection('Термины', terms, remaining);
+      if (termsSection) parts.push(termsSection);
+    }
+  }
+  return parts.join('\n');
+}
+
+// Хелпер: упаковывает массив строк в секцию вида «Заголовок: a, b, c.»
+// с обрезкой так, чтобы общая длина не превысила budget. Обрезка по последней
+// запятой (не на середине слова), точка ставится в конце.
+function _packPromptSection(label, items, budget) {
+  if (!items || !items.length || budget <= 0) return '';
+  const prefix = label + ': ';
+  const suffix = '.';
+  const inner = budget - prefix.length - suffix.length;
+  if (inner <= 0) return '';
+  let s = '';
+  for (let i = 0; i < items.length; i++) {
+    const piece = (i === 0 ? '' : ', ') + items[i];
+    if (s.length + piece.length > inner) break;
+    s += piece;
+  }
+  if (!s) {
+    // Даже первый элемент не влез — кладём его обрезанным, но лучше ничего не возвращать,
+    // чем ломать слово. Возвращаем пустоту: вызывающий код сам обработает.
+    return '';
+  }
+  return prefix + s + suffix;
+}
+
 // ── Block 6 v4: лимит Groq (Whisper free tier) ──────────────────
 // Реактивная блокировка: при 429 от Groq читаем retry-after или
 // x-ratelimit-reset-* и пишем глобальное «доступно с» в LS.
@@ -13064,9 +13148,20 @@ function readGroqRateLimitFromHeaders(res) {
   }
 }
 
-async function transcribeWithWhisper(file) {
+async function transcribeWithWhisper(file, options = {}) {
   const key = getGroqKey();
   if (!key) throw new Error('Не указан Groq API Key');
+
+  // Block 7 (А2): извлекаем опции (prompt / temperature). language всегда 'ru' (фиксировано ниже).
+  // Если prompt пустой — поле просто не добавляется в FormData (так Whisper его проигнорирует).
+  const _whisperPrompt = (typeof options.prompt === 'string' ? options.prompt.trim() : '');
+  const _whisperTemp = (typeof options.temperature === 'number' && isFinite(options.temperature))
+    ? options.temperature : 0;
+  if (_whisperPrompt) {
+    console.log(`[whisper-prompt] ${_whisperPrompt.length} chars · "${_whisperPrompt.slice(0, 80).replace(/\n/g, ' ')}${_whisperPrompt.length > 80 ? '…' : ''}"`);
+  } else {
+    console.log('[whisper-prompt] empty (нет команды проекта и нет терминов глоссария)');
+  }
 
   const whisperProgressUI = (title, stage, pct, note) => {
     // Use analysis progress bar during separate transcription step
@@ -13160,6 +13255,9 @@ async function transcribeWithWhisper(file) {
     formData.append('language','ru');
     formData.append('response_format','verbose_json');
     formData.append('timestamp_granularities[]','segment');
+    // Block 7 (А2): подсказка имён+терминов и температура
+    if (_whisperPrompt) formData.append('prompt', _whisperPrompt);
+    formData.append('temperature', String(_whisperTemp));
 
     // F3-Stop: используем глобальный AbortController если он есть
     const abortSignal = (typeof _opAbortController !== 'undefined' && _opAbortController) ? _opAbortController.signal : undefined;
