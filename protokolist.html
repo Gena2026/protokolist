@@ -44,7 +44,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .card{background:#fff;border-radius:14px;border:1px solid #e2e8f0;padding:26px;margin-bottom:18px}
 .card-title{font-size:15px;font-weight:600;color:#1e293b;margin-bottom:18px;display:flex;align-items:center;gap:8px}
 .card-title-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
-.icon-blue{background:#eff6ff}.icon-green{background:#f0fdf4}.icon-amber{background:#fffbeb}.icon-purple{background:#f5f3ff}
+.icon-blue{background:#eff6ff}.icon-green{background:#f0fdf4}.icon-amber{background:#fffbeb}.icon-purple{background:#f5f3ff}.icon-pink{background:#fdf2f8}
 label{display:block;font-size:12px;font-weight:600;color:#475569;margin-bottom:5px;margin-top:14px;text-transform:uppercase;letter-spacing:.5px}
 label:first-of-type{margin-top:0}
 input[type=text],input[type=password],textarea{width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 13px;font-size:14px;font-family:inherit;outline:none;transition:.2s;background:#fafafa;color:#1e293b}
@@ -1180,6 +1180,12 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
           <div class="nsi-tile-a-name">Функциональные области</div>
           <div class="nsi-tile-a-count" id="nsi-count-a-areas">0</div>
         </div>
+        <!-- Block 7: Глоссарий — 5-й справочник -->
+        <div class="nsi-tile-a" onclick="nsiOpenList('glossary')">
+          <div class="nsi-tile-a-icon" style="background:#fce7f3">📖</div>
+          <div class="nsi-tile-a-name">Глоссарий</div>
+          <div class="nsi-tile-a-count" id="nsi-count-a-glossary">0</div>
+        </div>
       </div>
     </div>
   </div>
@@ -1222,6 +1228,21 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
         <button class="btn btn-primary" onclick="nsiOpenNewElementCard('areas')">+ Добавить</button>
       </div>
       <div id="functional-areas-list"></div>
+    </div>
+
+    <!-- Block 7: GLOSSARY list — 5-й справочник, по-проектный + Общий -->
+    <div class="card nsi-list-card" data-dict="glossary" style="display:none">
+      <div class="nsi-list-header">
+        <div class="card-title" style="margin:0"><div class="card-title-icon icon-pink">📖</div>Глоссарий</div>
+        <button class="btn btn-primary" onclick="nsiOpenNewElementCard('glossary')">+ Добавить</button>
+      </div>
+      <!-- Селект scope: фильтр по проекту/общий -->
+      <div style="margin-bottom:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:12px;color:#64748b;font-weight:600">Проект:</label>
+        <select id="glossary-scope-select" class="pc-input" style="max-width:360px" onchange="changeGlossaryScopeFilter()"></select>
+        <span id="glossary-scope-count" style="font-size:12px;color:#94a3b8"></span>
+      </div>
+      <div id="glossary-list"></div>
     </div>
   </div>
 
@@ -11314,7 +11335,7 @@ async function refreshGoogleSpace() {
 
 
 // ── NSI — Нормативно-справочная информация ───────────────
-const getNSI = () => JSON.parse(localStorage.getItem('nsi') || '{"positions":[],"participants":[],"projects":[],"functionalAreas":[]}');
+const getNSI = () => JSON.parse(localStorage.getItem('nsi') || '{"positions":[],"participants":[],"projects":[],"functionalAreas":[],"glossary":[]}');
 const saveNSI = d => localStorage.setItem('nsi', JSON.stringify(d));
 
 // Гарантирует наличие новых полей в NSI (миграция со старых версий)
@@ -11378,6 +11399,34 @@ function ensureNSIDefaults() {
       });
     }
     nsi._b3migrated = true;
+    changed = true;
+  }
+
+  // Block 7 миграция: глоссарий — массив {id, term, definition?, scope}.
+  // scope: 0 = общий (для всех проектов), positive = id проекта (только для него).
+  // Заполняется дефолтным списком общих ИТ-терминов при первом запуске.
+  if (!Array.isArray(nsi.glossary)) {
+    nsi.glossary = [];
+    changed = true;
+  }
+  if (!nsi._b7_glossary_migrated) {
+    // Список ~30 общих терминов (на основе аудитов NotebookLM и общей ИТ-практики)
+    const defaultGlossary = [
+      '1С', '1С:ERP', '1С:УТ', '1С:БП',
+      'ERP', 'CRM', 'MRP', 'WMS', 'TMS', 'BPM', 'BI', 'OLAP', 'ETL',
+      'KPI', 'SLA', 'SQL', 'REST API', 'JSON', 'XML',
+      'ДДС', 'ОСВ', 'ТМЦ', 'УПД', 'ТЗ', 'МОЛ',
+      'безопасный остаток', 'lead time', 'дашборд', 'чек-бокс', 'регламент'
+    ];
+    const baseTs3 = Date.now();
+    // Не дублируем то что уже есть (на случай повторного запуска)
+    const existingTerms = new Set((nsi.glossary || []).map(g => (g.term || '').toLowerCase()));
+    defaultGlossary.forEach((term, i) => {
+      if (!existingTerms.has(term.toLowerCase())) {
+        nsi.glossary.push({ id: baseTs3 + i, term, definition: '', scope: 0 });
+      }
+    });
+    nsi._b7_glossary_migrated = true;
     changed = true;
   }
 
@@ -11590,6 +11639,33 @@ function pcRenderMiniCard(dict, id) {
         <label>Префикс <span class="pc-req">*</span></label>
         <input type="text" id="mc-areas-prefix" class="pc-input" maxlength="2" style="text-transform:uppercase;font-family:monospace;letter-spacing:.5px;text-align:center" placeholder="ПЛ" value="${a ? escHtml(a.prefix) : ''}">
       </div>`;
+  } else if (dict === 'glossary') {
+    // Block 7: мини-карточка термина глоссария — Термин, Определение (опц.), Проект (scope)
+    const g = isNew ? null : (nsi.glossary || []).find(x => x.id === id);
+    titleEl.textContent = isNew ? 'Новый термин' : 'Редактирование термина';
+    // По умолчанию для нового — текущий scope из селекта-фильтра, чтобы юзер
+    // создавал термин в той категории, которую сейчас просматривает.
+    const curScope = g ? (g.scope || 0) : (_glossaryScopeFilter || 0);
+    const projects = (nsi.projects || []).slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ru'));
+    const scopeOpts = [`<option value="0"${curScope === 0 ? ' selected' : ''}>🌐 Общий (для всех проектов)</option>`]
+      .concat(projects.map(p => {
+        const nm = p.name || `Проект #${p.id}`;
+        return `<option value="${p.id}"${curScope === p.id ? ' selected' : ''}>${escHtml(nm)}</option>`;
+      })).join('');
+    html = `
+      <div class="pc-field">
+        <label>Термин <span class="pc-req">*</span></label>
+        <input type="text" id="mc-glossary-term" class="pc-input" placeholder="ERP, биг-бэг, lead time…" value="${g ? escHtml(g.term) : ''}">
+      </div>
+      <div class="pc-field">
+        <label>Определение <span style="color:#94a3b8;font-weight:400;font-size:11px">(опционально)</span></label>
+        <textarea id="mc-glossary-definition" class="pc-input" rows="2" placeholder="Краткое определение, чтобы помнить что это" style="resize:vertical;min-height:54px">${g ? escHtml(g.definition || '') : ''}</textarea>
+      </div>
+      <div class="pc-field">
+        <label>Область применения <span class="pc-req">*</span></label>
+        <select id="mc-glossary-scope" class="pc-input">${scopeOpts}</select>
+        <div style="font-size:11px;color:#94a3b8;margin-top:4px">«Общий» термин используется во всех проектах. Проектный — только в выбранном.</div>
+      </div>`;
   }
   fieldsEl.innerHTML = html;
 }
@@ -11670,6 +11746,34 @@ function saveMiniCard(closeAfter) {
       if (a) { a.name = name; a.prefix = prefix; }
     }
     saveNSI(nsi);
+  } else if (dict === 'glossary') {
+    // Block 7: сохранение термина глоссария
+    const term = document.getElementById('mc-glossary-term').value.trim();
+    const definition = document.getElementById('mc-glossary-definition').value.trim();
+    const scope = parseInt(document.getElementById('mc-glossary-scope').value || '0') || 0;
+    if (!term) return showErr('Введи термин');
+    if (!Array.isArray(nsi.glossary)) nsi.glossary = [];
+    // Уникальность: один и тот же термин не может встречаться дважды в одном scope
+    // (case-insensitive). В разных scope — можно: общий ERP + проектный ERP с другим определением.
+    const dup = nsi.glossary.find(g =>
+      (g.term || '').toLowerCase() === term.toLowerCase() &&
+      (g.scope || 0) === scope &&
+      g.id !== editingMcId
+    );
+    if (dup) {
+      const where = scope === 0 ? 'в Общем глоссарии' : 'в выбранном проекте';
+      return showErr(`Термин «${term}» уже есть ${where}`);
+    }
+    if (isNew) {
+      nsi.glossary.push({ id: Date.now(), term, definition, scope });
+    } else {
+      const g = nsi.glossary.find(x => x.id === editingMcId);
+      if (g) { g.term = term; g.definition = definition; g.scope = scope; }
+    }
+    // Если термин был создан/перенесён в проектный scope — синхронизируем фильтр UI,
+    // чтобы юзер сразу увидел свой термин на правильной вкладке проекта.
+    _glossaryScopeFilter = scope;
+    saveNSI(nsi);
   }
 
   pcShowToast('✓ Сохранено');
@@ -11684,6 +11788,9 @@ function saveMiniCard(closeAfter) {
       newId = arr[arr.length - 1].id;
     } else if (dict === 'areas') {
       const arr = getNSI().functionalAreas;
+      newId = arr[arr.length - 1].id;
+    } else if (dict === 'glossary') {
+      const arr = getNSI().glossary;
       newId = arr[arr.length - 1].id;
     }
     editingMcId = newId;
@@ -12204,7 +12311,8 @@ const NSI_DICTS = {
   projects:     { name: 'Проекты',                  icon: '🗂️', iconBg: 'icon-amber'  },
   participants: { name: 'Участники',                icon: '👤', iconBg: 'icon-blue'   },
   positions:    { name: 'Должности',                icon: '📋', iconBg: 'icon-purple' },
-  areas:        { name: 'Функциональные области',   icon: '📐', iconBg: 'icon-green'  }
+  areas:        { name: 'Функциональные области',   icon: '📐', iconBg: 'icon-green'  },
+  glossary:     { name: 'Глоссарий',                icon: '📖', iconBg: 'icon-pink'   }
 };
 
 // Перейти на уровень list для конкретного справочника
@@ -12281,7 +12389,8 @@ function renderNSI() {
       projects:     (nsi.projects || []).length,
       participants: (nsi.participants || []).length,
       positions:    (nsi.positions || []).length,
-      areas:        (nsi.functionalAreas || []).length
+      areas:        (nsi.functionalAreas || []).length,
+      glossary:     (nsi.glossary || []).length
     };
     Object.entries(counts).forEach(([dict, count]) => {
       const el = document.getElementById(`nsi-count-a-${dict}`);
@@ -12422,7 +12531,88 @@ function renderNSILists() {
     ).join('') : '<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">Пока нет элементов. Нажми «+ Добавить» сверху.</div>';
   }
 
+  // Block 7: рендер списка Глоссария ───────────────────
+  // Селект scope: 0 = Общий, projectId = только этот проект.
+  // Фильтр сохраняется в _glossaryScopeFilter (JS-переменная).
+  const glossSel = document.getElementById('glossary-scope-select');
+  const glossList = document.getElementById('glossary-list');
+  const glossCnt = document.getElementById('glossary-scope-count');
+  if (glossSel && glossList) {
+    // Опции селекта: 🌐 Общий + все проекты
+    const projects = (nsi.projects || []).slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', 'ru'));
+    const curScope = _glossaryScopeFilter; // 0 либо id проекта
+    const opts = [];
+    opts.push(`<option value="0"${curScope === 0 ? ' selected' : ''}>🌐 Общий</option>`);
+    projects.forEach(p => {
+      const nm = p.name || `Проект #${p.id}`;
+      opts.push(`<option value="${p.id}"${curScope === p.id ? ' selected' : ''}>${escHtml(nm)}</option>`);
+    });
+    glossSel.innerHTML = opts.join('');
+    // Если выбранный scope указывает на удалённый проект — откатываем на «Общий»
+    if (curScope !== 0 && !projects.find(p => p.id === curScope)) {
+      _glossaryScopeFilter = 0;
+      glossSel.value = '0';
+    }
+    // Список терминов отфильтрованный по выбранному scope
+    const items = (nsi.glossary || []).filter(g => (g.scope || 0) === _glossaryScopeFilter);
+    items.sort((a,b) => (a.term||'').localeCompare(b.term||'', 'ru'));
+    if (glossCnt) {
+      glossCnt.textContent = items.length ? `· ${items.length} ${pluralCount(items.length)}` : '';
+    }
+    if (!items.length) {
+      const hint = _glossaryScopeFilter === 0
+        ? 'Пока нет общих терминов. Нажми «+ Добавить» сверху.'
+        : 'У этого проекта нет своих терминов. Нажми «+ Добавить» (общие термины подтягиваются автоматически при транскрипции).';
+      glossList.innerHTML = `<div style="font-size:13px;color:#94a3b8;text-align:center;padding:24px">${hint}</div>`;
+    } else {
+      glossList.innerHTML = items.map(g => {
+        const def = (g.definition || '').trim();
+        const defHtml = def
+          ? `<span style="color:#64748b;font-size:12px;margin-left:10px">— ${escHtml(def)}</span>`
+          : '';
+        return `<div class="nsi-row" onclick="nsiOpenElementCard('glossary', ${g.id})">
+          <span class="nsi-row-text">
+            <span style="font-weight:500">${escHtml(g.term)}</span>${defHtml}
+          </span>
+          <button class="protocol-del" onclick="event.stopPropagation();deleteGlossaryItem(${g.id})">×</button>
+        </div>`;
+      }).join('');
+    }
+  }
+
   // Карточка проекта рендерится через pcRenderTeam независимо от renderNSILists
+}
+
+// Block 7: текущий scope-фильтр в UI Глоссария (0 = Общий, либо id проекта)
+let _glossaryScopeFilter = 0;
+
+// Хендлер изменения селекта проекта в списке Глоссария
+function changeGlossaryScopeFilter() {
+  const sel = document.getElementById('glossary-scope-select');
+  if (!sel) return;
+  _glossaryScopeFilter = parseInt(sel.value || '0') || 0;
+  renderNSILists();
+}
+
+// Хелпер для будущей А2 (Whisper-prompt): термины применимые к проекту projectId.
+// Возвращает массив строк (без definitions) — общий слой + проектный слой.
+function getGlossaryTerms(projectId) {
+  const nsi = getNSI();
+  const all = nsi.glossary || [];
+  const pid = parseInt(projectId) || 0;
+  return all
+    .filter(g => (g.scope || 0) === 0 || (pid && g.scope === pid))
+    .map(g => (g.term || '').trim())
+    .filter(Boolean);
+}
+
+// Удалить термин глоссария
+function deleteGlossaryItem(id) {
+  if (!confirm('Удалить термин из глоссария?')) return;
+  const nsi = getNSI();
+  nsi.glossary = (nsi.glossary || []).filter(g => g.id !== id);
+  saveNSI(nsi);
+  renderNSI();
 }
 
 function updateProjectSelect() {
