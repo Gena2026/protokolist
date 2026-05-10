@@ -665,6 +665,10 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <h2 class="step-card-title">Загрузка</h2>
       <span class="step-card-status" id="step-1-status">ожидание файла</span>
       <button class="step-stop-btn op-stop-btn" type="button" onclick="cancelCurrentOp(1)" title="Отменить загрузку и удалить данные этой попытки">🛑 Стоп</button>
+      <!-- PerfLog: кнопка скачать лог Шага 1 — активна когда шаг завершён -->
+      <button id="btn-perflog-step-1" class="step-stop-btn" type="button"
+        onclick="PerfLog.downloadByOpName('upload')" title="Скачать .txt лог Шага 1"
+        style="background:#eef2ff;color:#4338ca;border-color:#c7d2fe;display:none">📥 Лог</button>
     </div>
 
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
@@ -737,6 +741,10 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
         <span class="step-card-status" id="step-2-status"></span>
         <button class="step-stop-btn op-stop-btn" type="button" onclick="cancelCurrentOp(2)" title="Отменить транскрипцию и удалить промежуточные данные">🛑 Стоп</button>
+        <!-- PerfLog: кнопка скачать лог Шага 2 -->
+        <button id="btn-perflog-step-2" class="step-stop-btn" type="button"
+          onclick="PerfLog.downloadByOpName('transcribe')" title="Скачать .txt лог Шага 2"
+          style="background:#eef2ff;color:#4338ca;border-color:#c7d2fe;display:none">📥 Лог</button>
         <button class="protocol-del" id="btn-reset-transcript" onclick="resetTranscriptForRerun()"
           title="Удалить транскрипцию и вернуть Шаг 2 к исходному состоянию"
           style="display:none">×</button>
@@ -770,6 +778,9 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       </div>
       <div class="progress-bar-bg"><div class="progress-bar" id="ap-bar"></div></div>
       <div class="progress-note" id="ap-note"></div>
+      <!-- PerfLog: UI-подробности (галочки этапов и таймеры). Переезжает вместе с прогресс-баром
+           через moveProgressTo. Содержимое генерится PerfLog._renderDetails. -->
+      <div id="perflog-details" style="display:none"></div>
     </div>
   </div>
 
@@ -780,6 +791,10 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <h2 class="step-card-title">Протокол</h2>
       <span class="step-card-status" id="step-3-status"></span>
       <button class="step-stop-btn op-stop-btn" type="button" onclick="cancelCurrentOp(3)" title="Отменить генерацию и не сохранять протокол">🛑 Стоп</button>
+      <!-- PerfLog: кнопка скачать лог Шага 3 -->
+      <button id="btn-perflog-step-3" class="step-stop-btn" type="button"
+        onclick="PerfLog.downloadByOpName('generate')" title="Скачать .txt лог Шага 3"
+        style="background:#eef2ff;color:#4338ca;border-color:#c7d2fe;display:none">📥 Лог</button>
     </div>
 
     <div class="step3-grid">
@@ -837,12 +852,13 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <button class="btn btn-success" onclick="downloadDocx('requirements')">⬇️ Требования.docx</button>
     </div>
     <!-- Диагностика производительности — фиксирует длительности всех шагов и API-вызовов,
-         помогает понимать где теряется время (особенно на multi-part видео и rate-limit-ретраях) -->
+         помогает понимать где теряется время (особенно на multi-part видео и rate-limit-ретраях).
+         Кнопки для логов отдельных шагов — в шапках карточек Шагов 1, 2, 3. -->
     <div style="margin-top:18px;padding:14px;border:1px solid #e5e7eb;border-radius:10px;background:#f8fafc">
-      <div style="font-size:13px;color:#64748b;margin-bottom:10px">📊 Диагностика производительности (логирует длительности всех шагов и API-вызовов, ошибки, ретраи)</div>
+      <div style="font-size:13px;color:#64748b;margin-bottom:10px">📊 Диагностика производительности — общий .txt по всем шагам сессии (загрузка → транскрипция → протокол) с итоговой таблицей и хронологией этапов.</div>
       <div class="btn-row" style="gap:8px">
-        <button class="btn btn-secondary" id="btn-perflog-download" onclick="PerfLog.downloadLast()" disabled style="font-size:13px">📥 Скачать лог последней операции (.txt)</button>
-        <button class="btn btn-secondary" id="btn-perflog-history" onclick="openPerfLogHistory()" disabled style="font-size:13px">📜 История логов (0)</button>
+        <button class="btn btn-secondary" id="btn-perflog-session" onclick="PerfLog.downloadSessionLog()" disabled style="font-size:13px">📥 Скачать лог всех шагов</button>
+        <button class="btn btn-secondary" id="btn-perflog-archive" onclick="openPerfLogHistory()" disabled style="font-size:13px">📜 Архив (0)</button>
       </div>
     </div>
   </div>
@@ -1524,11 +1540,16 @@ const MODEL = 'gemini-3.1-flash-lite-preview'; // free tier: 500 RPD, качес
 const PerfLog = {
   events: [],
   pageLoadedAt: Date.now(),
-  currentOp: null,        // { name, label, startedAt, events, meta }
+  currentOp: null,        // { name, label, startedAt, events, meta, sessionId }
   currentStep: null,      // { label, startedAt }
   history: [],            // зеркало localStorage['_perflog_history'] (не более 5)
   HISTORY_KEY: '_perflog_history',
-  MAX_HISTORY: 5,
+  MAX_HISTORY: 15,        // расширили чтобы влезало 3 шага × 3-5 сессий
+  // Текущая «сессия работы» = одна попытка пройти все 3 шага с одним файлом.
+  // Выставляется в Шаге 1 (новый файл), протаскивается через 2 и 3, сбрасывается
+  // при «полный сброс» / новом файле. Используется чтобы группировать операции
+  // в общий отчёт по сессии.
+  currentSessionId: null,
 
   init() {
     try {
@@ -1610,24 +1631,41 @@ const PerfLog = {
 
   startOp(name, label, meta) {
     if (this.currentOp) {
-      // Параллельная операция (не должно быть — но логируем)
       this._record('OP_OVERLAP', 'Новая операция начата при активной: ' + this.currentOp.name);
       this.endOp('aborted');
     }
     const startedAt = Date.now();
-    this.currentOp = { name, label, startedAt, events: [], meta: meta || {} };
-    this._record('OP_START', label + ' (' + name + ')', meta || {});
-    // Heartbeat покажет реальную работу таймеров в логе (alive каждые 5с).
-    // Если защита от throttling работает — drift всегда ~5000ms даже когда вкладка в фоне.
+    this.currentOp = {
+      name, label, startedAt,
+      events: [], meta: meta || {},
+      sessionId: (meta && meta.sessionId)
+        || this.currentSessionId
+        || ('s' + startedAt + '_' + Math.random().toString(36).slice(2, 6))
+    };
+    if (!this.currentSessionId) this.currentSessionId = this.currentOp.sessionId;
+    this._record('OP_START', label + ' (' + name + ') · session=' + this.currentOp.sessionId, meta || {});
     try { if (typeof HeartbeatMonitor !== 'undefined') HeartbeatMonitor.start(); } catch (_) {}
+    // UI-тикер раз в секунду перерисовывает «Подробности» — чтобы таймер «идёт Xs» рос вживую.
+    // Используем main-thread setInterval — он троттлится в фоне, но UI всё равно скрыт когда вкладка в фоне,
+    // так что юзер ничего не теряет. Heartbeat (через WorkerTimer) продолжает писать в лог стабильно.
+    if (this._uiTickInterval) clearInterval(this._uiTickInterval);
+    this._uiTickInterval = setInterval(() => this._renderDetails(), 1000);
     this._refreshUI();
+    this._renderDetails();
+  },
+
+  // Начало новой сессии (вызываем из startFileUpload и при ручной транскрипции).
+  // Возвращает id, который потом передаётся в meta других операций той же сессии.
+  startSession() {
+    this.currentSessionId = 's' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    return this.currentSessionId;
   },
 
   endOp(status, extraMeta) {
     if (!this.currentOp) return;
     if (this.currentStep) this.stepEnd();
-    // Останавливаем heartbeat — пока следующая операция не стартует
     try { if (typeof HeartbeatMonitor !== 'undefined') HeartbeatMonitor.stop(); } catch (_) {}
+    if (this._uiTickInterval) { clearInterval(this._uiTickInterval); this._uiTickInterval = null; }
     const op = this.currentOp;
     const endedAt = Date.now();
     const totalMs = endedAt - op.startedAt;
@@ -1637,7 +1675,8 @@ const PerfLog = {
       status, totalMs, summary, extraMeta: extraMeta || null
     });
     const record = {
-      sessionId: op.startedAt,
+      sessionId: op.sessionId,         // привязка к сессии (один файл = одна сессия)
+      opStart: op.startedAt,           // унаследованные имена для совместимости
       name: op.name,
       label: op.label,
       startedAt: op.startedAt,
@@ -1653,6 +1692,7 @@ const PerfLog = {
     this.currentOp = null;
     this.currentStep = null;
     this._refreshUI();
+    this._renderDetails(); // обновить подробности (показать финальный итог)
   },
 
   _persistHistory() {
@@ -1679,6 +1719,7 @@ const PerfLog = {
     if (this.currentStep) this.stepEnd();
     this.currentStep = { label: String(label).slice(0, 200), startedAt: Date.now() };
     this._record('STEP_START', this.currentStep.label);
+    this._renderDetails();
   },
 
   stepEnd() {
@@ -1686,6 +1727,7 @@ const PerfLog = {
     const dur = Date.now() - this.currentStep.startedAt;
     this._record('STEP_END', this.currentStep.label, { durationMs: dur });
     this.currentStep = null;
+    this._renderDetails();
   },
 
   // Возвращает handle для трекинга длительности и парного apiOk/apiErr/apiRetry.
@@ -1713,6 +1755,7 @@ const PerfLog = {
     this._record('API_RETRY', handle.api + ' retry · ' + (meta?.reason || 'unknown'), Object.assign({
       api: handle.api, callId: handle.callId, sinceCallStartMs: dur
     }, meta || {}));
+    this._renderDetails();
   },
 
   apiErr(handle, message, meta) {
@@ -1778,35 +1821,95 @@ const PerfLog = {
 
   formatLog(record) {
     const lines = [];
-    lines.push('=== Протоколист — лог производительности ===');
-    lines.push('Операция: ' + record.label + ' (' + record.name + ')');
-    lines.push('Старт: ' + new Date(record.startedAt).toLocaleString('ru-RU'));
-    lines.push('Финиш: ' + new Date(record.endedAt).toLocaleString('ru-RU'));
-    lines.push('Длительность: ' + this._fmtDur(record.totalMs));
-    lines.push('Статус: ' + record.status);
-    if (record.meta) lines.push('Параметры: ' + JSON.stringify(record.meta));
-    if (record.extraMeta) lines.push('Финиш-данные: ' + JSON.stringify(record.extraMeta));
+    const fmt = this._fmtDur.bind(this);
+
+    // ───── ШАПКА ─────
+    lines.push('═══════════════════════════════════════════════════════════════');
+    lines.push('  Протоколист — лог производительности');
+    lines.push('═══════════════════════════════════════════════════════════════');
     lines.push('');
-    lines.push('───── СВОДКА ─────');
+    lines.push('Операция:    ' + record.label);
+    lines.push('Тип:         ' + record.name);
+    lines.push('Сессия:      ' + (record.sessionId || '?'));
+    lines.push('Старт:       ' + new Date(record.startedAt).toLocaleString('ru-RU'));
+    lines.push('Финиш:       ' + new Date(record.endedAt).toLocaleString('ru-RU'));
+    lines.push('Длительность: ' + fmt(record.totalMs));
+    lines.push('Статус:      ' + record.status);
+    lines.push('');
+
+    // ───── ПАРАМЕТРЫ (вертикальный список вместо JSON) ─────
+    if (record.meta && Object.keys(record.meta).length) {
+      lines.push('───── ПАРАМЕТРЫ ─────');
+      for (const [k, v] of Object.entries(record.meta)) {
+        if (v == null || v === '') continue;
+        lines.push('  ' + k.padEnd(20) + ' : ' + this._fmtMetaValue(v));
+      }
+      lines.push('');
+    }
+    if (record.extraMeta && Object.keys(record.extraMeta).length) {
+      lines.push('───── ДАННЫЕ НА ФИНИШЕ ─────');
+      for (const [k, v] of Object.entries(record.extraMeta)) {
+        if (v == null || v === '') continue;
+        lines.push('  ' + k.padEnd(20) + ' : ' + this._fmtMetaValue(v));
+      }
+      lines.push('');
+    }
+
+    // ───── СВОДКА ─────
     const s = record.summary || {};
     const total = record.totalMs || 0;
     const pct = (x) => total > 0 ? Math.round((x / total) * 100) + '%' : '-';
-    lines.push('  Активные API-вызовы: ' + this._fmtDur(s.apiTimeMs) + ' (' + pct(s.apiTimeMs) + ')');
-    lines.push('    Gemini:  ' + s.geminiCalls + ' вызовов · ' + this._fmtDur(s.geminiTimeMs));
-    lines.push('    Whisper: ' + s.whisperCalls + ' вызовов · ' + this._fmtDur(s.whisperTimeMs));
-    lines.push('  Паузы (sleep между шагами): ' + this._fmtDur(s.sleepTimeMs) + ' (' + pct(s.sleepTimeMs) + ')');
-    lines.push('  Ретрай-ожидания (rate limit): ' + this._fmtDur(s.retryWaitMs) + ' (' + pct(s.retryWaitMs) + ')');
-    lines.push('  Ретраев API всего: ' + s.retryCount);
-    lines.push('  Ошибок: ' + s.errorCount);
-    lines.push('  Шагов (STEP_START): ' + s.stepCount);
+    lines.push('───── СВОДКА ─────');
+    lines.push('  Активные API-вызовы:        ' + fmt(s.apiTimeMs) + ' (' + pct(s.apiTimeMs) + ')');
+    lines.push('    └ Gemini:                 ' + s.geminiCalls + ' вызовов · ' + fmt(s.geminiTimeMs));
+    lines.push('    └ Whisper:                ' + s.whisperCalls + ' вызовов · ' + fmt(s.whisperTimeMs));
+    lines.push('  Паузы между шагами (sleep): ' + fmt(s.sleepTimeMs) + ' (' + pct(s.sleepTimeMs) + ')');
+    lines.push('  Ретрай-ожидания (rate-limit): ' + fmt(s.retryWaitMs) + ' (' + pct(s.retryWaitMs) + ')');
+    lines.push('  Ретраев API всего:          ' + s.retryCount);
+    lines.push('  Ошибок:                     ' + s.errorCount);
+    // Heartbeat-метрики (alive-метки от WorkerTimer — диагностика троттлинга)
+    const hb = this._heartbeatStats(record.events);
+    if (hb.count > 0) {
+      lines.push('  Heartbeat-меток:            ' + hb.count + ' (max drift ' + fmt(hb.maxDriftMs) + ', подозрительных ' + hb.suspicious + ')');
+    }
+    lines.push('  Этапов всего:               ' + s.stepCount);
     lines.push('');
+
+    // ───── ХРОНОЛОГИЯ ЭТАПОВ ─────
+    const timeline = this._buildTimeline(record.events);
+    if (timeline.length) {
+      lines.push('───── ХРОНОЛОГИЯ ЭТАПОВ ─────');
+      const maxLabel = Math.min(60, timeline.reduce((m, t) => Math.max(m, t.label.length), 0));
+      for (const item of timeline) {
+        const icon = item.status === 'done' ? '✓'
+                   : item.status === 'fail' ? '✗'
+                   : item.status === 'incomplete' ? '⋯'
+                   : '·';
+        const label = item.label.length > maxLabel ? item.label.slice(0, maxLabel - 1) + '…' : item.label;
+        const dots = '.'.repeat(Math.max(3, maxLabel - label.length + 3));
+        const dur = item.durationMs != null ? fmt(item.durationMs) : '—';
+        const extras = [];
+        if (item.retries > 0) extras.push(item.retries + ' ретрай' + (item.retries > 1 ? 'я' : '') + ' ' + (item.retryReason || ''));
+        if (item.errors > 0) extras.push(item.errors + ' ошиб' + (item.errors > 1 ? 'ок' : 'ка'));
+        const tail = extras.length ? '  ⚠️  ' + extras.join(', ') : '';
+        lines.push('  ' + icon + ' ' + label + ' ' + dots + ' ' + dur + tail);
+      }
+      lines.push('  ─────────────────────────────────────────────────────');
+      lines.push('  Итого:                                        ' + fmt(record.totalMs));
+      lines.push('');
+    }
+
+    // ───── ДЕТАЛИ (alive-метки фильтруем) ─────
     lines.push('───── ДЕТАЛИ ─────');
+    lines.push('  (alive-метки скрыты — оставлены только подозрительные с drift > 6с)');
+    lines.push('');
     for (const e of record.events) {
+      // Скрываем рутинные heartbeat-метки — оставляем только подозрительные
+      if (e.type === 'INFO' && e.message === 'alive' && !e.suspicious) continue;
       const t = this._fmtTs(e.ts);
-      const r = ('+' + this._fmtDur(e.relMs)).padEnd(9);
+      const r = ('+' + fmt(e.relMs)).padEnd(9);
       const stepPrefix = e.step ? '[' + e.step + '] ' : '';
       let detail = e.message || '';
-      // Дополняем деталями по типу
       if (e.type === 'API_CALL') {
         const extras = [];
         if (e.model) extras.push('model=' + e.model);
@@ -1835,6 +1938,151 @@ const PerfLog = {
     return lines.join('\n');
   },
 
+  // Форматирование значений meta для читаемости. Числа со знаками для размеров и длительностей.
+  _fmtMetaValue(v) {
+    if (v == null) return '';
+    if (typeof v === 'boolean') return v ? 'да' : 'нет';
+    if (typeof v === 'number') return String(v);
+    if (typeof v === 'string') return v;
+    if (Array.isArray(v)) return v.join(', ');
+    try { return JSON.stringify(v); } catch (_) { return String(v); }
+  },
+
+  // Строит «Хронологию этапов» — каждый STEP_START → STEP_END с длительностью.
+  // Свернутые в строку этапа метаданные: ретраи API внутри этапа, ошибки.
+  // Если этап не закрылся (ошибка/отмена) — показываем как incomplete.
+  _buildTimeline(events) {
+    const items = [];
+    const stack = []; // на случай вложенных STEP_START без STEP_END
+    for (const e of events) {
+      if (e.type === 'STEP_START') {
+        stack.push({
+          label: e.message || '(без названия)',
+          startedAt: e.ts,
+          durationMs: null,
+          retries: 0,
+          retryReason: null,
+          errors: 0,
+          status: 'incomplete'
+        });
+      } else if (e.type === 'STEP_END') {
+        const cur = stack.pop();
+        if (cur) {
+          cur.durationMs = (e.durationMs != null) ? e.durationMs : (e.ts - cur.startedAt);
+          cur.status = 'done';
+          items.push(cur);
+        }
+      } else if (e.type === 'API_RETRY') {
+        const cur = stack[stack.length - 1];
+        if (cur) {
+          cur.retries++;
+          if (e.reason && !cur.retryReason) cur.retryReason = e.reason;
+        }
+      } else if (e.type === 'API_ERR' || e.type === 'JS_ERROR' || e.type === 'PROMISE_REJECTION') {
+        const cur = stack[stack.length - 1];
+        if (cur) cur.errors++;
+      }
+    }
+    // Незакрытые этапы (например, операция упала до STEP_END) — добавляем как «incomplete»
+    while (stack.length) {
+      const cur = stack.pop();
+      cur.status = 'incomplete';
+      items.push(cur);
+    }
+    // Сортируем по времени старта (закрытые могли уйти раньше незакрытых)
+    items.sort((a, b) => a.startedAt - b.startedAt);
+    return items;
+  },
+
+  _heartbeatStats(events) {
+    let count = 0, maxDrift = 0, suspicious = 0;
+    for (const e of events) {
+      if (e.type === 'INFO' && e.message === 'alive') {
+        count++;
+        if (typeof e.driftMs === 'number') {
+          if (e.driftMs > maxDrift) maxDrift = e.driftMs;
+        }
+        if (e.suspicious) suspicious++;
+      }
+    }
+    return { count, maxDriftMs: maxDrift, suspicious };
+  },
+
+  // Все операции одной сессии (от шага 1 к шагу 3) в хронологическом порядке.
+  getSessionLogs(sessionId) {
+    if (!sessionId) return [];
+    return this.history
+      .filter(r => r.sessionId === sessionId)
+      .sort((a, b) => a.startedAt - b.startedAt);
+  },
+
+  // Текущая активная сессия (для кнопки «Лог всей сессии»)
+  getCurrentSessionLogs() {
+    return this.getSessionLogs(this.currentSessionId);
+  },
+
+  // Один большой .txt со всеми шагами сессии: общие итоги сверху, потом каждый шаг полностью.
+  formatSessionLog(sessionId) {
+    const ops = this.getSessionLogs(sessionId);
+    if (!ops.length) return null;
+    const fmt = this._fmtDur.bind(this);
+    const lines = [];
+
+    // Берём данные о файле из самой ранней операции (обычно Шаг 1)
+    const first = ops[0];
+    const fileMeta = first.meta || {};
+    const totalMs = ops.reduce((s, o) => s + (o.totalMs || 0), 0);
+    const startedAt = ops[0].startedAt;
+    const endedAt = ops[ops.length - 1].endedAt;
+
+    lines.push('═══════════════════════════════════════════════════════════════');
+    lines.push('  ОБЩИЙ ОТЧЁТ ПО СЕССИИ');
+    lines.push('═══════════════════════════════════════════════════════════════');
+    lines.push('');
+    lines.push('Сессия:      ' + sessionId);
+    if (fileMeta.fileName)         lines.push('Файл:        ' + fileMeta.fileName);
+    if (fileMeta.fileSizeMB)       lines.push('Размер:      ' + fileMeta.fileSizeMB + ' МБ');
+    if (fileMeta.videoDurationMin) lines.push('Длительность видео: ' + fileMeta.videoDurationMin + ' мин (' + fileMeta.videoDurationSec + ' сек)');
+    lines.push('Старт первой операции: ' + new Date(startedAt).toLocaleString('ru-RU'));
+    lines.push('Финиш последней:       ' + new Date(endedAt).toLocaleString('ru-RU'));
+    lines.push('Календарное время сессии: ' + fmt(endedAt - startedAt) + ' (включая простой между шагами)');
+    lines.push('Машинное время на работу: ' + fmt(totalMs));
+    lines.push('Шагов в сессии: ' + ops.length);
+    lines.push('');
+
+    // Сводная таблица «итоги по шагам»
+    lines.push('───── ИТОГИ ПО ШАГАМ ─────');
+    let stepNum = 0;
+    for (const op of ops) {
+      stepNum++;
+      const status = op.status === 'ok' ? '✓' : op.status === 'aborted' ? '⊘' : '✗';
+      const lbl = op.label.length > 50 ? op.label.slice(0, 50) + '…' : op.label;
+      lines.push('  ' + status + ' [' + stepNum + '] ' + lbl.padEnd(52) + fmt(op.totalMs));
+    }
+    lines.push('  ─────────────────────────────────────────────────────');
+    lines.push('  ИТОГО на работу:                                    ' + fmt(totalMs));
+    lines.push('');
+
+    // Полный лог каждого шага
+    let i = 0;
+    for (const op of ops) {
+      i++;
+      lines.push('');
+      lines.push('═══════════════════════════════════════════════════════════════');
+      lines.push('  ШАГ #' + i + ' · ' + op.label);
+      lines.push('═══════════════════════════════════════════════════════════════');
+      lines.push('');
+      // Используем тот же formatLog, но без шапки с отдельной сессией (она уже в общем заголовке)
+      // Берём начиная с раздела «Параметры»
+      const subLines = this.formatLog(op).split('\n');
+      // Пропускаем шапку (первые 11-12 строк до «ПАРАМЕТРЫ»)
+      const startIdx = subLines.findIndex(l => l.includes('ПАРАМЕТРЫ') || l.includes('СВОДКА'));
+      const sliced = startIdx >= 0 ? subLines.slice(startIdx) : subLines;
+      lines.push(sliced.join('\n'));
+    }
+    return lines.join('\n');
+  },
+
   download(idx) {
     idx = idx || 0;
     if (!this.history.length) {
@@ -1843,13 +2091,45 @@ const PerfLog = {
     }
     const record = this.history[idx];
     if (!record) return;
-    const text = this.formatLog(record);
+    this._downloadText(this.formatLog(record), 'perflog_' + record.name + '_' + this._fileStamp(record.startedAt) + '.txt');
+  },
+
+  // Скачивает лог конкретного шага по имени операции.
+  // Если есть несколько — берёт самый свежий.
+  downloadByOpName(name) {
+    const found = this.history.find(r => r.name === name);
+    if (!found) {
+      alert('Лог шага «' + name + '» ещё не записан. Запусти этот шаг до конца и попробуй снова.');
+      return;
+    }
+    this._downloadText(this.formatLog(found), 'perflog_' + found.name + '_' + this._fileStamp(found.startedAt) + '.txt');
+  },
+
+  // Скачивает общий отчёт по сессии (один большой файл со всеми шагами)
+  downloadSessionLog(sessionId) {
+    sessionId = sessionId || this.currentSessionId;
+    // Если активной сессии нет — берём последнюю по времени из истории
+    if (!sessionId && this.history.length) sessionId = this.history[0].sessionId;
+    const text = this.formatSessionLog(sessionId);
+    if (!text) {
+      alert('В этой сессии ещё нет завершённых шагов. Запусти Шаг 1 (или 2/3) и попробуй снова.');
+      return;
+    }
+    const ops = this.getSessionLogs(sessionId);
+    const stamp = this._fileStamp(ops[0].startedAt);
+    this._downloadText(text, 'perflog_session_' + stamp + '.txt');
+  },
+
+  _fileStamp(ts) {
+    return new Date(ts).toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  },
+
+  _downloadText(text, filename) {
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const stamp = new Date(record.startedAt).toISOString().slice(0, 16).replace(/[:T]/g, '-');
-    a.download = 'perflog_' + record.name + '_' + stamp + '.txt';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { try { document.body.removeChild(a); } catch (_) {} URL.revokeObjectURL(url); }, 100);
@@ -1864,39 +2144,119 @@ const PerfLog = {
   },
 
   _refreshUI() {
-    const dlBtn = document.getElementById('btn-perflog-download');
-    if (dlBtn) {
-      dlBtn.disabled = this.history.length === 0;
-      dlBtn.title = this.history.length === 0
-        ? 'Нет сохранённых логов — запусти операцию'
-        : 'Скачать .txt лог последней операции';
+    // Кнопка «📥 Лог сессии» в карточке Результат
+    const sessBtn = document.getElementById('btn-perflog-session');
+    if (sessBtn) {
+      const ops = this.getCurrentSessionLogs();
+      const hasOps = ops.length > 0 || this.history.length > 0;
+      sessBtn.disabled = !hasOps;
+      sessBtn.title = hasOps
+        ? 'Скачать общий .txt со всеми шагами текущей сессии'
+        : 'Сессия ещё не началась — загрузи файл';
     }
-    const histBtn = document.getElementById('btn-perflog-history');
+    // Кнопки «Лог шага N» в шапках карточек шагов 1, 2, 3
+    const opNamesByStep = { 1: 'upload', 2: 'transcribe', 3: 'generate' };
+    for (let n = 1; n <= 3; n++) {
+      const btn = document.getElementById('btn-perflog-step-' + n);
+      if (!btn) continue;
+      const has = this.history.some(r => r.name === opNamesByStep[n]);
+      btn.disabled = !has;
+      btn.style.display = has ? '' : 'none';
+      btn.title = has ? 'Скачать .txt лог Шага ' + n : '';
+    }
+    // Кнопка «Архив» — старая история всех операций
+    const histBtn = document.getElementById('btn-perflog-archive');
     if (histBtn) {
       histBtn.disabled = this.history.length === 0;
-      histBtn.textContent = '📜 История логов (' + this.history.length + ')';
+      histBtn.textContent = '📜 Архив (' + this.history.length + ')';
     }
-    // Если в истории есть логи — показываем карточку результата чтобы кнопки
-    // были доступны даже до того как юзер создал первый протокол.
-    // Если протокола ещё нет (currentProtocolText пуст) — прячем preview и кнопки docx,
-    // оставляя только панель PerfLog.
-    if (this.history.length > 0) {
-      const card = document.getElementById('protocol-result-card');
-      if (card && card.style.display === 'none') {
-        card.style.display = 'block';
-        // Прячем preview и кнопки docx если протокола ещё нет
-        if (typeof currentProtocolText === 'undefined' || !currentProtocolText) {
-          const preview = document.getElementById('protocol-preview');
-          if (preview) preview.style.display = 'none';
-          const docxRow = card.querySelector('.btn-row');
-          if (docxRow) docxRow.style.display = 'none';
-          // Заголовок карточки тоже меняем — это уже не «Результат», а только диагностика
-          const title = card.querySelector('.card-title');
-          if (title) title.innerHTML = '<div class="card-title-icon icon-green">📊</div>Диагностика';
-        }
+  },
+
+  // Рендерит «Подробности» под прогресс-баром: список этапов с галочками и временем.
+  // Вызывается на каждый STEP_START / STEP_END / API_RETRY / OP_END.
+  _renderDetails() {
+    const root = document.getElementById('perflog-details');
+    if (!root) return;
+    const fmt = this._fmtDur.bind(this);
+
+    // Источник данных:
+    //   1) Активная операция → показываем её прогресс
+    //   2) Нет активной, но в history последняя операция завершилась < 30с назад → показываем как итог
+    //   3) Иначе прячем
+    let op = this.currentOp;
+    let isFinal = false;
+    if (!op && this.history.length) {
+      const last = this.history[0];
+      if (Date.now() - last.endedAt < 30000) {
+        op = last;
+        isFinal = true;
       }
     }
-  }
+    if (!op) { root.style.display = 'none'; return; }
+    root.style.display = '';
+
+    const timeline = this._buildTimeline(op.events);
+    const live = this.currentStep;
+    if (live && !isFinal) {
+      const found = timeline.find(t => t.label === live.label && t.status === 'incomplete');
+      if (found) found.durationMs = Date.now() - live.startedAt;
+    }
+
+    const opElapsed = isFinal ? op.totalMs : (Date.now() - op.startedAt);
+    const stepCount = timeline.length;
+    const doneCount = timeline.filter(t => t.status === 'done').length;
+
+    const summaryText = isFinal
+      ? `Подробности · ✓ готово · ${doneCount}/${stepCount} этапов · ${fmt(opElapsed)}`
+      : (stepCount > 0
+          ? `Подробности · ${doneCount}/${stepCount} этапов · идёт ${fmt(opElapsed)}`
+          : `Подробности · идёт ${fmt(opElapsed)}`);
+
+    const itemsHtml = timeline.length === 0
+      ? '<div style="color:#94a3b8;font-size:13px;padding:6px 0">Этапы появятся по мере выполнения...</div>'
+      : timeline.map(item => {
+          const icon = item.status === 'done' ? '<span style="color:#15803d">✓</span>'
+                     : item.status === 'fail' ? '<span style="color:#dc2626">✗</span>'
+                     : '<span style="color:#3b82f6">⏳</span>';
+          const dur = item.status === 'done'
+            ? fmt(item.durationMs)
+            : (item.durationMs != null ? '<span style="color:#3b82f6">идёт ' + fmt(item.durationMs) + '</span>' : '—');
+          const tail = (item.retries > 0 || item.errors > 0)
+            ? ' <span style="color:#d97706;font-size:11px">⚠️ ' +
+              (item.retries > 0 ? item.retries + ' ретрай' + (item.retries > 1 ? 'я' : '') : '') +
+              (item.errors > 0 ? (item.retries > 0 ? ', ' : '') + item.errors + ' ошиб' + (item.errors > 1 ? 'ок' : 'ка') : '') +
+              '</span>'
+            : '';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:13px;line-height:1.4">' +
+            '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:10px">' +
+              icon + ' ' + this._escapeHtml(item.label) + tail +
+            '</span>' +
+            '<span style="color:#64748b;font-variant-numeric:tabular-nums;font-size:12px;flex-shrink:0">' + dur + '</span>' +
+          '</div>';
+        }).join('');
+
+    root.innerHTML =
+      '<details ' + (this._detailsOpen ? 'open' : '') + ' style="margin-top:10px;border-top:1px dashed #e2e8f0;padding-top:8px">' +
+        '<summary style="cursor:pointer;font-size:12px;color:' + (isFinal ? '#15803d' : '#64748b') + ';font-weight:500;outline:none;user-select:none">' +
+          this._escapeHtml(summaryText) +
+        '</summary>' +
+        '<div style="margin-top:8px;padding-left:4px;max-height:280px;overflow-y:auto">' +
+          itemsHtml +
+        '</div>' +
+      '</details>';
+
+    const det = root.querySelector('details');
+    if (det) {
+      det.addEventListener('toggle', () => { this._detailsOpen = det.open; });
+    }
+  },
+
+  _detailsOpen: true,  // дефолтно открыто
+
+  _escapeHtml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  },
 };
 PerfLog.init();
 
@@ -1905,31 +2265,62 @@ function openPerfLogHistory() {
   const items = PerfLog.history;
   if (!items.length) { alert('Нет сохранённых логов'); return; }
   const fmt = PerfLog._fmtDur.bind(PerfLog);
-  const html = items.map((r, i) => {
-    const d = new Date(r.startedAt).toLocaleString('ru-RU');
-    const s = r.summary || {};
-    const status = r.status === 'ok' ? '<span style="color:#15803d">✓ успех</span>'
-                 : r.status === 'aborted' ? '<span style="color:#dc2626">✗ отменено</span>'
-                 : '<span style="color:#dc2626">✗ ' + r.status + '</span>';
-    const total = r.totalMs || 0;
-    const apiPct = total ? Math.round((s.apiTimeMs / total) * 100) : 0;
-    const sleepPct = total ? Math.round((s.sleepTimeMs / total) * 100) : 0;
-    const retryPct = total ? Math.round((s.retryWaitMs / total) * 100) : 0;
-    return '<div style="padding:14px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:10px;background:#fafafa">' +
+
+  // Группируем операции по sessionId, чтобы показать сессии целиком + операции внутри
+  const sessionsMap = new Map();
+  for (const r of items) {
+    const sid = r.sessionId || ('legacy_' + r.startedAt);
+    if (!sessionsMap.has(sid)) sessionsMap.set(sid, []);
+    sessionsMap.get(sid).push(r);
+  }
+  // Сортируем сессии по самой ранней операции в каждой (по убыванию даты — свежие сверху)
+  const sessions = Array.from(sessionsMap.entries()).map(([sid, ops]) => {
+    ops.sort((a, b) => a.startedAt - b.startedAt);
+    return { sid, ops };
+  });
+  sessions.sort((a, b) => b.ops[0].startedAt - a.ops[0].startedAt);
+
+  const stepNumByName = { upload: 1, transcribe: 2, generate: 3 };
+  const html = sessions.map(({ sid, ops }, sIdx) => {
+    const first = ops[0];
+    const last = ops[ops.length - 1];
+    const totalMs = ops.reduce((s, o) => s + (o.totalMs || 0), 0);
+    const wall = last.endedAt - first.startedAt;
+    const date = new Date(first.startedAt).toLocaleString('ru-RU');
+    const fileMeta = first.meta || {};
+    const fileLabel = fileMeta.fileName
+      ? fileMeta.fileName + (fileMeta.fileSizeMB ? ' · ' + fileMeta.fileSizeMB + ' МБ' : '') + (fileMeta.videoDurationMin ? ' · ' + fileMeta.videoDurationMin + ' мин' : '')
+      : '(без файла)';
+
+    const opsHtml = ops.map((r, i) => {
+      const stepNum = stepNumByName[r.name] || '?';
+      const status = r.status === 'ok' ? '<span style="color:#15803d">✓</span>'
+                   : r.status === 'aborted' ? '<span style="color:#dc2626">⊘</span>'
+                   : '<span style="color:#dc2626">✗</span>';
+      const histIdx = items.indexOf(r);
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:#fff;border:1px solid #f1f5f9;border-radius:6px;margin-top:4px">' +
+        '<span style="font-size:12px;flex:1">' +
+          status + ' Шаг ' + stepNum + ': ' +
+          PerfLog._escapeHtml(r.label.replace(/^Шаг \d+: /, '')) +
+          ' <span style="color:#94a3b8">· ' + fmt(r.totalMs) + '</span>' +
+        '</span>' +
+        '<button style="font-size:11px;padding:3px 8px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:4px;cursor:pointer" onclick="PerfLog.download(' + histIdx + ')">📥</button>' +
+      '</div>';
+    }).join('');
+
+    return '<div style="padding:14px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:12px;background:#fafafa">' +
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">' +
-        '<div style="font-weight:600;font-size:14px">' + r.label + '</div>' +
-        '<div style="font-size:12px">' + status + '</div>' +
+        '<div style="font-weight:600;font-size:14px">' + PerfLog._escapeHtml(fileLabel) + '</div>' +
+        '<div style="font-size:11px;color:#64748b">' + ops.length + ' шаг(ов)</div>' +
       '</div>' +
-      '<div style="font-size:12px;color:#64748b;margin-bottom:10px">' + d + ' · общая длительность ' + fmt(r.totalMs) + '</div>' +
-      '<div style="font-size:13px;color:#334155;line-height:1.6;margin-bottom:10px">' +
-        '🔵 API: ' + fmt(s.apiTimeMs) + ' (' + apiPct + '%) · Gemini ' + s.geminiCalls + ' · Whisper ' + s.whisperCalls + '<br>' +
-        '⏸ Паузы: ' + fmt(s.sleepTimeMs) + ' (' + sleepPct + '%)<br>' +
-        '🔄 Ретрай-ожидания: ' + fmt(s.retryWaitMs) + ' (' + retryPct + '%) · ретраев ' + s.retryCount + '<br>' +
-        (s.errorCount > 0 ? '<span style="color:#dc2626">⚠️ Ошибок: ' + s.errorCount + '</span>' : '<span style="color:#15803d">Ошибок нет</span>') +
+      '<div style="font-size:12px;color:#64748b;margin-bottom:10px">' + date + ' · работа ' + fmt(totalMs) + ' · календарно ' + fmt(wall) + '</div>' +
+      opsHtml +
+      '<div style="margin-top:10px;display:flex;gap:6px">' +
+        '<button class="btn btn-success" style="font-size:12px;padding:6px 12px" onclick="PerfLog.downloadSessionLog(' + JSON.stringify(sid) + ')">📥 Скачать сессию (.txt)</button>' +
       '</div>' +
-      '<button class="btn btn-success" style="font-size:12px;padding:6px 12px" onclick="PerfLog.download(' + i + ')">⬇️ Скачать .txt</button>' +
     '</div>';
   }).join('');
+
   const overlay = document.createElement('div');
   overlay.id = '_perflog_overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;overflow:auto';
@@ -1937,13 +2328,13 @@ function openPerfLogHistory() {
   overlay.innerHTML =
     '<div style="background:white;border-radius:12px;padding:24px;max-width:760px;width:100%;max-height:calc(100vh - 80px);overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)" onclick="event.stopPropagation()">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-        '<h3 style="margin:0;font-size:18px">📜 История логов производительности</h3>' +
+        '<h3 style="margin:0;font-size:18px">📜 Архив сессий</h3>' +
         '<button style="border:none;background:#f1f5f9;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px" onclick="document.getElementById(\'_perflog_overlay\').remove()">×</button>' +
       '</div>' +
-      '<div style="font-size:13px;color:#64748b;margin-bottom:18px">Последние ' + PerfLog.MAX_HISTORY + ' операций (загрузка / транскрипция / генерация). Используй для понимания где теряется время.</div>' +
+      '<div style="font-size:13px;color:#64748b;margin-bottom:18px">Последние сессии (1 файл = 1 сессия). Можно скачать всю сессию одним файлом или отдельный шаг через кнопку 📥 рядом.</div>' +
       html +
       '<div style="margin-top:16px;text-align:right">' +
-        '<button style="background:#fee2e2;color:#991b1b;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="if(confirm(\'Очистить всю историю логов?\')){PerfLog.clearHistory();document.getElementById(\'_perflog_overlay\').remove();}">🗑 Очистить всю историю</button>' +
+        '<button style="background:#fee2e2;color:#991b1b;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px" onclick="if(confirm(\'Очистить весь архив сессий?\')){PerfLog.clearHistory();document.getElementById(\'_perflog_overlay\').remove();}">🗑 Очистить весь архив</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(overlay);
@@ -3213,6 +3604,9 @@ async function startFileUpload(file) {
   audioOnlyMode = document.getElementById('audio-only-flag')?.checked || false;
   markStepStart(1);  // хронометраж Шага 1
   try {
+    // Новый файл = новая сессия. Все следующие шаги (transcribe, generate)
+    // привяжутся к этому sessionId автоматически через PerfLog.currentSessionId.
+    PerfLog.startSession();
     // currentMediaInfo обновляется ниже в startFileUpload (после getVideoDuration),
     // поэтому здесь длительность ещё может быть 0. Главный источник для шагов 2 и 3.
     const _videoSec = (typeof currentMediaInfo !== 'undefined' && currentMediaInfo.durationSec) || 0;
