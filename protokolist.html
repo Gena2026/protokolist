@@ -731,6 +731,8 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
     <textarea id="manual-transcript" style="display:none"></textarea>
 
     <div class="step-card-hint" id="step-1-hint">Файл автоматически режется на части по 14 минут и загружается на серверы Google. Живёт 48 часов.</div>
+    <!-- Block 7-UI: статичный блок «Подробности» для Шага 1 (показывается после завершения, остаётся видимым) -->
+    <div id="perflog-step-1-details" style="display:none;margin-top:10px"></div>
   </div>
 
   <!-- ШАГ 2: ТРАНСКРИПЦИЯ -->
@@ -782,6 +784,8 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
            через moveProgressTo. Содержимое генерится PerfLog._renderDetails. -->
       <div id="perflog-details" style="display:none"></div>
     </div>
+    <!-- Block 7-UI: статичный блок «Подробности» для Шага 2 (показывается после завершения, остаётся видимым) -->
+    <div id="perflog-step-2-details" style="display:none;margin-top:10px"></div>
   </div>
 
   <!-- ШАГ 3: ПРОТОКОЛ -->
@@ -839,6 +843,8 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
     </div>
 
     <div class="step-card-hint" id="step-3-hint">Двухпроходная генерация: сначала тезисы, потом шаблон с таблицами и реестром требований.</div>
+    <!-- Block 7-UI: статичный блок «Подробности» для Шага 3 (показывается после завершения, остаётся видимым) -->
+    <div id="perflog-step-3-details" style="display:none;margin-top:10px"></div>
   </div>
 
   <div id="protocol-status"></div>
@@ -1634,6 +1640,9 @@ const PerfLog = {
       this._record('OP_OVERLAP', 'Новая операция начата при активной: ' + this.currentOp.name);
       this.endOp('aborted');
     }
+    // Block 7-UI: новый старт = сброс юзерского override (предыдущая операция могла быть раскрыта вручную)
+    this._detailsOpenUserOverride = false;
+    this._detailsOpen = true;
     const startedAt = Date.now();
     this.currentOp = {
       name, label, startedAt,
@@ -2174,27 +2183,59 @@ const PerfLog = {
 
   // Рендерит «Подробности» под прогресс-баром: список этапов с галочками и временем.
   // Вызывается на каждый STEP_START / STEP_END / API_RETRY / OP_END.
+  //
+  // Block 7-UI: теперь рендерит в ДВУХ местах:
+  //   1) Живой блок #perflog-details (переезжает с прогресс-баром через moveProgressTo)
+  //      — показывает активную операцию.
+  //   2) Статичные блоки #perflog-step-1-details / -2 / -3 (приколочены к шагам)
+  //      — показывают завершённые операции этих шагов и остаются после завершения.
   _renderDetails() {
-    const root = document.getElementById('perflog-details');
-    if (!root) return;
     const fmt = this._fmtDur.bind(this);
 
-    // Источник данных:
-    //   1) Активная операция → показываем её прогресс
-    //   2) Нет активной, но в history последняя операция завершилась < 30с назад → показываем как итог
-    //   3) Иначе прячем
-    let op = this.currentOp;
-    let isFinal = false;
-    if (!op && this.history.length) {
-      const last = this.history[0];
-      if (Date.now() - last.endedAt < 30000) {
-        op = last;
-        isFinal = true;
+    // ── 1. Активная операция → в живой #perflog-details ──
+    const liveRoot = document.getElementById('perflog-details');
+    if (liveRoot) {
+      if (this.currentOp) {
+        liveRoot.style.display = '';
+        liveRoot.innerHTML = this._renderOpDetailsHtml(this.currentOp, false);
+        this._attachToggleHandler(liveRoot, false);
+      } else {
+        liveRoot.style.display = 'none';
+        liveRoot.innerHTML = '';
       }
     }
-    if (!op) { root.style.display = 'none'; return; }
-    root.style.display = '';
 
+    // ── 2. Завершённые операции каждого шага → в статичные блоки ──
+    const opNamesByStep = { 1: 'upload', 2: 'transcribe', 3: 'generate' };
+    for (let n = 1; n <= 3; n++) {
+      const root = document.getElementById('perflog-step-' + n + '-details');
+      if (!root) continue;
+      // Если шаг сейчас активен — не дублируем (живой блок уже показывает прогресс),
+      // НО продолжаем показывать архивные подробности если они уже были.
+      const isActiveThisStep = this.currentOp && this.currentOp.name === opNamesByStep[n];
+      if (isActiveThisStep) {
+        // Прячем статичный блок чтобы не дублировать с живым
+        root.style.display = 'none';
+        root.innerHTML = '';
+        continue;
+      }
+      // Берём последнюю завершённую операцию этого шага из history
+      const lastOp = this.history.find(r => r.name === opNamesByStep[n]);
+      if (!lastOp) {
+        root.style.display = 'none';
+        root.innerHTML = '';
+        continue;
+      }
+      root.style.display = '';
+      root.innerHTML = this._renderOpDetailsHtml(lastOp, true);
+      this._attachToggleHandler(root, true);
+    }
+  },
+
+  // Хелпер: формирует HTML для деталей одной операции (живой или завершённой).
+  // isFinal — true если операция уже завершилась.
+  _renderOpDetailsHtml(op, isFinal) {
+    const fmt = this._fmtDur.bind(this);
     const timeline = this._buildTimeline(op.events);
     const live = this.currentStep;
     if (live && !isFinal) {
@@ -2218,40 +2259,51 @@ const PerfLog = {
           const icon = item.status === 'done' ? '<span style="color:#15803d">✓</span>'
                      : item.status === 'fail' ? '<span style="color:#dc2626">✗</span>'
                      : '<span style="color:#3b82f6">⏳</span>';
+          // Block 7-UI: время рядом с названием через · (точку), а не справа отдельной колонкой
           const dur = item.status === 'done'
-            ? fmt(item.durationMs)
-            : (item.durationMs != null ? '<span style="color:#3b82f6">идёт ' + fmt(item.durationMs) + '</span>' : '—');
+            ? '<span style="color:#64748b;font-variant-numeric:tabular-nums">' + fmt(item.durationMs) + '</span>'
+            : (item.durationMs != null ? '<span style="color:#3b82f6;font-variant-numeric:tabular-nums">идёт ' + fmt(item.durationMs) + '</span>' : '');
           const tail = (item.retries > 0 || item.errors > 0)
             ? ' <span style="color:#d97706;font-size:11px">⚠️ ' +
               (item.retries > 0 ? item.retries + ' ретрай' + (item.retries > 1 ? 'я' : '') : '') +
               (item.errors > 0 ? (item.retries > 0 ? ', ' : '') + item.errors + ' ошиб' + (item.errors > 1 ? 'ок' : 'ка') : '') +
               '</span>'
             : '';
-          return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:13px;line-height:1.4">' +
-            '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:10px">' +
-              icon + ' ' + this._escapeHtml(item.label) + tail +
-            '</span>' +
-            '<span style="color:#64748b;font-variant-numeric:tabular-nums;font-size:12px;flex-shrink:0">' + dur + '</span>' +
+          const durPart = dur ? ' <span style="color:#cbd5e1">·</span> ' + dur : '';
+          return '<div style="padding:3px 0;font-size:13px;line-height:1.4">' +
+            icon + ' ' + this._escapeHtml(item.label) + durPart + tail +
           '</div>';
         }).join('');
 
-    root.innerHTML =
-      '<details ' + (this._detailsOpen ? 'open' : '') + ' style="margin-top:10px;border-top:1px dashed #e2e8f0;padding-top:8px">' +
-        '<summary style="cursor:pointer;font-size:12px;color:' + (isFinal ? '#15803d' : '#64748b') + ';font-weight:500;outline:none;user-select:none">' +
-          this._escapeHtml(summaryText) +
-        '</summary>' +
-        '<div style="margin-top:8px;padding-left:4px;max-height:280px;overflow-y:auto">' +
-          itemsHtml +
-        '</div>' +
-      '</details>';
+    // Block 7-UI: во время операции — раскрыто; после завершения — свёрнуто
+    // (но если пользователь явно открывал/закрывал — уважаем его выбор)
+    const openAttr = isFinal
+      ? (this._detailsOpenUserOverride ? 'open' : '')
+      : (this._detailsOpen ? 'open' : '');
 
+    return '<details ' + openAttr + ' style="margin-top:10px;border-top:1px dashed #e2e8f0;padding-top:8px">' +
+      '<summary style="cursor:pointer;font-size:12px;color:' + (isFinal ? '#15803d' : '#64748b') + ';font-weight:500;outline:none;user-select:none">' +
+        this._escapeHtml(summaryText) +
+      '</summary>' +
+      '<div style="margin-top:8px;padding-left:4px;max-height:280px;overflow-y:auto">' +
+        itemsHtml +
+      '</div>' +
+    '</details>';
+  },
+
+  // Хелпер: привязывает обработчик toggle для запоминания состояния раскрытости
+  _attachToggleHandler(root, isFinal) {
     const det = root.querySelector('details');
     if (det) {
-      det.addEventListener('toggle', () => { this._detailsOpen = det.open; });
+      det.addEventListener('toggle', () => {
+        if (isFinal) this._detailsOpenUserOverride = det.open;
+        else this._detailsOpen = det.open;
+      });
     }
   },
 
-  _detailsOpen: true,  // дефолтно открыто
+  _detailsOpen: true,  // во время операции — раскрыто по умолчанию
+  _detailsOpenUserOverride: false,  // после завершения — свёрнуто, пока юзер не раскроет
 
   _escapeHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -3620,6 +3672,9 @@ async function startFileUpload(file) {
     });
   } catch (_) {}
 
+  // Block 7-UI: переносим прогресс-бар (с «Подробностями») внутрь Шага 1.
+  moveProgressTo(1);
+
   // Formats Google does NOT support at all — convert those only
   const _ext = file.name.split('.').pop().toLowerCase();
   const _mustConvert = ['wmv', 'flv', 'ts', 'mts', 'm2ts'];
@@ -3630,8 +3685,11 @@ async function startFileUpload(file) {
       note: 'Формат не поддерживается Google — конвертируем'
     });
     try {
+      PerfLog.step(`Конвертация ${_ext.toUpperCase()} → MP4 (ffmpeg)`);
       file = await convertToMp4(file);
+      PerfLog.stepEnd();
     } catch(convErr) {
+      try { PerfLog.stepEnd(); } catch(_) {}
       setUploadUI('error', { msg: `Ошибка конвертации ${_ext}: ${convErr.message}` });
       return;
     }
@@ -3681,7 +3739,9 @@ async function startFileUpload(file) {
         pct: 5,
         note: 'Видео не нужно — только аудио'
       });
+      PerfLog.step('Извлечение аудио из видео (ffmpeg)');
       const audioFile = await extractAudioWithFFmpeg(file);
+      PerfLog.stepEnd();
 
       setUploadUI('uploading', {
         title: 'Загрузка аудио на Google...',
@@ -3689,6 +3749,7 @@ async function startFileUpload(file) {
         pct: 20,
         note: `${(audioFile.size/1024/1024).toFixed(1)} МБ · не закрывай вкладку`
       });
+      PerfLog.step(`Загрузка аудио на Google (${(audioFile.size/1024/1024).toFixed(1)} МБ)`);
       const result = await uploadFileToGemini(audioFile, (loaded, total) => {
         setUploadUI('uploading', {
           title: 'Загрузка аудио на Google...',
@@ -3697,15 +3758,20 @@ async function startFileUpload(file) {
           note: 'Не закрывай вкладку'
         });
       });
+      PerfLog.stepEnd();
       setUIP('Ожидание Google...', 93, 'Обычно 10–30 сек');
+      PerfLog.step('Ожидание обработки на Google (ACTIVE)');
       await waitForActive(result.uri);
+      PerfLog.stepEnd();
       uploadedFile = result;
       uploadState = 'ready';
       clearBusy();
       const meetingTitle = document.getElementById('meeting-title').value.trim() || file.name;
       saveSingleFileURI(file, result.uri, result.mimeType, meetingTitle, duration);
       // Сохраняем извлечённое аудио в IDB — переиспользуем audioFile, без повторного ffmpeg
+      PerfLog.step('Сохранение аудио в IDB (для Whisper)');
       await cacheAudioForWhisper(file, makeFileKey(file), audioFile);
+      PerfLog.stepEnd();
       setUploadUI('ready', {
         title: `🔊 ${file.name}`,
         sub: duration > 0
@@ -3730,7 +3796,9 @@ async function startFileUpload(file) {
           pct: 3,
           note: `${numParts} частей · без перекодирования`
         });
+        PerfLog.step(`Нарезка видео на ${numParts} ${pluralizeRu(numParts, 'часть', 'части', 'частей')} (ffmpeg)`);
         const chunks = await splitVideoIntoChunks(file);
+        PerfLog.stepEnd();
 
         uploadedParts = [];
         for (let i = 0; i < chunks.length; i++) {
@@ -3745,6 +3813,7 @@ async function startFileUpload(file) {
             title: `Загрузка на Google — часть ${i+1} из ${chunks.length}`,
             stage: '0 МБ', pct: pBase, note: 'Не закрывай вкладку'
           });
+          PerfLog.step(`Загрузка на Google: часть ${i+1}/${chunks.length} (${(chunk.file.size/1024/1024).toFixed(1)} МБ)`);
           const result = await uploadFileToGemini(chunk.file, (loaded, total) => {
             setUploadUI('uploading', {
               title: `Загрузка на Google — часть ${i+1} из ${chunks.length}`,
@@ -3755,6 +3824,7 @@ async function startFileUpload(file) {
           });
           setUIP(`Часть ${i+1}: ожидание Google...`, pEnd - 2, 'Обычно 10–30 сек');
           await waitForActive(result.uri);
+          PerfLog.stepEnd();
           saveChunkURI(fileKey, i, result.uri, result.mimeType, chunk.label);
           uploadedParts.push({ ...result, label: chunk.label, transcriptSegment: '' });
         }
@@ -3775,6 +3845,7 @@ async function startFileUpload(file) {
           stage: '0 МБ', pct: 2,
           note: `${mb} МБ · не закрывай вкладку`
         });
+        PerfLog.step(`Загрузка на Google: ${file.name} (${mb} МБ)`);
         const result = await uploadFileToGemini(file, (loaded, total) => {
           setUploadUI('uploading', {
             title: `Загрузка: ${file.name}`,
@@ -3783,11 +3854,14 @@ async function startFileUpload(file) {
             note: 'Не закрывай вкладку'
           });
         });
+        PerfLog.stepEnd();
         setUploadUI('uploading', {
           title: 'Файл обрабатывается на серверах Google...',
           stage: 'Ожидание...', pct: 93, note: 'Обычно 10–30 секунд'
         });
+        PerfLog.step('Ожидание обработки на Google (ACTIVE)');
         await waitForActive(result.uri);
+        PerfLog.stepEnd();
         uploadedFile = result;
         uploadState = 'ready';
         clearBusy();
@@ -3809,7 +3883,9 @@ async function startFileUpload(file) {
         stage: 'ffmpeg', pct: 95,
         note: 'Это займёт ~30-60 сек, не закрывай вкладку'
       });
+      PerfLog.step('Извлечение аудио для Whisper (ffmpeg → IDB)');
       await cacheAudioForWhisper(file, fileKey, null);
+      PerfLog.stepEnd();
       // Возвращаем плашку «готово» (она была перезаписана прогрессом извлечения)
       setUploadUI('ready', {
         title: file.name,
@@ -5500,7 +5576,8 @@ async function sleepWithCountdown(ms, stage, pct, baseNote) {
 const _silentInfo = (...args) => {};
 
 // Перемещает один и тот же прогресс-бар внутрь активного шага.
-// Вызывается перед запуском долгой операции:
+// Block 7-UI: теперь работает и для Шага 1 (загрузка):
+//   moveProgressTo(1) — для startFileUpload
 //   moveProgressTo(2) — для startTranscription / retryGeminiCleanup
 //   moveProgressTo(3) — для generateProtocol
 function moveProgressTo(stepNum) {
