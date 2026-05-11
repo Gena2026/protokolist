@@ -1665,8 +1665,28 @@ const PerfLog = {
 
   // Начало новой сессии (вызываем из startFileUpload и при ручной транскрипции).
   // Возвращает id, который потом передаётся в meta других операций той же сессии.
+  //
+  // Block 7-UI: ОЧИЩАЕМ статичные блоки «Подробности» прошлой сессии перед стартом
+  // новой. История (this.history) сохраняется для архива, но визуальные блоки
+  // в шапках Шагов 1/2/3 не должны показывать чужую сессию.
   startSession() {
     this.currentSessionId = 's' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    // Сбрасываем визуальный счётчик «какая сессия отображается»
+    this._renderedSessionId = this.currentSessionId;
+    // Прячем статичные блоки прошлой сессии (содержимое останется в history, но не показываем)
+    for (let n = 1; n <= 3; n++) {
+      const root = document.getElementById('perflog-step-' + n + '-details');
+      if (root) {
+        root.style.display = 'none';
+        root.innerHTML = '';
+      }
+    }
+    // Прячем живой блок тоже (если остался от прошлой сессии)
+    const liveRoot = document.getElementById('perflog-details');
+    if (liveRoot) {
+      liveRoot.style.display = 'none';
+      liveRoot.innerHTML = '';
+    }
     return this.currentSessionId;
   },
 
@@ -2206,7 +2226,11 @@ const PerfLog = {
     }
 
     // ── 2. Завершённые операции каждого шага → в статичные блоки ──
+    // Block 7-UI: показываем ТОЛЬКО операции текущей сессии (this.currentSessionId).
+    // Без фильтра по сессии Шаг 1 показывал бы данные прошлой загрузки даже после
+    // выбора нового видео.
     const opNamesByStep = { 1: 'upload', 2: 'transcribe', 3: 'generate' };
+    const currentSid = this.currentSessionId;
     for (let n = 1; n <= 3; n++) {
       const root = document.getElementById('perflog-step-' + n + '-details');
       if (!root) continue;
@@ -2219,8 +2243,10 @@ const PerfLog = {
         root.innerHTML = '';
         continue;
       }
-      // Берём последнюю завершённую операцию этого шага из history
-      const lastOp = this.history.find(r => r.name === opNamesByStep[n]);
+      // Берём последнюю завершённую операцию этого шага ТЕКУЩЕЙ сессии из history
+      const lastOp = this.history.find(r =>
+        r.name === opNamesByStep[n] && (!currentSid || r.sessionId === currentSid)
+      );
       if (!lastOp) {
         root.style.display = 'none';
         root.innerHTML = '';
@@ -3655,6 +3681,12 @@ async function startFileUpload(file) {
 
   audioOnlyMode = document.getElementById('audio-only-flag')?.checked || false;
   markStepStart(1);  // хронометраж Шага 1
+
+  // Block 7-UI: ПЕРВЫМ делом — переезжаем прогресс-бар в Шаг 1 (до startOp!),
+  // чтобы первый рендер «Подробностей» попал в карточку Шага 1, а не остался
+  // в Шаге 2 (где прогресс-бар был после прошлой сессии).
+  moveProgressTo(1);
+
   try {
     // Новый файл = новая сессия. Все следующие шаги (transcribe, generate)
     // привяжутся к этому sessionId автоматически через PerfLog.currentSessionId.
@@ -3671,9 +3703,6 @@ async function startFileUpload(file) {
       audioOnlyMode
     });
   } catch (_) {}
-
-  // Block 7-UI: переносим прогресс-бар (с «Подробностями») внутрь Шага 1.
-  moveProgressTo(1);
 
   // Formats Google does NOT support at all — convert those only
   const _ext = file.name.split('.').pop().toLowerCase();
