@@ -731,6 +731,10 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
     <textarea id="manual-transcript" style="display:none"></textarea>
 
     <div class="step-card-hint" id="step-1-hint">Файл автоматически режется на части по 14 минут и загружается на серверы Google. Живёт 48 часов.</div>
+    <!-- Block 8: живой блок «Подробности» для Шага 1 — показывает прогресс этапов
+         ВО ВРЕМЯ загрузки. Шаг 1 не использует общий #analysis-progress (там свой
+         UI #upload-progress-area), поэтому нужен отдельный контейнер. -->
+    <div id="perflog-step-1-live" style="display:none;margin-top:10px"></div>
     <!-- Block 7-UI: статичный блок «Подробности» для Шага 1 (показывается после завершения, остаётся видимым) -->
     <div id="perflog-step-1-details" style="display:none;margin-top:10px"></div>
   </div>
@@ -852,10 +856,15 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
   <!-- РЕЗУЛЬТАТ -->
   <div class="card" id="protocol-result-card" style="display:none">
     <div class="card-title"><div class="card-title-icon icon-green">✅</div>Результат</div>
-    <div class="preview" id="protocol-preview"></div>
+    <!-- Block 8: большое поле с текстом протокола убрано — оставлен скрытый div
+         для совместимости (некоторые места присваивают .textContent при сбросе).
+         Содержимое теперь смотрят через кнопку 👁 Просмотр (открывает модалку). -->
+    <div class="preview" id="protocol-preview" style="display:none"></div>
     <div class="btn-row">
+      <button class="btn btn-secondary" onclick="openProtocolResultPreview()" title="Открыть протокол в окне предпросмотра">👁 Просмотр</button>
       <button class="btn btn-success" onclick="downloadDocx('protocol')">⬇️ Протокол.docx</button>
       <button class="btn btn-success" onclick="downloadDocx('requirements')">⬇️ Требования.docx</button>
+      <button class="btn btn-secondary" onclick="startNewSession()" title="Сбросить и подготовиться к загрузке нового видео (созданные файлы остаются в Библиотеке)">🔄 Начать новую сессию</button>
     </div>
     <!-- Диагностика производительности — фиксирует длительности всех шагов и API-вызовов,
          помогает понимать где теряется время (особенно на multi-part видео и rate-limit-ретраях).
@@ -1687,6 +1696,12 @@ const PerfLog = {
       liveRoot.style.display = 'none';
       liveRoot.innerHTML = '';
     }
+    // Block 8: живой блок Шага 1 (нужен потому что Шаг 1 не использует общий #analysis-progress)
+    const step1Live = document.getElementById('perflog-step-1-live');
+    if (step1Live) {
+      step1Live.style.display = 'none';
+      step1Live.innerHTML = '';
+    }
     return this.currentSessionId;
   },
 
@@ -2154,7 +2169,12 @@ const PerfLog = {
   },
 
   _downloadText(text, filename) {
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    // Block 8: для совместимости с Windows Notepad — добавляем UTF-8 BOM
+    // и заменяем \n → \r\n. Без этого старый Блокнот сливает всё в одну строку
+    // и ломает кириллицу. В современных редакторах (VSCode, Notepad++) BOM
+    // и CRLF корректно игнорируются.
+    const crlfText = String(text).replace(/\r?\n/g, '\r\n');
+    const blob = new Blob(['\uFEFF', crlfText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -2225,6 +2245,22 @@ const PerfLog = {
       }
     }
 
+    // ── 1.5. Block 8: активный Шаг 1 → ДУБЛИРОВАТЬ в собственный живой блок Шага 1.
+    // Причина: Шаг 1 (загрузка) использует свой UI (#upload-progress-area), а не
+    // общий #analysis-progress. Чтобы во время загрузки тоже были видны
+    // «Подробности» — рендерим их в отдельный контейнер карточки Шага 1.
+    const step1Live = document.getElementById('perflog-step-1-live');
+    if (step1Live) {
+      if (this.currentOp && this.currentOp.name === 'upload') {
+        step1Live.style.display = '';
+        step1Live.innerHTML = this._renderOpDetailsHtml(this.currentOp, false);
+        this._attachToggleHandler(step1Live, false);
+      } else {
+        step1Live.style.display = 'none';
+        step1Live.innerHTML = '';
+      }
+    }
+
     // ── 2. Завершённые операции каждого шага → в статичные блоки ──
     // Block 7-UI: показываем ТОЛЬКО операции текущей сессии (this.currentSessionId).
     // Без фильтра по сессии Шаг 1 показывал бы данные прошлой загрузки даже после
@@ -2243,10 +2279,12 @@ const PerfLog = {
         root.innerHTML = '';
         continue;
       }
-      // Берём последнюю завершённую операцию этого шага ТЕКУЩЕЙ сессии из history
-      const lastOp = this.history.find(r =>
-        r.name === opNamesByStep[n] && (!currentSid || r.sessionId === currentSid)
-      );
+      // Берём последнюю завершённую операцию этого шага ТЕКУЩЕЙ сессии из history.
+      // Block 8: если currentSid === null (сессия сброшена через startNewSession) —
+      // НЕ показываем «последний из любой сессии», прячем блок до новой загрузки.
+      const lastOp = currentSid
+        ? this.history.find(r => r.name === opNamesByStep[n] && r.sessionId === currentSid)
+        : null;
       if (!lastOp) {
         root.style.display = 'none';
         root.innerHTML = '';
@@ -2311,7 +2349,10 @@ const PerfLog = {
       '<summary style="cursor:pointer;font-size:12px;color:' + (isFinal ? '#15803d' : '#64748b') + ';font-weight:500;outline:none;user-select:none">' +
         this._escapeHtml(summaryText) +
       '</summary>' +
-      '<div style="margin-top:8px;padding-left:4px;max-height:280px;overflow-y:auto">' +
+      // Block 8: убран max-height/overflow-y — вложенный скролл глючил при большом
+      // количестве этапов (прыгал наверх). Список этапов разворачивается на полную
+      // высоту, страница прокручивается общим скроллом браузера.
+      '<div style="margin-top:8px;padding-left:4px">' +
         itemsHtml +
       '</div>' +
     '</details>';
@@ -2394,7 +2435,7 @@ function openPerfLogHistory() {
       '<div style="font-size:12px;color:#64748b;margin-bottom:10px">' + date + ' · работа ' + fmt(totalMs) + ' · календарно ' + fmt(wall) + '</div>' +
       opsHtml +
       '<div style="margin-top:10px;display:flex;gap:6px">' +
-        '<button class="btn btn-success" style="font-size:12px;padding:6px 12px" onclick="PerfLog.downloadSessionLog(' + JSON.stringify(sid) + ')">📥 Скачать сессию (.txt)</button>' +
+        '<button class="btn btn-success" style="font-size:12px;padding:6px 12px" onclick="PerfLog.downloadSessionLog(\'' + sid + '\')">📥 Скачать сессию (.txt)</button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -2749,6 +2790,39 @@ function canAcceptFileForAuto() {
   flashStep3();
   updateAutoModeBanner();
   return false;
+}
+
+// Block 8: блокируем загрузку нового файла поверх уже завершённой сессии.
+// Если протокол уже создан или транскрипция получена — пользователь должен явно
+// нажать «🔄 Начать новую сессию» (или F5), чтобы освободить состояние.
+// Возвращает true если можно грузить.
+function canAcceptFileForSession() {
+  // Идёт операция — заблокировано (другие проверки тоже это ловят, но дублируем)
+  if (_busyOp) {
+    alert('Сейчас идёт операция. Дождись её завершения или нажми «🛑 Стоп».');
+    return false;
+  }
+  if (uploadState === 'uploading') return false;
+  // Шаг 3 уже завершён — есть готовый протокол
+  if (currentProtocolText && currentProtocolText.trim().length > 0) {
+    alert('Сессия завершена — протокол уже создан.\n\nЧтобы загрузить новое видео, нажми кнопку «🔄 Начать новую сессию» в карточке Результат (или обнови страницу F5).\n\nСозданный протокол уже сохранён в Библиотеке.');
+    const card = document.getElementById('protocol-result-card');
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return false;
+  }
+  // Шаг 2 уже завершён — есть транскрипция (но протокола ещё нет)
+  if (currentTranscriptText && currentTranscriptText.trim().length > 0) {
+    if (!confirm('У тебя уже есть транскрипция текущей сессии. Если загрузишь другое видео — она потеряется (но останется сохранённой в Библиотеке).\n\nПродолжить и заменить?')) {
+      return false;
+    }
+    // Юзер подтвердил — сбрасываем in-memory транскрипцию, чтобы не мешала новой сессии
+    currentTranscriptText = '';
+    const ta = document.getElementById('manual-transcript');
+    if (ta) ta.value = '';
+    const loaded = document.getElementById('transcript-loaded');
+    if (loaded) loaded.style.display = 'none';
+  }
+  return true;
 }
 
 // Авто-триггер транскрипции — вызывается из конца startFileUpload в случае успеха.
@@ -3464,6 +3538,7 @@ function onUploadAreaClick() {
   if (uploadState === 'uploading') return;
   if (!canAcceptFileForProject()) return;  // Block 6: блок если на Шаге 0 нет проекта
   if (!canAcceptFileForAuto()) return;  // F3: блок если Авто включён и Шаг 3 пуст
+  if (!canAcceptFileForSession()) return;  // Block 8: блок если сессия уже завершена
   document.getElementById('audio-file').click();
 }
 
@@ -3516,6 +3591,7 @@ function onUploadAreaClick() {
     if (uploadState === 'uploading') return;
     if (!canAcceptFileForProject()) return;  // Block 6: блок если на Шаге 0 нет проекта
     if (!canAcceptFileForAuto()) return;  // F3: блок если Авто включён и Шаг 3 пуст
+    if (!canAcceptFileForSession()) return;  // Block 8: блок если сессия уже завершена
     const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
     if (f) startFileUpload(f);
   });
@@ -3534,6 +3610,10 @@ function handleFileSelect(input) {
     return;
   }
   if (!canAcceptFileForAuto()) {  // F3: финальная защита
+    input.value = '';
+    return;
+  }
+  if (!canAcceptFileForSession()) {  // Block 8: блок если сессия уже завершена
     input.value = '';
     return;
   }
@@ -3599,6 +3679,8 @@ async function handleTranscriptFile(input) {
 
   // Block 6: транскрипция тоже привязывается к проекту
   if (!canAcceptFileForProject()) return;
+  // Block 8: блок если сессия уже завершена
+  if (!canAcceptFileForSession()) return;
 
   const ext = (f.name.split('.').pop() || '').toLowerCase();
   const btn = document.getElementById('btn-load-transcript');
@@ -9263,6 +9345,105 @@ function downloadTranscript(text, filename) {
 
 
 // ── DOCX GENERATION ───────────────────────────────────
+
+// Block 8: открыть текст созданного протокола в существующей модалке предпросмотра
+// (как в Библиотеке). Заменяет старое огромное поле .preview под кнопками.
+function openProtocolResultPreview() {
+  if (!currentProtocolText) { alert('Протокол ещё не создан.'); return; }
+  let mergedText = currentProtocolText;
+  if (currentRequirementsText && !/ЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ/i.test(mergedText)) {
+    mergedText = mergedText.trimEnd() + '\n\nЗАФИКСИРОВАННЫЕ ТРЕБОВАНИЯ:\n' + currentRequirementsText.trim() + '\n';
+  }
+  const title = (document.getElementById('meeting-title')?.value || '').trim() || 'Протокол';
+  const html = (typeof libRenderMarkdown === 'function')
+    ? libRenderMarkdown(mergedText)
+    : '<pre style="white-space:pre-wrap;font-family:inherit">' + mergedText.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])) + '</pre>';
+  openLibPreview(title, html, () => downloadDocx('protocol'));
+}
+
+// Block 8: «Начать новую сессию» — мягкий сброс UI и in-memory состояния.
+// Файлы в Библиотеке (протоколы, аудио в IDB, презентации, отчёты) НЕ удаляются.
+// Сбрасываем только текущее «активное» состояние, чтобы пользователь мог
+// загрузить новое видео поверх старой страницы.
+function startNewSession() {
+  // Защита: если идёт операция — не пускаем
+  if (_busyOp) {
+    alert('Сначала дождись завершения текущей операции или нажми «🛑 Стоп».');
+    return;
+  }
+  if (!confirm('Начать новую сессию?\n\nТекущий протокол и транскрипция уже сохранены в Библиотеке — они никуда не денутся. Сбросится только эта страница, чтобы можно было загрузить новое видео.')) {
+    return;
+  }
+
+  // ── In-memory state ──
+  uploadedFile = null;
+  uploadedParts = [];
+  currentRawFile = null;
+  currentFileKey = null;
+  currentMediaInfo = { durationSec: 0, numChunks: 0 };
+  currentTranscriptText = '';
+  currentProtocolText = '';
+  currentRequirementsText = '';
+  if (typeof currentReportTheses !== 'undefined') currentReportTheses = [];
+  uploadState = 'idle';
+  audioOnlyMode = false;
+
+  // ── PerfLog: завершаем текущую сессию, чтобы следующая загрузка создала новую ──
+  try {
+    if (PerfLog && PerfLog.currentOp) {
+      // На случай если есть незакрытая операция — финализируем по-тихому
+      PerfLog.endOp('aborted');
+    }
+    PerfLog.currentSessionId = null;
+  } catch (_) {}
+
+  // ── UI ──
+  const $ = id => document.getElementById(id);
+  // Скрываем карточку результата
+  if ($('protocol-result-card')) $('protocol-result-card').style.display = 'none';
+  if ($('protocol-preview'))     $('protocol-preview').textContent = '';
+  if ($('cleanup-status'))       $('cleanup-status').textContent = '';
+  if ($('protocol-status'))      $('protocol-status').innerHTML = '';
+  if ($('analysis-progress'))    $('analysis-progress').style.display = 'none';
+  // Прячем чип ручной транскрипции
+  if ($('transcript-loaded')) $('transcript-loaded').style.display = 'none';
+  if ($('manual-transcript')) $('manual-transcript').value = '';
+
+  // Очищаем PerfLog-блоки этапов (статичные + живые)
+  ['perflog-step-1-details','perflog-step-2-details','perflog-step-3-details','perflog-step-1-live','perflog-details']
+    .forEach(id => { const el = $(id); if (el) { el.style.display = 'none'; el.innerHTML = ''; } });
+
+  // Возвращаем dropzone в idle
+  if (typeof setUploadUI === 'function') setUploadUI('idle');
+
+  // Сбрасываем состояние шагов
+  if (typeof setStepState === 'function') {
+    setStepState(1, 'next', 'жду файл');
+    setStepHint(1, 'Загрузи видео или аудио в область выше. MP4, MKV, WEBM, MOV, MP3, WAV и т.п. До 2 ГБ.');
+    setStepState(2, 'disabled', '');
+    setStepHint(2, 'Whisper расшифрует аудио, Gemini почистит пунктуацию и добавит экранный контекст.');
+    setStepState(3, 'disabled', '');
+    setStepHint(3, 'Двухпроходная генерация: сначала тезисы, потом шаблон с таблицами и реестром требований.');
+  }
+
+  // Кнопки в шагах 2/3 — disabled
+  const tBtn = $('btn-transcribe');
+  if (tBtn) { tBtn.disabled = true; tBtn.title = 'Сначала загрузи файл'; }
+  const mainBtn = $('btn-download-transcript-main');
+  if (mainBtn) mainBtn.disabled = true;
+  const cleanupBtn = $('btn-cleanup');
+  if (cleanupBtn) cleanupBtn.disabled = true;
+  const resetTBtn = $('btn-reset-transcript');
+  if (resetTBtn) resetTBtn.style.display = 'none';
+
+  // Обновляем PerfLog UI (кнопки лога/архива)
+  try { PerfLog._refreshUI(); PerfLog._renderDetails(); } catch (_) {}
+
+  // Прокручиваем к Шагу 1
+  const step1 = $('step-1');
+  if (step1) step1.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 async function downloadDocx(type) {
   const map = {
     protocol:     { text: currentProtocolText,     file: 'протокол.docx' },
