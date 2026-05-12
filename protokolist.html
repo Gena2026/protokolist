@@ -665,10 +665,8 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <h2 class="step-card-title">Загрузка</h2>
       <span class="step-card-status" id="step-1-status">ожидание файла</span>
       <button class="step-stop-btn op-stop-btn" type="button" onclick="cancelCurrentOp(1)" title="Отменить загрузку и удалить данные этой попытки">🛑 Стоп</button>
-      <!-- PerfLog: кнопка скачать лог Шага 1 — активна когда шаг завершён -->
-      <button id="btn-perflog-step-1" class="step-stop-btn" type="button"
-        onclick="PerfLog.downloadByOpName('upload')" title="Скачать .txt лог Шага 1"
-        style="background:#eef2ff;color:#4338ca;border-color:#c7d2fe;display:none">📥 Лог</button>
+      <!-- Block 8: кнопка «Лог» перенесена в блок «Подробности» под прогрессом —
+           появляется когда шаг завершён, через PerfLog._renderOpDetailsHtml. -->
     </div>
 
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
@@ -747,10 +745,7 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
         <span class="step-card-status" id="step-2-status"></span>
         <button class="step-stop-btn op-stop-btn" type="button" onclick="cancelCurrentOp(2)" title="Отменить транскрипцию и удалить промежуточные данные">🛑 Стоп</button>
-        <!-- PerfLog: кнопка скачать лог Шага 2 -->
-        <button id="btn-perflog-step-2" class="step-stop-btn" type="button"
-          onclick="PerfLog.downloadByOpName('transcribe')" title="Скачать .txt лог Шага 2"
-          style="background:#eef2ff;color:#4338ca;border-color:#c7d2fe;display:none">📥 Лог</button>
+        <!-- Block 8: кнопка «Лог» перенесена в блок «Подробности» под прогрессом. -->
         <button class="protocol-del" id="btn-reset-transcript" onclick="resetTranscriptForRerun()"
           title="Удалить транскрипцию и вернуть Шаг 2 к исходному состоянию"
           style="display:none">×</button>
@@ -799,10 +794,7 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <h2 class="step-card-title">Протокол</h2>
       <span class="step-card-status" id="step-3-status"></span>
       <button class="step-stop-btn op-stop-btn" type="button" onclick="cancelCurrentOp(3)" title="Отменить генерацию и не сохранять протокол">🛑 Стоп</button>
-      <!-- PerfLog: кнопка скачать лог Шага 3 -->
-      <button id="btn-perflog-step-3" class="step-stop-btn" type="button"
-        onclick="PerfLog.downloadByOpName('generate')" title="Скачать .txt лог Шага 3"
-        style="background:#eef2ff;color:#4338ca;border-color:#c7d2fe;display:none">📥 Лог</button>
+      <!-- Block 8: кнопка «Лог» перенесена в блок «Подробности» под прогрессом. -->
     </div>
 
     <div class="step3-grid">
@@ -2203,16 +2195,9 @@ const PerfLog = {
         ? 'Скачать общий .txt со всеми шагами текущей сессии'
         : 'Сессия ещё не началась — загрузи файл';
     }
-    // Кнопки «Лог шага N» в шапках карточек шагов 1, 2, 3
-    const opNamesByStep = { 1: 'upload', 2: 'transcribe', 3: 'generate' };
-    for (let n = 1; n <= 3; n++) {
-      const btn = document.getElementById('btn-perflog-step-' + n);
-      if (!btn) continue;
-      const has = this.history.some(r => r.name === opNamesByStep[n]);
-      btn.disabled = !has;
-      btn.style.display = has ? '' : 'none';
-      btn.title = has ? 'Скачать .txt лог Шага ' + n : '';
-    }
+    // Block 8: кнопки «Лог шага N» из шапок шагов удалены —
+    // теперь кнопка скачивания живёт внутри блока «Подробности» и
+    // рендерится через _renderOpDetailsHtml (только когда isFinal=true).
     // Кнопка «Архив» — старая история всех операций
     const histBtn = document.getElementById('btn-perflog-archive');
     if (histBtn) {
@@ -2345,6 +2330,19 @@ const PerfLog = {
       ? (this._detailsOpenUserOverride ? 'open' : '')
       : (this._detailsOpen ? 'open' : '');
 
+    // Block 8: кнопка «Скачать лог» внутри блока «Подробности».
+    // Показываем ТОЛЬКО когда операция завершена (isFinal=true) — во время
+    // выполнения лога ещё нет, скачивать нечего. Перенесена из шапки шага.
+    const stepByName = { upload: 1, transcribe: 2, generate: 3 };
+    const stepNum = stepByName[op.name] || '?';
+    const downloadBtnHtml = isFinal
+      ? '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #e2e8f0;display:flex;justify-content:flex-end">' +
+          '<button type="button" onclick="PerfLog.downloadByOpName(\'' + op.name + '\')" ' +
+            'style="font-size:12px;padding:6px 12px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:6px;cursor:pointer;font-weight:500" ' +
+            'title="Скачать .txt лог Шага ' + stepNum + '">📥 Скачать лог Шага ' + stepNum + '</button>' +
+        '</div>'
+      : '';
+
     return '<details ' + openAttr + ' style="margin-top:10px;border-top:1px dashed #e2e8f0;padding-top:8px">' +
       '<summary style="cursor:pointer;font-size:12px;color:' + (isFinal ? '#15803d' : '#64748b') + ';font-weight:500;outline:none;user-select:none">' +
         this._escapeHtml(summaryText) +
@@ -2355,6 +2353,7 @@ const PerfLog = {
       '<div style="margin-top:8px;padding-left:4px">' +
         itemsHtml +
       '</div>' +
+      downloadBtnHtml +
     '</details>';
   },
 
