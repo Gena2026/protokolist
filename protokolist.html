@@ -866,6 +866,7 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       <div class="btn-row" style="gap:8px">
         <button class="btn btn-secondary" id="btn-perflog-session" onclick="PerfLog.downloadSessionLog()" disabled style="font-size:13px">📥 Скачать лог всех шагов</button>
         <button class="btn btn-secondary" id="btn-perflog-archive" onclick="openPerfLogHistory()" disabled style="font-size:13px">📜 Архив (0)</button>
+        <button class="btn btn-secondary" id="btn-costlog-session" onclick="CostTracker.downloadSessionLog()" style="font-size:13px;background:#fef3c7;color:#92400e;border-color:#fde68a">💰 Лог цен всех шагов</button>
       </div>
     </div>
   </div>
@@ -1526,6 +1527,56 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
     <label style="margin-top:14px">Groq API Key (для транскрипции Whisper)</label>
     <input type="password" id="groq-key" placeholder="gsk_...">
     <div class="key-hint">Бесплатно без карты: console.groq.com → API Keys</div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         💰 БЛОК ЦЕН ДЛЯ МОНИТОРИНГА (временный, для расчёта бюджета)
+         ═══════════════════════════════════════════════════════════ -->
+    <div style="margin-top:22px;padding:14px;border:1px solid #e2e8f0;border-radius:10px;background:#fafbfc">
+      <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:4px">💰 Цены для мониторинга (опционально)</div>
+      <div style="font-size:11px;color:#64748b;margin-bottom:14px">Для расчёта стоимости 1 протокола. Цены актуальны на май 2026.</div>
+
+      <label style="margin-top:0">Модель Gemini</label>
+      <select id="cost-gemini-model" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 13px;font-size:14px;font-family:inherit;outline:none;background:#fafafa;color:#1e293b">
+        <option value="2.5-flash-lite" data-in="0.10" data-out="0.40">Gemini 2.5 Flash-Lite — $0.10 / $0.40 (рекомендую)</option>
+        <option value="2.0-flash" data-in="0.10" data-out="0.40">Gemini 2.0 Flash — $0.10 / $0.40</option>
+        <option value="2.5-flash" data-in="0.30" data-out="2.50">Gemini 2.5 Flash — $0.30 / $2.50</option>
+        <option value="3-flash" data-in="0.50" data-out="3.00">Gemini 3 Flash Preview — $0.50 / $3.00</option>
+        <option value="2.5-pro" data-in="1.25" data-out="10.00">Gemini 2.5 Pro — $1.25 / $10.00 (≤200K)</option>
+        <option value="3.1-pro" data-in="2.00" data-out="12.00">Gemini 3.1 Pro — $2.00 / $12.00 (≤200K)</option>
+        <option value="custom" data-in="" data-out="">⚙️ Своя цена</option>
+      </select>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="flex:1">
+          <label style="margin-top:0;font-size:10px">Input $ / 1M tokens</label>
+          <input type="text" id="cost-gemini-in" value="0.10" style="font-size:13px;padding:8px 10px">
+        </div>
+        <div style="flex:1">
+          <label style="margin-top:0;font-size:10px">Output $ / 1M tokens</label>
+          <input type="text" id="cost-gemini-out" value="0.40" style="font-size:13px;padding:8px 10px">
+        </div>
+      </div>
+
+      <label style="margin-top:14px">STT провайдер (транскрипция)</label>
+      <select id="cost-stt-provider" style="width:100%;border:1px solid #e2e8f0;border-radius:9px;padding:10px 13px;font-size:14px;font-family:inherit;outline:none;background:#fafafa;color:#1e293b">
+        <option value="groq-turbo" data-price="0.04">Groq Whisper Turbo — $0.04/час (текущий)</option>
+        <option value="groq-v3" data-price="0.111">Groq Whisper Large v3 — $0.111/час</option>
+        <option value="assemblyai-universal" data-price="0.15">AssemblyAI Universal-2 — $0.15/час</option>
+        <option value="assemblyai-slam" data-price="0.21">AssemblyAI Slam-1 — $0.21/час</option>
+        <option value="google-stt-batch" data-price="0.96">Google STT Batch (Chirp) — $0.96/час</option>
+        <option value="google-stt-standard" data-price="3.84">Google STT Standard (Chirp) — $3.84/час</option>
+        <option value="openai-mini" data-price="0.18">OpenAI GPT-4o Mini Transcribe — $0.18/час</option>
+        <option value="openai-whisper" data-price="0.36">OpenAI Whisper — $0.36/час</option>
+        <option value="deepgram-nova3" data-price="0.258">Deepgram Nova-3 Batch — $0.258/час</option>
+        <option value="custom" data-price="">⚙️ Своя цена</option>
+      </select>
+      <label style="margin-top:8px;font-size:10px">Цена $ / час аудио</label>
+      <input type="text" id="cost-stt-price" value="0.04" style="font-size:13px;padding:8px 10px">
+
+      <div style="margin-top:10px;font-size:11px;color:#94a3b8;font-style:italic">
+        💡 Эти настройки используются только для расчёта стоимости. Реальная модель Gemini задаётся в коде (константа MODEL).
+      </div>
+    </div>
+
     <div class="modal-footer">
       <button class="btn btn-primary" onclick="saveSettings()">Сохранить</button>
       <button class="btn btn-secondary" onclick="closeSettings()">Закрыть</button>
@@ -1538,6 +1589,416 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 const CHUNK_MINUTES = 14; // 14 мин × 60 × 263 токена/сек = ~221K — с запасом до лимита 250K TPM
 const CHUNK_SEC = CHUNK_MINUTES * 60;
 const MODEL = 'gemini-3.1-flash-lite-preview'; // free tier: 500 RPD, качество выше
+
+// ═══════════════════════════════════════════════════════════════════
+// 💰 COST TRACKER — мониторинг токенов и стоимости (временный модуль)
+// ═══════════════════════════════════════════════════════════════════
+// Перехватывает usageMetadata из ответов Gemini API и длительность аудио
+// из вызовов Groq. Считает стоимость по ценам из ⚙️ настроек.
+// Кнопки скачивания лога цен — рядом с кнопками лога производительности.
+// Когда станет не нужно — просто удалить этот блок и вызовы CostTracker.*
+const CostTracker = {
+  events: [],              // все события {opName, callType, ...} текущей сессии
+  history: [],             // зеркало localStorage['_costlog_history']
+  HISTORY_KEY: '_costlog_history',
+  MAX_HISTORY: 15,
+  currentSessionId: null,
+  currentOp: null,         // { name, startedAt, geminiCalls: [], sttCalls: [] }
+
+  // Дефолтные цены — синхронизированы с <select> в settings-modal
+  defaults: {
+    geminiModel: '2.5-flash-lite',
+    geminiInputPrice: 0.10,   // $/1M input tokens
+    geminiOutputPrice: 0.40,  // $/1M output tokens
+    sttProvider: 'groq-turbo',
+    sttPricePerHour: 0.04     // $/час аудио
+  },
+
+  init() {
+    try {
+      const raw = localStorage.getItem(this.HISTORY_KEY);
+      this.history = raw ? JSON.parse(raw) : [];
+    } catch (_) { this.history = []; }
+    this.loadPricesFromStorage();
+  },
+
+  // Загружает сохранённые цены из localStorage
+  loadPricesFromStorage() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('_cost_settings') || '{}');
+      this.prices = {
+        geminiModel: saved.geminiModel || this.defaults.geminiModel,
+        geminiInputPrice: parseFloat(saved.geminiInputPrice) || this.defaults.geminiInputPrice,
+        geminiOutputPrice: parseFloat(saved.geminiOutputPrice) || this.defaults.geminiOutputPrice,
+        sttProvider: saved.sttProvider || this.defaults.sttProvider,
+        sttPricePerHour: parseFloat(saved.sttPricePerHour) || this.defaults.sttPricePerHour
+      };
+    } catch (_) {
+      this.prices = Object.assign({}, this.defaults);
+    }
+  },
+
+  // Сохраняет цены в localStorage (вызывается из saveSettings)
+  savePricesToStorage(prices) {
+    localStorage.setItem('_cost_settings', JSON.stringify(prices));
+    this.prices = prices;
+  },
+
+  // Начало операции (upload/transcribe/generate) — синхронно с PerfLog
+  opStart(name, label, sessionId) {
+    this.currentOp = {
+      name,
+      label: label || name,
+      startedAt: Date.now(),
+      sessionId: sessionId || this.currentSessionId,
+      geminiCalls: [],
+      sttCalls: []
+    };
+    if (sessionId) this.currentSessionId = sessionId;
+  },
+
+  // Завершение операции — сохраняем в history
+  opEnd(success) {
+    if (!this.currentOp) return;
+    const op = this.currentOp;
+    op.endedAt = Date.now();
+    op.duration = op.endedAt - op.startedAt;
+    op.success = success !== false;
+    op.totals = this._calcTotals(op);
+
+    // Записываем в history (только если были вызовы)
+    if (op.geminiCalls.length > 0 || op.sttCalls.length > 0) {
+      this.history.unshift(op);
+      if (this.history.length > this.MAX_HISTORY) {
+        this.history = this.history.slice(0, this.MAX_HISTORY);
+      }
+      try {
+        localStorage.setItem(this.HISTORY_KEY, JSON.stringify(this.history));
+      } catch (_) {}
+    }
+    this.currentOp = null;
+  },
+
+  // Регистрация вызова Gemini API с usageMetadata
+  recordGeminiCall(label, usageMetadata, meta) {
+    if (!this.currentOp) return;
+    const promptTokens = usageMetadata?.promptTokenCount || 0;
+    const outputTokens = usageMetadata?.candidatesTokenCount || 0;
+    const totalTokens = usageMetadata?.totalTokenCount || (promptTokens + outputTokens);
+
+    const inputCost = (promptTokens / 1000000) * this.prices.geminiInputPrice;
+    const outputCost = (outputTokens / 1000000) * this.prices.geminiOutputPrice;
+    const totalCost = inputCost + outputCost;
+
+    this.currentOp.geminiCalls.push({
+      ts: Date.now(),
+      label: label || 'Gemini call',
+      promptTokens,
+      outputTokens,
+      totalTokens,
+      inputCost,
+      outputCost,
+      totalCost,
+      meta: meta || {}
+    });
+  },
+
+  // Регистрация вызова STT (Whisper) — считаем по длительности аудио
+  recordSttCall(label, audioSeconds, meta) {
+    if (!this.currentOp) return;
+    const audioHours = audioSeconds / 3600;
+    const cost = audioHours * this.prices.sttPricePerHour;
+
+    this.currentOp.sttCalls.push({
+      ts: Date.now(),
+      label: label || 'STT call',
+      audioSeconds,
+      audioHours,
+      cost,
+      meta: meta || {}
+    });
+  },
+
+  // Подсчёт итогов для операции
+  _calcTotals(op) {
+    let geminiInputTokens = 0, geminiOutputTokens = 0, geminiCost = 0;
+    let sttSeconds = 0, sttCost = 0;
+
+    for (const c of op.geminiCalls) {
+      geminiInputTokens += c.promptTokens;
+      geminiOutputTokens += c.outputTokens;
+      geminiCost += c.totalCost;
+    }
+    for (const c of op.sttCalls) {
+      sttSeconds += c.audioSeconds;
+      sttCost += c.cost;
+    }
+
+    return {
+      geminiCallsCount: op.geminiCalls.length,
+      geminiInputTokens,
+      geminiOutputTokens,
+      geminiCost,
+      sttCallsCount: op.sttCalls.length,
+      sttSeconds,
+      sttCost,
+      totalCost: geminiCost + sttCost
+    };
+  },
+
+  // Форматирование числа с разделителями тысяч
+  _fmtNum(n) {
+    return Math.round(n).toLocaleString('ru-RU').replace(/,/g, ' ');
+  },
+
+  // Форматирование цены ($0.0234)
+  _fmtCost(c) {
+    if (c < 0.01) return '$' + c.toFixed(4);
+    if (c < 1) return '$' + c.toFixed(3);
+    return '$' + c.toFixed(2);
+  },
+
+  _fmtDuration(sec) {
+    if (sec < 60) return Math.round(sec) + ' сек';
+    const m = Math.floor(sec / 60);
+    const s = Math.round(sec % 60);
+    if (m < 60) return m + 'м ' + s + 'с';
+    const h = Math.floor(m / 60);
+    return h + 'ч ' + (m % 60) + 'м';
+  },
+
+  _fileStamp(ts) {
+    return new Date(ts).toISOString().slice(0, 16).replace(/[:T]/g, '-');
+  },
+
+  // Форматирование лога одной операции (Шаг 1/2/3)
+  formatOpLog(op) {
+    if (!op) return '';
+    const lines = [];
+    const stepByName = { upload: 1, transcribe: 2, generate: 3, report: 'R', presentation: 'P' };
+    const stepNum = stepByName[op.name] || '?';
+
+    lines.push('═══════════════════════════════════════════════════');
+    lines.push('💰 ЛОГ ЦЕН И ТОКЕНОВ — ШАГ ' + stepNum);
+    lines.push('═══════════════════════════════════════════════════');
+    lines.push('Операция: ' + (op.label || op.name));
+    lines.push('Начало:      ' + new Date(op.startedAt).toLocaleString('ru-RU'));
+    if (op.endedAt) {
+      lines.push('Завершение:  ' + new Date(op.endedAt).toLocaleString('ru-RU'));
+      lines.push('Длительность: ' + this._fmtDuration(op.duration / 1000));
+    }
+    lines.push('Статус:      ' + (op.success ? '✅ успешно' : '❌ с ошибкой'));
+    lines.push('');
+    lines.push('── НАСТРОЙКИ ЦЕН ──');
+    lines.push('Gemini: ' + this.prices.geminiModel + ' — input $' +
+               this.prices.geminiInputPrice + ', output $' +
+               this.prices.geminiOutputPrice + ' / 1M tokens');
+    lines.push('STT:    ' + this.prices.sttProvider + ' — $' +
+               this.prices.sttPricePerHour + ' / час аудио');
+    lines.push('');
+
+    // STT вызовы
+    if (op.sttCalls.length > 0) {
+      lines.push('───────────────────────────────────────────────────');
+      lines.push('📝 STT ТРАНСКРИБАЦИЯ');
+      lines.push('───────────────────────────────────────────────────');
+      let totalSec = 0, totalCost = 0;
+      op.sttCalls.forEach((c, i) => {
+        lines.push('');
+        lines.push('STT #' + (i + 1) + ': ' + c.label);
+        lines.push('  Длительность: ' + this._fmtDuration(c.audioSeconds) +
+                   ' (' + c.audioHours.toFixed(3) + ' часа)');
+        lines.push('  Стоимость:    ' + this._fmtCost(c.cost));
+        if (c.meta && c.meta.chunkIdx !== undefined) {
+          lines.push('  Чанк:         ' + (c.meta.chunkIdx + 1) + '/' + c.meta.totalChunks);
+        }
+        totalSec += c.audioSeconds;
+        totalCost += c.cost;
+      });
+      if (op.sttCalls.length > 1) {
+        lines.push('');
+        lines.push('  ИТОГО STT: ' + this._fmtDuration(totalSec) +
+                   ' = ' + this._fmtCost(totalCost));
+      }
+      lines.push('');
+    }
+
+    // Gemini вызовы
+    if (op.geminiCalls.length > 0) {
+      lines.push('───────────────────────────────────────────────────');
+      lines.push('🤖 GEMINI API ВЫЗОВЫ');
+      lines.push('───────────────────────────────────────────────────');
+      op.geminiCalls.forEach((c, i) => {
+        lines.push('');
+        lines.push('Вызов #' + (i + 1) + ': ' + c.label);
+        lines.push('  Input:     ' + this._fmtNum(c.promptTokens) + ' токенов');
+        lines.push('  Output:    ' + this._fmtNum(c.outputTokens) + ' токенов');
+        lines.push('  Total:     ' + this._fmtNum(c.totalTokens) + ' токенов');
+        lines.push('  Стоимость: ' + this._fmtCost(c.inputCost) + ' (in) + ' +
+                   this._fmtCost(c.outputCost) + ' (out) = ' +
+                   this._fmtCost(c.totalCost));
+      });
+      lines.push('');
+    }
+
+    // Итоги
+    const t = op.totals || this._calcTotals(op);
+    lines.push('───────────────────────────────────────────────────');
+    lines.push('📊 ИТОГО ПО ШАГУ ' + stepNum);
+    lines.push('───────────────────────────────────────────────────');
+    if (t.sttCallsCount > 0) {
+      lines.push('STT вызовов:         ' + t.sttCallsCount);
+      lines.push('Аудио обработано:    ' + this._fmtDuration(t.sttSeconds));
+      lines.push('STT стоимость:       ' + this._fmtCost(t.sttCost));
+    }
+    if (t.geminiCallsCount > 0) {
+      lines.push('Gemini вызовов:      ' + t.geminiCallsCount);
+      lines.push('Input токенов всего: ' + this._fmtNum(t.geminiInputTokens));
+      lines.push('Output токенов всего:' + this._fmtNum(t.geminiOutputTokens));
+      lines.push('Gemini стоимость:    ' + this._fmtCost(t.geminiCost));
+    }
+    lines.push('═══════════════════════════════════════════════════');
+    lines.push('ОБЩАЯ СТОИМОСТЬ:    ' + this._fmtCost(t.totalCost));
+    lines.push('═══════════════════════════════════════════════════');
+    return lines.join('\n');
+  },
+
+  // Форматирование общего лога сессии (все шаги вместе)
+  formatSessionLog(sessionId) {
+    sessionId = sessionId || this.currentSessionId;
+    if (!sessionId && this.history.length) sessionId = this.history[0].sessionId;
+    if (!sessionId) return '';
+
+    const ops = this.history.filter(o => o.sessionId === sessionId);
+    if (!ops.length) return '';
+
+    // Сортируем по времени старта
+    ops.sort((a, b) => a.startedAt - b.startedAt);
+
+    const lines = [];
+    lines.push('═══════════════════════════════════════════════════════');
+    lines.push('💰 СВОДНЫЙ ОТЧЁТ ПО ТОКЕНАМ И СТОИМОСТИ');
+    lines.push('Сессия: ' + sessionId);
+    lines.push('═══════════════════════════════════════════════════════');
+    lines.push('Начало сессии:    ' + new Date(ops[0].startedAt).toLocaleString('ru-RU'));
+    lines.push('Конец сессии:     ' + new Date(ops[ops.length-1].endedAt || Date.now()).toLocaleString('ru-RU'));
+    lines.push('');
+    lines.push('── НАСТРОЙКИ ЦЕН ──');
+    lines.push('Gemini: ' + this.prices.geminiModel + ' — input $' +
+               this.prices.geminiInputPrice + ', output $' +
+               this.prices.geminiOutputPrice + ' / 1M tokens');
+    lines.push('STT:    ' + this.prices.sttProvider + ' — $' +
+               this.prices.sttPricePerHour + ' / час аудио');
+    lines.push('');
+
+    // Каждый шаг
+    let totalGeminiCost = 0, totalSttCost = 0, totalCost = 0;
+    let totalGeminiCalls = 0, totalSttCalls = 0;
+    let totalInputTokens = 0, totalOutputTokens = 0, totalAudioSec = 0;
+
+    ops.forEach(op => {
+      const stepByName = { upload: 1, transcribe: 2, generate: 3, report: 'R', presentation: 'P' };
+      const stepNum = stepByName[op.name] || '?';
+      const t = op.totals || this._calcTotals(op);
+      lines.push('───────────────────────────────────────────────────────');
+      lines.push('ШАГ ' + stepNum + ': ' + (op.label || op.name));
+      lines.push('───────────────────────────────────────────────────────');
+      if (t.sttCallsCount > 0) {
+        lines.push('  STT:    ' + t.sttCallsCount + ' вызовов · ' +
+                   this._fmtDuration(t.sttSeconds) + ' · ' +
+                   this._fmtCost(t.sttCost));
+      }
+      if (t.geminiCallsCount > 0) {
+        lines.push('  Gemini: ' + t.geminiCallsCount + ' вызовов · ' +
+                   this._fmtNum(t.geminiInputTokens) + ' in + ' +
+                   this._fmtNum(t.geminiOutputTokens) + ' out · ' +
+                   this._fmtCost(t.geminiCost));
+      }
+      lines.push('  💰 Стоимость шага: ' + this._fmtCost(t.totalCost));
+      lines.push('');
+
+      totalGeminiCost += t.geminiCost;
+      totalSttCost += t.sttCost;
+      totalCost += t.totalCost;
+      totalGeminiCalls += t.geminiCallsCount;
+      totalSttCalls += t.sttCallsCount;
+      totalInputTokens += t.geminiInputTokens;
+      totalOutputTokens += t.geminiOutputTokens;
+      totalAudioSec += t.sttSeconds;
+    });
+
+    lines.push('═══════════════════════════════════════════════════════');
+    lines.push('📊 ИТОГО ПО ВСЕЙ СЕССИИ');
+    lines.push('═══════════════════════════════════════════════════════');
+    if (totalSttCalls > 0) {
+      lines.push('STT вызовов всего:    ' + totalSttCalls);
+      lines.push('Аудио обработано:     ' + this._fmtDuration(totalAudioSec));
+      lines.push('STT стоимость:        ' + this._fmtCost(totalSttCost));
+      lines.push('');
+    }
+    if (totalGeminiCalls > 0) {
+      lines.push('Gemini вызовов всего: ' + totalGeminiCalls);
+      lines.push('Input токенов:        ' + this._fmtNum(totalInputTokens));
+      lines.push('Output токенов:       ' + this._fmtNum(totalOutputTokens));
+      lines.push('Gemini стоимость:     ' + this._fmtCost(totalGeminiCost));
+      lines.push('');
+    }
+    lines.push('═══════════════════════════════════════════════════════');
+    lines.push('💰 ОБЩАЯ СТОИМОСТЬ СЕССИИ: ' + this._fmtCost(totalCost));
+    lines.push('═══════════════════════════════════════════════════════');
+    lines.push('');
+    lines.push('💡 Экстраполяция:');
+    lines.push('  10 протоколов в месяц:  ' + this._fmtCost(totalCost * 10));
+    lines.push('  50 протоколов в месяц:  ' + this._fmtCost(totalCost * 50));
+    lines.push('  100 протоколов в месяц: ' + this._fmtCost(totalCost * 100));
+    lines.push('  200 протоколов в месяц: ' + this._fmtCost(totalCost * 200));
+
+    return lines.join('\n');
+  },
+
+  // Скачать лог одной операции (по имени шага: upload/transcribe/generate)
+  downloadByOpName(name) {
+    const found = this.history.find(r => r.name === name);
+    if (!found) {
+      alert('Лог цен для шага «' + name + '» ещё не записан. Запусти этот шаг и попробуй снова.');
+      return;
+    }
+    this._downloadText(this.formatOpLog(found),
+                       'costlog_' + found.name + '_' + this._fileStamp(found.startedAt) + '.txt');
+  },
+
+  // Скачать общий лог сессии
+  downloadSessionLog(sessionId) {
+    sessionId = sessionId || this.currentSessionId;
+    if (!sessionId && this.history.length) sessionId = this.history[0].sessionId;
+    const text = this.formatSessionLog(sessionId);
+    if (!text) {
+      alert('В этой сессии ещё нет вызовов API. Запусти Шаг 1/2/3 и попробуй снова.');
+      return;
+    }
+    const ops = this.history.filter(o => o.sessionId === sessionId);
+    const stamp = this._fileStamp(ops[0].startedAt);
+    this._downloadText(text, 'costlog_session_' + stamp + '.txt');
+  },
+
+  _downloadText(text, filename) {
+    const crlfText = String(text).replace(/\r?\n/g, '\r\n');
+    const blob = new Blob(['\uFEFF', crlfText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+};
+// Инициализируем при загрузке скрипта
+try { CostTracker.init(); } catch (_) {}
+// ═══════════════════════════════════════════════════════════════════
+// END OF CostTracker
+// ═══════════════════════════════════════════════════════════════════
 
 // ── PERF LOG ──────────────────────────────────────────
 // Замеряет длительность всех ключевых операций (Gemini-вызовы, Whisper-чанки,
@@ -1654,6 +2115,8 @@ const PerfLog = {
     };
     if (!this.currentSessionId) this.currentSessionId = this.currentOp.sessionId;
     this._record('OP_START', label + ' (' + name + ') · session=' + this.currentOp.sessionId, meta || {});
+    // 💰 CostTracker: синхронно запускаем операцию
+    try { CostTracker.opStart(name, label, this.currentOp.sessionId); } catch (_) {}
     try { if (typeof HeartbeatMonitor !== 'undefined') HeartbeatMonitor.start(); } catch (_) {}
     // UI-тикер раз в секунду перерисовывает «Подробности» — чтобы таймер «идёт Xs» рос вживую.
     // Используем main-thread setInterval — он троттлится в фоне, но UI всё равно скрыт когда вкладка в фоне,
@@ -1672,6 +2135,8 @@ const PerfLog = {
   // в шапках Шагов 1/2/3 не должны показывать чужую сессию.
   startSession() {
     this.currentSessionId = 's' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    // 💰 CostTracker: синхронизируем sessionId
+    try { CostTracker.currentSessionId = this.currentSessionId; } catch (_) {}
     // Сбрасываем визуальный счётчик «какая сессия отображается»
     this._renderedSessionId = this.currentSessionId;
     // Прячем статичные блоки прошлой сессии (содержимое останется в history, но не показываем)
@@ -1725,6 +2190,8 @@ const PerfLog = {
     this.history.unshift(record);
     if (this.history.length > this.MAX_HISTORY) this.history = this.history.slice(0, this.MAX_HISTORY);
     this._persistHistory();
+    // 💰 CostTracker: завершаем операцию синхронно
+    try { CostTracker.opEnd(status === 'ok'); } catch (_) {}
     this.currentOp = null;
     this.currentStep = null;
     this._refreshUI();
@@ -2336,10 +2803,13 @@ const PerfLog = {
     const stepByName = { upload: 1, transcribe: 2, generate: 3 };
     const stepNum = stepByName[op.name] || '?';
     const downloadBtnHtml = isFinal
-      ? '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #e2e8f0;display:flex;justify-content:flex-end">' +
+      ? '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #e2e8f0;display:flex;justify-content:flex-end;gap:8px">' +
           '<button type="button" onclick="PerfLog.downloadByOpName(\'' + op.name + '\')" ' +
             'style="font-size:12px;padding:6px 12px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:6px;cursor:pointer;font-weight:500" ' +
             'title="Скачать .txt лог Шага ' + stepNum + '">📥 Скачать лог Шага ' + stepNum + '</button>' +
+          '<button type="button" onclick="CostTracker.downloadByOpName(\'' + op.name + '\')" ' +
+            'style="font-size:12px;padding:6px 12px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:6px;cursor:pointer;font-weight:500" ' +
+            'title="Скачать .txt лог цен и токенов Шага ' + stepNum + '">💰 Лог цен Шага ' + stepNum + '</button>' +
         '</div>'
       : '';
 
@@ -3175,6 +3645,29 @@ function safeSetItem(key, value) {
 function openSettings() {
   document.getElementById('gemini-key').value = getKey();
   document.getElementById('groq-key').value = localStorage.getItem('groq_key') || '';
+  // 💰 Загружаем текущие цены из CostTracker
+  try {
+    CostTracker.loadPricesFromStorage();
+    const p = CostTracker.prices;
+    const modelSel = document.getElementById('cost-gemini-model');
+    if (modelSel) {
+      modelSel.value = p.geminiModel;
+      // если значение не найдено в списке — ставим custom
+      if (modelSel.value !== p.geminiModel) modelSel.value = 'custom';
+    }
+    const inEl = document.getElementById('cost-gemini-in');
+    const outEl = document.getElementById('cost-gemini-out');
+    if (inEl) inEl.value = p.geminiInputPrice;
+    if (outEl) outEl.value = p.geminiOutputPrice;
+
+    const sttSel = document.getElementById('cost-stt-provider');
+    if (sttSel) {
+      sttSel.value = p.sttProvider;
+      if (sttSel.value !== p.sttProvider) sttSel.value = 'custom';
+    }
+    const sttPriceEl = document.getElementById('cost-stt-price');
+    if (sttPriceEl) sttPriceEl.value = p.sttPricePerHour;
+  } catch (_) {}
   document.getElementById('settings-modal').classList.add('open');
 }
 function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
@@ -3183,9 +3676,44 @@ function saveSettings() {
   if (k) localStorage.setItem('gemini_key', k);
   const gk = document.getElementById('groq-key').value.trim();
   if (gk) localStorage.setItem('groq_key', gk);
+  // 💰 Сохраняем цены
+  try {
+    const modelSel = document.getElementById('cost-gemini-model');
+    const sttSel = document.getElementById('cost-stt-provider');
+    const prices = {
+      geminiModel: modelSel ? modelSel.value : '2.5-flash-lite',
+      geminiInputPrice: parseFloat(document.getElementById('cost-gemini-in').value) || 0.10,
+      geminiOutputPrice: parseFloat(document.getElementById('cost-gemini-out').value) || 0.40,
+      sttProvider: sttSel ? sttSel.value : 'groq-turbo',
+      sttPricePerHour: parseFloat(document.getElementById('cost-stt-price').value) || 0.04
+    };
+    CostTracker.savePricesToStorage(prices);
+  } catch (e) { console.warn('CostTracker save failed:', e); }
   closeSettings();
-  showStatus('protocol-status', 'success', 'Ключи сохранены');
+  showStatus('protocol-status', 'success', 'Настройки сохранены');
 }
+
+// 💰 Автоматическое обновление цен при выборе модели/провайдера из dropdown
+document.addEventListener('DOMContentLoaded', () => {
+  const modelSel = document.getElementById('cost-gemini-model');
+  if (modelSel) {
+    modelSel.addEventListener('change', (e) => {
+      const opt = e.target.options[e.target.selectedIndex];
+      const inPrice = opt.getAttribute('data-in');
+      const outPrice = opt.getAttribute('data-out');
+      if (inPrice) document.getElementById('cost-gemini-in').value = inPrice;
+      if (outPrice) document.getElementById('cost-gemini-out').value = outPrice;
+    });
+  }
+  const sttSel = document.getElementById('cost-stt-provider');
+  if (sttSel) {
+    sttSel.addEventListener('change', (e) => {
+      const opt = e.target.options[e.target.selectedIndex];
+      const price = opt.getAttribute('data-price');
+      if (price) document.getElementById('cost-stt-price').value = price;
+    });
+  }
+});
 
 // ── TABS ─────────────────────────────────────────────
 function showTab(name, el) {
@@ -5584,7 +6112,7 @@ async function uploadFileToGemini(file, onProgress) {
 // который в свою очередь ретраим (как обычную ошибку сети).
 const GEMINI_TIMEOUT_MS = 5 * 60 * 1000; // 5 минут на запрос
 
-async function callGemini(parts, _attempt = 0) {
+async function callGemini(parts, _attempt = 0, _costLabel = null) {
   const key = getKey();
   if (!key) throw new Error('Не указан Gemini API Key');
 
@@ -5657,7 +6185,7 @@ async function callGemini(parts, _attempt = 0) {
       const waitSec = [30, 60, 120][_attempt];
       try { PerfLog.apiRetry(_plHandle, { reason, attempt: _attempt + 1, waitSec, type: isAbort ? 'timeout' : 'network', errMsg: fetchErr.message }); } catch (_) {}
       await countdownWait(waitSec, _attempt + 1, reason);
-      return callGemini(parts, _attempt + 1);
+      return callGemini(parts, _attempt + 1, _costLabel);
     }
     try { PerfLog.apiErr(_plHandle, reason + ' — несколько попыток подряд неудачны', { type: 'network_final' }); } catch (_) {}
     throw new Error(reason + ' — несколько попыток подряд неудачны');
@@ -5669,6 +6197,17 @@ async function callGemini(parts, _attempt = 0) {
     const d = await res.json();
     const respText = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
     try { PerfLog.apiOk(_plHandle, { responseChars: respText.length, attempt: _attempt + 1 }); } catch (_) {}
+    // 💰 CostTracker: записываем токены и стоимость
+    try {
+      if (d.usageMetadata) {
+        const label = _costLabel || ('Gemini call (' + (parts.some(p => p.fileData) ? 'with file' : 'text') + ')');
+        CostTracker.recordGeminiCall(label, d.usageMetadata, {
+          model: MODEL,
+          attempt: _attempt + 1,
+          hasFile: parts.some(p => p && p.fileData)
+        });
+      }
+    } catch (_) {}
     return respText;
   }
 
@@ -5691,7 +6230,7 @@ async function callGemini(parts, _attempt = 0) {
     const reason = isOverload ? 'Gemini перегружен' : 'Лимит API';
     try { PerfLog.apiRetry(_plHandle, { status: res.status, reason, attempt: _attempt + 1, waitSec, errMsg: msg.slice(0, 200) }); } catch (_) {}
     await countdownWait(waitSec, _attempt + 1, reason);
-    return callGemini(parts, _attempt + 1);
+    return callGemini(parts, _attempt + 1, _costLabel);
   }
 
   if (isFileGone) {
@@ -14264,6 +14803,15 @@ async function transcribeWithWhisper(file, options = {}) {
       throw new Error('Groq Whisper: ' + errMsg);
     }
     const data = await res.json();
+    // 💰 CostTracker: записываем стоимость STT для этого чанка
+    try {
+      const chunkAudioSec = Math.round((end - start) / sr);
+      CostTracker.recordSttCall(
+        'Whisper чанк ' + (i + 1) + '/' + numChunks,
+        chunkAudioSec,
+        { chunkIdx: i, totalChunks: numChunks, model: GROQ_WHISPER_MODEL }
+      );
+    } catch (_) {}
     let chunkText = '';
     if (data.segments) {
       for (const seg of data.segments) {
