@@ -1590,6 +1590,18 @@ const CHUNK_MINUTES = 14; // 14 мин × 60 × 263 токена/сек = ~221K 
 const CHUNK_SEC = CHUNK_MINUTES * 60;
 const MODEL = 'gemini-3.1-flash-lite-preview'; // free tier: 500 RPD, качество выше
 
+// ── TPM-SAFE паузы между Gemini-запросами ────────────────────
+// Gemini 3.1 Flash Lite на free tier: TPM = 250K токенов в минуту (скользящее окно).
+// Один видео-запрос (~13 мин видео + промпт) = ~200K токенов — почти весь лимит.
+// Между двумя видео-запросами нужно ≥60 сек, чтобы TPM-счётчик в скользящем окне
+// освободился ниже 50K (250K − 200K). 65 сек — с запасом 5 сек.
+// До 14 мая стояло 20 сек — это давало 3 видео-запроса в минуту = 600K TPM,
+// в 2.4 раза выше лимита. Google в моменте возвращал 503 ровно от этого паттерна.
+// Текстовые merge-запросы (~5K токенов) безопасно делать каждые 20 сек.
+const PAUSE_VIDEO_TO_VIDEO_MS = 65000;  // 65 сек — для видео↔видео (тяжёлые ~200K токенов)
+const PAUSE_TEXT_TO_TEXT_MS  = 20000;  // 20 сек — для текст↔текст (лёгкие ~5-10K токенов)
+const PAUSE_TEXT_TO_VIDEO_MS = 45000;  // 45 сек — после текста перед видео (cleanup → enrichment)
+
 // ═══════════════════════════════════════════════════════════════════
 // 💰 COST TRACKER — мониторинг токенов и стоимости (временный модуль)
 // ═══════════════════════════════════════════════════════════════════
@@ -5061,10 +5073,10 @@ async function enrichTranscriptWithVideo() {
         if (statusEl) statusEl.textContent =
           `✓ Часть ${i + 1} обработана, пауза перед следующей...`;
         await sleepWithCountdown(
-          20000,
+          PAUSE_VIDEO_TO_VIDEO_MS,                                // 65 сек: TPM-safe между видео-запросами
           `Шаг 2 из 2 · пауза перед частью ${i + 2}`,
           pct + 3,
-          `✓ Часть ${i + 1} готова · соблюдаем лимит API`
+          `✓ Часть ${i + 1} готова · соблюдаем TPM-лимит Gemini (~200K токенов на видео-чанк)`
         );
       }
     }
@@ -5269,6 +5281,15 @@ async function retryGeminiCleanup() {
 
     // ── Шаг 2: Video enrichment (если видео доступно) ──
     if (hasVideo) {
+      // TPM-safe пауза после cleanup (текст ~20K токенов) перед первым видео-запросом
+      // (видео ~200K токенов). Без неё первый enrichment стабильно ловит 503 — cleanup
+      // только что съел часть скользящего TPM-окна.
+      await sleepWithCountdown(
+        PAUSE_TEXT_TO_VIDEO_MS,
+        'TPM-safe пауза перед видео-обогащением',
+        hasVideo ? 25 : 50,
+        '✓ Пунктуация и термины восстановлены · ждём TPM-окно перед видео'
+      );
       const enriched = await enrichTranscriptWithVideo();
       if (enriched) {
         currentTranscriptText = enriched;
@@ -7139,7 +7160,7 @@ async function generateProtocol() {
         ]);
         partTheses.push(thesesRaw || ''); // сохраняем в отдельный массив
 
-        await sleepWithCountdown(20000, `Пауза перед шагом ${step2}`, pctBase + 2, 'Соблюдаем лимит API · тезисы готовы ✓');
+        await sleepWithCountdown(PAUSE_VIDEO_TO_VIDEO_MS, `Пауза перед шагом ${step2}`, pctBase + 2, '✓ Тезисы готовы · TPM-safe пауза 65 сек перед видео-протоколом');
 
         // Проход 2: полный протокол с готовыми тезисами
         _silentInfo(
@@ -7159,7 +7180,7 @@ async function generateProtocol() {
         partRequirements.push(rText);
 
         if (i < uploadedParts.length - 1) {
-          await sleepWithCountdown(20000, `Пауза перед частью ${i + 2}`, pctBase + 7, 'Соблюдаем лимит API');
+          await sleepWithCountdown(PAUSE_VIDEO_TO_VIDEO_MS, `Пауза перед частью ${i + 2}`, pctBase + 7, '✓ Часть готова · TPM-safe пауза 65 сек перед следующей частью');
         }
       }
 
@@ -7171,7 +7192,7 @@ async function generateProtocol() {
       _silentInfo(
         `Шаг ${stepNum}/${totalSteps} — объединяю протоколы...`);
       showAP('Объединение протоколов...', 62, 'Шапка, глоссарий, вопросы, таблицы — без тезисов');
-      await sleepWithCountdown(20000, 'Пауза перед объединением протоколов', 62, 'Соблюдаем лимит API');
+      await sleepWithCountdown(PAUSE_TEXT_TO_TEXT_MS, 'Пауза перед объединением протоколов', 62, 'Соблюдаем лимит API');
       protocolText = await callGemini([{ text: MERGE_PROMPT(partProtocols, title) }]);
 
       // Объединение тезисов ОТДЕЛЬНЫМ запросом — merge главного протокола их не касается
@@ -7180,7 +7201,7 @@ async function generateProtocol() {
         `Шаг ${stepNum}/${totalSteps} — объединяю тезисы...`);
       showAP('Объединение тезисов...', 70,
         'Консолидирую As Is / To Be по темам, ничего не теряя');
-      await sleepWithCountdown(20000, 'Пауза перед объединением тезисов', 70, 'Соблюдаем лимит API');
+      await sleepWithCountdown(PAUSE_TEXT_TO_TEXT_MS, 'Пауза перед объединением тезисов', 70, 'Соблюдаем лимит API');
       const mergedTheses = await callGemini([{
         text: MERGE_THESES_PROMPT(partTheses.filter(t => t && t.trim()), title)
       }]);
@@ -7190,7 +7211,7 @@ async function generateProtocol() {
       _silentInfo(
         `Шаг ${stepNum}/${totalSteps} — объединяю участников...`);
       showAP('Объединение участников...', 75, 'Собираю уникальных людей');
-      await sleepWithCountdown(20000, 'Пауза перед объединением участников', 75, 'Соблюдаем лимит API');
+      await sleepWithCountdown(PAUSE_TEXT_TO_TEXT_MS, 'Пауза перед объединением участников', 75, 'Соблюдаем лимит API');
       const mergedParticipants = await callGemini([{
         text: MERGE_PARTICIPANTS_PROMPT(partProtocols, title, teamText)
       }]);
@@ -7226,7 +7247,7 @@ async function generateProtocol() {
       _silentInfo(
         `Шаг ${stepNum}/${totalSteps} — объединяю реестры требований...`);
       showAP('Объединение реестров требований...', 82, 'Убираем дубли, сохраняем нюансы');
-      await sleepWithCountdown(20000, 'Пауза перед объединением требований', 82, 'Соблюдаем лимит API');
+      await sleepWithCountdown(PAUSE_TEXT_TO_TEXT_MS, 'Пауза перед объединением требований', 82, 'Соблюдаем лимит API');
       currentRequirementsText = await callGemini([{
         text: MERGE_REQUIREMENTS_PROMPT(partRequirements, title)
       }]);
@@ -7237,7 +7258,7 @@ async function generateProtocol() {
         `Шаг ${stepNum}/${totalSteps} — финальная проверка требований...`);
       showAP('Сверяю реестр с протоколом...', 90,
         'Проверяем не потерялось ли ничего при объединении');
-      await sleepWithCountdown(20000, 'Пауза перед финальной проверкой', 90, 'Соблюдаем лимит API');
+      await sleepWithCountdown(PAUSE_TEXT_TO_TEXT_MS, 'Пауза перед финальной проверкой', 90, 'Соблюдаем лимит API');
       currentRequirementsText = await callGemini([{
         text: FINAL_CHECK_REQUIREMENTS_PROMPT(protocolText, currentRequirementsText, title)
       }]);
@@ -7258,7 +7279,7 @@ async function generateProtocol() {
         { text: THESES_PROMPT(null, currentTranscriptText || '', hasVisual) }
       ]);
 
-      await sleepWithCountdown(20000, 'Пауза перед протоколом', 45, 'Тезисы готовы ✓ · соблюдаем лимит API');
+      await sleepWithCountdown(PAUSE_VIDEO_TO_VIDEO_MS, 'Пауза перед протоколом', 45, '✓ Тезисы готовы · TPM-safe пауза 65 сек перед видео-протоколом');
 
       _silentInfo( 'Шаг 2 из 2 — составляю протокол...');
       showAP('Шаг 2 из 2 — протокол', 55,
