@@ -6175,6 +6175,12 @@ async function callGemini(parts, _attempt = 0, _costLabel = null) {
 
   let res;
   try {
+    // maxOutputTokens: для видео-запросов (enrich, theses, protocol) нужно больше токенов.
+    // 8192 было слишком мало — при длинных чанках (13 мин видео + транскрипция) Gemini
+    // упирался в лимит и иногда возвращал 503 вместо усечённого ответа (поведение preview-модели).
+    // 65536 — безопасный максимум для flash-lite на free tier.
+    const hasFile = parts.some(p => p && p.fileData);
+    const maxTokens = hasFile ? 65536 : 8192;
     res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${key}`,
       {
@@ -6182,7 +6188,7 @@ async function callGemini(parts, _attempt = 0, _costLabel = null) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+          generationConfig: { temperature: 0.2, maxOutputTokens: maxTokens }
         }),
         signal: controller.signal
       }
