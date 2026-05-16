@@ -911,7 +911,14 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
       </div>
       <div class="progress-bar-bg"><div class="progress-bar" id="report-progress-bar"></div></div>
       <div id="report-progress-note" style="font-size:11px;color:#94a3b8;margin-top:6px"></div>
+      <!-- PerfLog: живой блок «Подробности» во время генерации отчёта.
+           Содержимое рендерится PerfLog._renderDetails. -->
+      <div id="perflog-report-live" style="display:none;margin-top:10px"></div>
     </div>
+    <!-- PerfLog: статичный блок «Подробности» — последняя завершённая генерация отчёта.
+         Остаётся видимым после завершения; кнопки «📥 Скачать лог отчёта» и
+         «💰 Лог цен отчёта» появляются внутри блока. -->
+    <div id="perflog-report-details" style="display:none;margin-top:14px"></div>
   </div>
   <div class="card" id="report-result-card" style="display:none">
     <div class="card-title"><div class="card-title-icon icon-amber">📄</div>Отчёт</div>
@@ -1025,6 +1032,14 @@ textarea.pc-input{resize:vertical;min-height:60px;line-height:1.5}
 
     <div id="presentation-status"></div>
     <div id="presentation-progress" style="display:none;margin-top:14px"></div>
+    <!-- PerfLog: живой блок «Подробности» во время генерации презентации.
+         Не вкладываем в #presentation-progress — тот пересоздаётся через innerHTML
+         в generatePresentation, и блок бы пропадал после каждого запуска. -->
+    <div id="perflog-presentation-live" style="display:none;margin-top:10px"></div>
+    <!-- PerfLog: статичный блок «Подробности» — последняя завершённая генерация
+         презентации. Кнопки «📥 Скачать лог презентации» и «💰 Лог цен презентации»
+         появляются внутри блока. -->
+    <div id="perflog-presentation-details" style="display:none;margin-top:14px"></div>
 
     <div id="presentation-result-card" style="display:none;margin-top:18px;padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px">
       <div style="font-size:13px;font-weight:600;color:#1e293b;margin-bottom:10px">Готовая презентация</div>
@@ -2758,6 +2773,49 @@ const PerfLog = {
       root.innerHTML = this._renderOpDetailsHtml(lastOp, true);
       this._attachToggleHandler(root, true);
     }
+
+    // ── 3. Отчёт и Презентация — отдельные операции, своя сессия каждая.
+    // В отличие от шагов 1/2/3 НЕ фильтруем по currentSessionId: каждый запуск
+    // отчёта/презентации = независимая сессия, и UI должен показывать ПОСЛЕДНЮЮ
+    // операцию этого имени из history, даже если currentSessionId сейчас другая
+    // (например, юзер сгенерил отчёт, потом загрузил новое видео — лог отчёта
+    // должен оставаться доступным).
+    ['report', 'presentation'].forEach(opName => {
+      const liveEl = document.getElementById('perflog-' + opName + '-live');
+      const detailsEl = document.getElementById('perflog-' + opName + '-details');
+      const isActive = this.currentOp && this.currentOp.name === opName;
+
+      // Живой блок — только если эта операция сейчас активна
+      if (liveEl) {
+        if (isActive) {
+          liveEl.style.display = '';
+          liveEl.innerHTML = this._renderOpDetailsHtml(this.currentOp, false);
+          this._attachToggleHandler(liveEl, false);
+        } else {
+          liveEl.style.display = 'none';
+          liveEl.innerHTML = '';
+        }
+      }
+
+      // Статичный блок — последняя завершённая операция этого имени из history
+      if (detailsEl) {
+        if (isActive) {
+          // Не дублируем с живым блоком
+          detailsEl.style.display = 'none';
+          detailsEl.innerHTML = '';
+          return;
+        }
+        const lastOp = this.history.find(r => r.name === opName);
+        if (!lastOp) {
+          detailsEl.style.display = 'none';
+          detailsEl.innerHTML = '';
+          return;
+        }
+        detailsEl.style.display = '';
+        detailsEl.innerHTML = this._renderOpDetailsHtml(lastOp, true);
+        this._attachToggleHandler(detailsEl, true);
+      }
+    });
   },
 
   // Хелпер: формирует HTML для деталей одной операции (живой или завершённой).
@@ -2812,16 +2870,25 @@ const PerfLog = {
     // Block 8: кнопка «Скачать лог» внутри блока «Подробности».
     // Показываем ТОЛЬКО когда операция завершена (isFinal=true) — во время
     // выполнения лога ещё нет, скачивать нечего. Перенесена из шапки шага.
-    const stepByName = { upload: 1, transcribe: 2, generate: 3 };
-    const stepNum = stepByName[op.name] || '?';
+    // Лейблы:
+    //   upload/transcribe/generate — «Шага N» (часть сессии протокола)
+    //   report/presentation — «отчёта»/«презентации» (отдельные сессии)
+    const opLabels = {
+      upload:       'Шага 1',
+      transcribe:   'Шага 2',
+      generate:     'Шага 3',
+      report:       'отчёта',
+      presentation: 'презентации'
+    };
+    const opLabel = opLabels[op.name] || ('«' + op.name + '»');
     const downloadBtnHtml = isFinal
       ? '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed #e2e8f0;display:flex;justify-content:flex-end;gap:8px">' +
           '<button type="button" onclick="PerfLog.downloadByOpName(\'' + op.name + '\')" ' +
             'style="font-size:12px;padding:6px 12px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;border-radius:6px;cursor:pointer;font-weight:500" ' +
-            'title="Скачать .txt лог Шага ' + stepNum + '">📥 Скачать лог Шага ' + stepNum + '</button>' +
+            'title="Скачать .txt лог ' + opLabel + '">📥 Скачать лог ' + opLabel + '</button>' +
           '<button type="button" onclick="CostTracker.downloadByOpName(\'' + op.name + '\')" ' +
             'style="font-size:12px;padding:6px 12px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:6px;cursor:pointer;font-weight:500" ' +
-            'title="Скачать .txt лог цен и токенов Шага ' + stepNum + '">💰 Лог цен Шага ' + stepNum + '</button>' +
+            'title="Скачать .txt лог цен и токенов ' + opLabel + '">💰 Лог цен ' + opLabel + '</button>' +
         '</div>'
       : '';
 
@@ -9304,6 +9371,11 @@ async function generateReport() {
   const instr = document.getElementById('report-instructions').value.trim();
   const btn = document.querySelector('#page-report .btn-primary');
 
+  // PerfLog: каждый запуск отчёта — своя независимая сессия. SessionId передаём в
+  // meta — startOp прокинет её в CostTracker для группировки токенов.
+  const _reportSessionId = 'rep_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  let _perfStarted = false;
+
   try {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Готовлю...'; }
 
@@ -9335,6 +9407,22 @@ async function generateReport() {
     // Уникальные области среди всех протоколов
     const usedAreaIds = [...new Set(selectedProtocols.flatMap(p => p.functionalAreaIds || []))];
 
+    // PerfLog: стартуем операцию (после сбора meta, чтобы знать размерности)
+    try {
+      PerfLog.startOp('report', `Отчёт об обследовании: ${project.name}`, {
+        sessionId: _reportSessionId,
+        projectId: project.id,
+        projectName: project.name,
+        protocolsCount: selectedProtocols.length,
+        areasCount: usedAreaIds.length,
+        allToBeThesesCount: allToBeTheses.length,
+        totalProtocolsChars: selectedProtocols.reduce((s, p) => s + (p.protocol || '').length, 0),
+        hasInstructions: !!instr
+      });
+      _perfStarted = true;
+      PerfLog.step('Подготовка данных и сбор тезисов');
+    } catch (_) {}
+
     // ── 3. Запускаем Gemini-вызовы ──────────────────────
     // Block 6 v4: прогресс-бар. Всего N=2+usedAreaIds.length промисов.
     // 0%   — старт
@@ -9357,29 +9445,33 @@ async function generateReport() {
       if (barEl) barEl.style.width = `${pct}%`;
       if (noteEl && note !== undefined) noteEl.textContent = note;
     };
-    const onCallDone = () => {
+    // PerfLog: на каждое завершение параллельного промиса логируем "получен ответ #N".
+    // callerLabel — какой именно ответ пришёл (введение / глоссарий / область X).
+    const onCallDone = (callerLabel) => {
       doneCalls++;
       const pct = 5 + 85 * (doneCalls / totalCalls);
       setReportProgress(pct, `🤖 Получено ответов от Gemini: ${doneCalls} из ${totalCalls}`,
         `Параллельные запросы: введение, глоссарий, ${usedAreaIds.length} ${pluralizeRu(usedAreaIds.length, 'область', 'области', 'областей')}`);
+      try { PerfLog.step(`Ответ ${doneCalls}/${totalCalls}: ${callerLabel}`); } catch (_) {}
     };
 
     setReportProgress(5, '📤 Отправляю запросы в Gemini…', `Всего параллельных запросов: ${totalCalls}`);
+    try { PerfLog.step(`Отправлено параллельных запросов: ${totalCalls}`); } catch (_) {}
     // Чистим старый текстовый статус — теперь его роль играет прогресс-бар
     showStatus('report-status', '', '');
 
     const introPromise = callGemini([{
       text: REPORT_INTRO_PROMPT(project, protocolsMeta, allToBeTheses, instr)
-    }]).then(r => { onCallDone(); return r; })
-      .catch(e => { onCallDone(); throw e; });
+    }]).then(r => { onCallDone('введение и цели'); return r; })
+      .catch(e => { onCallDone('введение и цели (ошибка)'); throw e; });
 
     const combinedProtocolsText = selectedProtocols.map(p =>
       `=== ${p.title} (${p.date}) ===\n${p.protocol}`
     ).join('\n\n');
     const glossaryPromise = callGemini([{
       text: REPORT_GLOSSARY_PROMPT(combinedProtocolsText)
-    }]).then(r => { onCallDone(); return r; })
-      .catch(e => { onCallDone(); throw e; });
+    }]).then(r => { onCallDone('глоссарий'); return r; })
+      .catch(e => { onCallDone('глоссарий (ошибка)'); throw e; });
 
     // AS-IS по каждой функциональной области — параллельно
     const areaPromises = usedAreaIds.map(aid => {
@@ -9387,8 +9479,8 @@ async function generateReport() {
       const asIsTheses = (thesesByArea[aid] || []).filter(t => t.asIs);
       return callGemini([{
         text: REPORT_AREA_AS_IS_PROMPT(areaName, asIsTheses)
-      }]).then(text => { onCallDone(); return { areaId: aid, areaName, text }; })
-        .catch(e => { onCallDone(); return { areaId: aid, areaName, text: `[Ошибка генерации: ${e.message}]` }; });
+      }]).then(text => { onCallDone(`область «${areaName}»`); return { areaId: aid, areaName, text }; })
+        .catch(e => { onCallDone(`область «${areaName}» (ошибка)`); return { areaId: aid, areaName, text: `[Ошибка генерации: ${e.message}]` }; });
     });
 
     // ── 4. Ожидание всех вызовов ──────────────────────
@@ -9397,6 +9489,7 @@ async function generateReport() {
     ]);
 
     setReportProgress(92, '🔧 Парсинг результатов и сборка отчёта…', '');
+    try { PerfLog.step('Парсинг ответов и сборка структуры отчёта'); } catch (_) {}
 
     // ── 5. Парсинг результатов ──────────────────────
     const introBlocks = parseReportIntroBlocks(introRaw);
@@ -9422,22 +9515,46 @@ async function generateReport() {
 
     // Block 4: автосохранение в Библиотеку → подвкладка «Отчёты»
     let _savedVersion = '';
+    let _savedVersionNum = null;
     try {
       const savedRep = saveReportToLibrary(reportData);
-      if (savedRep) _savedVersion = ` (версия ${savedRep.version})`;
+      if (savedRep) {
+        _savedVersion = ` (версия ${savedRep.version})`;
+        _savedVersionNum = savedRep.version;
+      }
     } catch (e) {
       console.warn('[reports] не удалось сохранить в библиотеку', e);
     }
+    try { PerfLog.step('Сохранение в библиотеку отчётов'); } catch (_) {}
     setReportProgress(100, '✅ Готово!', '');
     setTimeout(() => { if (progressEl) progressEl.style.display = 'none'; }, 1200);
     showStatus('report-status', 'success', `✅ Отчёт готов${_savedVersion}! Скачай .docx ниже или вернись к нему позже через «Библиотека → Отчёты».`);
+
+    // PerfLog: успех
+    try {
+      PerfLog.endOp('ok', {
+        reportVersion: _savedVersionNum,
+        reportChars: (currentReportText || '').length,
+        glossaryItemsCount: glossaryItems.length,
+        areaSectionsCount: areaResults.length
+      });
+      _perfStarted = false;
+    } catch (_) {}
   } catch (e) {
     console.error('[report] generation failed:', e);
     const progressEl2 = document.getElementById('report-progress');
     if (progressEl2) progressEl2.style.display = 'none';
     showStatus('report-status', 'error', `Ошибка: ${e.message}`);
+    // PerfLog: ошибка
+    try {
+      if (_perfStarted) { PerfLog.endOp('error', { errMsg: e.message }); _perfStarted = false; }
+    } catch (_) {}
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '✨ Создать отчёт'; }
+    // Защита: если операция почему-то не была закрыта (нестандартный путь выхода) — закрываем сейчас
+    try {
+      if (_perfStarted) { PerfLog.endOp('error', { errMsg: 'неожиданный путь завершения' }); }
+    } catch (_) {}
   }
 }
 
@@ -9766,7 +9883,27 @@ async function generatePresentation() {
     if (n && note !== undefined) n.textContent = note;
   };
 
+  // PerfLog: каждый запуск презентации — своя независимая сессия.
+  const _presSessionId = 'pres_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  let _perfStarted = false;
+
   try {
+    // PerfLog: стартуем операцию
+    try {
+      const reportDataSize = JSON.stringify(rd).length;
+      PerfLog.startOp('presentation', `Презентация: ${rd.project.name || '(без названия)'} (из отчёта v${report.version || '?'})`, {
+        sessionId: _presSessionId,
+        projectId: rd.project.id,
+        projectName: rd.project.name,
+        reportId: report.id,
+        reportVersion: report.version,
+        areaSectionsCount: (rd.areaSections || []).length,
+        reportDataSize
+      });
+      _perfStarted = true;
+      PerfLog.step('Подготовка данных и группировка тезисов');
+    } catch (_) {}
+
     // ── 1. Подготовка: команда, тезисы по областям ──
     const nsi = getNSI();
     const customerCurator = getProjectCurator(rd.project, 'customer', nsi);
@@ -9789,29 +9926,33 @@ async function generatePresentation() {
     // Block 6 v4: реальный прогресс по мере завершения промисов
     const totalRequests = 1 + (rd.areaSections || []).length;
     let doneRequests = 0;
-    const onPresCallDone = () => {
+    // PerfLog: каждое завершение параллельного промиса = отдельный шаг в логе
+    const onPresCallDone = (callerLabel) => {
       doneRequests++;
       const pct = 5 + 70 * (doneRequests / totalRequests);
       setProgress(`🤖 Получено ответов от Gemini: ${doneRequests} из ${totalRequests}`, pct,
         `Параллельные запросы: общий обзор + ${(rd.areaSections || []).length} ${pluralizeRu((rd.areaSections || []).length, 'область', 'области', 'областей')}`);
+      try { PerfLog.step(`Ответ ${doneRequests}/${totalRequests}: ${callerLabel}`); } catch (_) {}
     };
     setProgress('📤 Отправляю запросы в Gemini…', 5, `Всего параллельных запросов: ${totalRequests}`);
+    try { PerfLog.step(`Отправлено параллельных запросов: ${totalRequests}`); } catch (_) {}
 
     const overviewPromise = callGemini([{
       text: PRESENTATION_OVERVIEW_PROMPT(rd.project, rd.sectionIntro, rd.sectionGoals, rd.protocolsMeta, customerCurator)
-    }]).then(r => { onPresCallDone(); return r; })
-      .catch(e => { onPresCallDone(); throw e; });
+    }]).then(r => { onPresCallDone('общий обзор'); return r; })
+      .catch(e => { onPresCallDone('общий обзор (ошибка)'); throw e; });
 
     const areaPromises = (rd.areaSections || []).map(area =>
       callGemini([{
         text: PRESENTATION_AREA_PROMPT(area.areaName, area.text, thesesByArea[area.areaId] || [])
-      }]).then(raw => { onPresCallDone(); return { areaId: area.areaId, areaName: area.areaName, raw }; })
-        .catch(e => { onPresCallDone(); return { areaId: area.areaId, areaName: area.areaName, raw: '[]', error: e.message }; })
+      }]).then(raw => { onPresCallDone(`область «${area.areaName}»`); return { areaId: area.areaId, areaName: area.areaName, raw }; })
+        .catch(e => { onPresCallDone(`область «${area.areaName}» (ошибка)`); return { areaId: area.areaId, areaName: area.areaName, raw: '[]', error: e.message }; })
     );
 
     const [overviewRaw, ...areaResults] = await Promise.all([overviewPromise, ...areaPromises]);
 
     setProgress('Парсинг ответов...', 80, '');
+    try { PerfLog.step('Парсинг JSON-ответов Gemini'); } catch (_) {}
 
     // ── 3. Парсинг ──
     const overviewParsed = parsePresentationJSON(overviewRaw, {
@@ -9836,6 +9977,7 @@ async function generatePresentation() {
     });
 
     setProgress('Сборка структуры презентации...', 92, '');
+    try { PerfLog.step('Сборка структуры презентации'); } catch (_) {}
 
     // ── 4. Финальная структура презентации ──
     const presentation = {
@@ -9866,6 +10008,7 @@ async function generatePresentation() {
     const saved = savePresentationToLibrary(presentation);
     if (saved) presentation.version = saved.version;
     currentPresentation = presentation;
+    try { PerfLog.step('Сохранение в библиотеку презентаций'); } catch (_) {}
 
     setProgress('✅ Готово!', 100, '');
     setTimeout(() => { progressEl.style.display = 'none'; }, 1200);
@@ -9883,12 +10026,30 @@ async function generatePresentation() {
     `;
     resultEl.style.display = 'block';
     resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // PerfLog: успех
+    try {
+      PerfLog.endOp('ok', {
+        presentationVersion: saved ? saved.version : null,
+        areaSlidesCount: areaSlides.length,
+        totalSlideCount: slideCount
+      });
+      _perfStarted = false;
+    } catch (_) {}
   } catch (e) {
     console.error('[presentation] generation failed:', e);
     showStatus('presentation-status', 'error', `Ошибка: ${e.message}`);
     progressEl.style.display = 'none';
+    // PerfLog: ошибка
+    try {
+      if (_perfStarted) { PerfLog.endOp('error', { errMsg: e.message }); _perfStarted = false; }
+    } catch (_) {}
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '✨ Создать презентацию'; }
+    // Защита: если операция не закрылась штатно — закрываем сейчас
+    try {
+      if (_perfStarted) { PerfLog.endOp('error', { errMsg: 'неожиданный путь завершения' }); }
+    } catch (_) {}
   }
 }
 
